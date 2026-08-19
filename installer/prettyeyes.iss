@@ -77,48 +77,77 @@ const
   TextStrong = $F0F0F0;
   TextDim = $9A9A9A;
 
-procedure PaintPage(Page: TNewNotebookPage);
+procedure PaintControl(Control: TControl); forward;
+
+procedure PaintChildren(Parent: TWinControl);
 var
   Index: Integer;
-  Child: TControl;
+begin
+  for Index := 0 to Parent.ControlCount - 1 do
+    PaintControl(Parent.Controls[Index]);
+end;
+
+procedure PaintControl(Control: TControl);
+begin
+  // Inno nests controls inside panels, so a single pass over the direct
+  // children of a page leaves half the wizard white.
+  if Control is TNewStaticText then
+  begin
+    TNewStaticText(Control).Font.Color := TextStrong;
+    TNewStaticText(Control).Color := Bg;
+  end
+  else if Control is TNewCheckBox then
+  begin
+    TNewCheckBox(Control).Font.Color := TextStrong;
+    TNewCheckBox(Control).Color := Bg;
+  end
+  else if Control is TNewRadioButton then
+  begin
+    TNewRadioButton(Control).Font.Color := TextStrong;
+    TNewRadioButton(Control).Color := Bg;
+  end
+  else if Control is TNewCheckListBox then
+  begin
+    TNewCheckListBox(Control).Color := Bg;
+    TNewCheckListBox(Control).Font.Color := TextStrong;
+    TNewCheckListBox(Control).BorderStyle := bsNone;
+  end
+  else if Control is TNewEdit then
+  begin
+    TNewEdit(Control).Color := BgDeep;
+    TNewEdit(Control).Font.Color := TextStrong;
+  end
+  else if Control is TNewMemo then
+  begin
+    TNewMemo(Control).Color := BgDeep;
+    TNewMemo(Control).Font.Color := TextStrong;
+  end
+  else if Control is TListBox then
+  begin
+    TListBox(Control).Color := BgDeep;
+    TListBox(Control).Font.Color := TextStrong;
+  end
+  else if Control is TLabel then
+  begin
+    TLabel(Control).Font.Color := TextDim;
+    TLabel(Control).Transparent := True;
+  end
+  else if Control is TBevel then
+    TBevel(Control).Visible := False
+  else if Control is TPanel then
+  begin
+    TPanel(Control).Color := Bg;
+    TPanel(Control).BevelOuter := bvNone;
+  end;
+
+  if Control is TWinControl then
+    PaintChildren(TWinControl(Control));
+end;
+
+procedure PaintPage(Page: TNewNotebookPage);
 begin
   Page.Color := Bg;
-
-  for Index := 0 to Page.ControlCount - 1 do
-  begin
-    Child := Page.Controls[Index];
-
-    if Child is TNewStaticText then
-    begin
-      TNewStaticText(Child).Font.Color := TextStrong;
-      TNewStaticText(Child).Color := Bg;
-    end
-    else if Child is TNewCheckBox then
-    begin
-      TNewCheckBox(Child).Font.Color := TextStrong;
-      TNewCheckBox(Child).Color := Bg;
-    end
-    else if Child is TNewCheckListBox then
-    begin
-      TNewCheckListBox(Child).Color := Bg;
-      TNewCheckListBox(Child).Font.Color := TextStrong;
-      TNewCheckListBox(Child).BorderStyle := bsNone;
-    end
-    else if Child is TNewEdit then
-    begin
-      TNewEdit(Child).Color := BgDeep;
-      TNewEdit(Child).Font.Color := TextStrong;
-    end
-    else if Child is TNewMemo then
-    begin
-      TNewMemo(Child).Color := BgDeep;
-      TNewMemo(Child).Font.Color := TextStrong;
-    end
-    else if Child is TLabel then
-      TLabel(Child).Font.Color := TextDim
-    else if Child is TBevel then
-      TBevel(Child).Visible := False;
-  end;
+  PaintChildren(Page);
 end;
 
 procedure PaintForm();
@@ -133,7 +162,11 @@ begin
     Child := WizardForm.Controls[Index];
 
     if Child is TPanel then
-      TPanel(Child).Color := Bg
+    begin
+      TPanel(Child).Color := Bg;
+      TPanel(Child).BevelOuter := bvNone;
+      PaintChildren(TWinControl(Child));
+    end
     else if Child is TBevel then
       TBevel(Child).Visible := False;
   end;
