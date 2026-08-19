@@ -43,8 +43,8 @@ public sealed class OverlaySession
             window.ToolFactory = () => _activeTool is null ? null : CreateTool(_activeTool.Value);
             window.ToolbarControl.ToolPicked += OnToolPicked;
             window.ToolbarControl.UndoClicked += OnUndoRequested;
-            window.ToolbarControl.CopyClicked += async (_, _) => await SendAsync(_services.Clipboard);
-            window.ToolbarControl.SaveClicked += async (_, _) => await SendAsync(_services.File);
+            window.ToolbarControl.CopyClicked += OnCopyClicked;
+            window.ToolbarControl.SaveClicked += OnSaveClicked;
 
             _windows.Add(window);
             window.PlaceOn(monitor, Document);
@@ -160,6 +160,32 @@ public sealed class OverlaySession
     {
         Document?.Add(annotation);
         Redraw();
+    }
+
+    private async void OnCopyClicked(object? sender, EventArgs e) => await SendSafelyAsync(_services.Clipboard);
+
+    private async void OnSaveClicked(object? sender, EventArgs e) => await SendSafelyAsync(_services.File);
+
+    /// <summary>
+    /// An async event handler is the one place where an exception has nowhere
+    /// to go, so it is caught here and shown instead of killing the process.
+    /// </summary>
+    private async Task SendSafelyAsync(IImageSink sink)
+    {
+        try
+        {
+            await SendAsync(sink);
+        }
+        catch (IOException ex)
+        {
+            SetTopmost(true);
+            ShowError(ex.Message);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            SetTopmost(true);
+            ShowError(ex.Message);
+        }
     }
 
     private async Task SendAsync(IImageSink sink)

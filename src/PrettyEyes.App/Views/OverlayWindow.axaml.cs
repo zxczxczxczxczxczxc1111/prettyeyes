@@ -175,7 +175,10 @@ public partial class OverlayWindow : Window
     /// </summary>
     private void PlaceChip(CaptureRect selection, double localX, double localTop, bool toolbarAbove)
     {
-        Chip.Update(selection);
+        // The renderer crops the selection to the captured frame, so the chip
+        // has to show the cropped size or it promises pixels that never arrive.
+        var visible = selection.Intersect(_frameBounds);
+        Chip.Update(visible.IsEmpty ? selection : visible);
         Chip.IsVisible = true;
         Chip.Margin = default;
         Chip.Measure(Size.Infinity);

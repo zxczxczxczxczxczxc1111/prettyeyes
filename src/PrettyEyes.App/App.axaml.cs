@@ -40,7 +40,7 @@ public partial class App : Application
             // and the coordinates no longer describe the same desktop.
             Services.Hotkeys.DisplayChanged += (_, _) => _session?.Close();
 
-            desktop.ShutdownRequested += (_, _) => Services.Hotkeys.Dispose();
+            desktop.ShutdownRequested += (_, _) => Services.Dispose();
         }
 
         base.OnFrameworkInitializationCompleted();

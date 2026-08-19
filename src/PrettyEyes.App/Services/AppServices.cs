@@ -12,7 +12,7 @@ namespace PrettyEyes.App.Services;
 /// Composition root. Everything the app needs is created here once, in a known
 /// order, so no other class has to go looking for its dependencies.
 /// </summary>
-public sealed class AppServices
+public sealed class AppServices : IDisposable
 {
     private AppServices(
         HostWindow host,
@@ -134,5 +134,16 @@ public sealed class AppServices
             RegionHotkeyRegistered = regionRegistered,
             FullScreenHotkeyRegistered = fullScreenRegistered,
         };
+    }
+
+    /// <summary>
+    /// Called on shutdown. The D3D11 device and the tray entry belong to us and
+    /// should not wait for process teardown to be released.
+    /// </summary>
+    public void Dispose()
+    {
+        Hotkeys.Dispose();
+        (Capture as IDisposable)?.Dispose();
+        (Notifier as IDisposable)?.Dispose();
     }
 }
