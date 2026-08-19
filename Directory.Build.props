@@ -4,5 +4,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
+    <!-- One place for the version: the installer reads its own copy in prettyeyes.iss. -->
+    <Version>1.0.1</Version>
   </PropertyGroup>
 </Project>
