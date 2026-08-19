@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
+using PrettyEyes.Core.Tools;
 using CaptureRect = PrettyEyes.Core.Geometry.CaptureRect;
 
 namespace PrettyEyes.App.Views;
@@ -15,6 +16,8 @@ public partial class OverlayWindow : Window
     private int _anchorX;
     private int _anchorY;
     private bool _dragging;
+    private OverlayMode _mode = OverlayMode.Selecting;
+    private ITool? _tool;
 
     public OverlayWindow() => InitializeComponent();
 
@@ -23,6 +26,15 @@ public partial class OverlayWindow : Window
     public event EventHandler? Cancelled;
 
     public event EventHandler? UndoRequested;
+
+    /// <summary>Raised once a tool gesture produced a shape.</summary>
+    public event EventHandler<IAnnotation>? AnnotationDrawn;
+
+    /// <summary>
+    /// Asks the session for a fresh tool instance, one per gesture. Null means
+    /// no tool is active yet, which keeps the window free of tool state.
+    /// </summary>
+    public Func<ITool>? ToolFactory { get; set; }
 
     /// <summary>
     /// Places the window over one monitor. Show() comes first on purpose: the
@@ -141,6 +153,16 @@ public partial class OverlayWindow : Window
         base.OnPointerPressed(e);
 
         var (x, y) = ToVirtualPixels(e.GetPosition(this));
+
+        if (_mode == OverlayMode.Drawing)
+        {
+            _tool = ToolFactory?.Invoke();
+            _tool?.Begin(x, y);
+            _dragging = true;
+            e.Pointer.Capture(this);
+            return;
+        }
+
         _anchorX = x;
         _anchorY = y;
         _dragging = true;
@@ -160,6 +182,13 @@ public partial class OverlayWindow : Window
         }
 
         var (x, y) = ToVirtualPixels(e.GetPosition(this));
+
+        if (_mode == OverlayMode.Drawing)
+        {
+            Surface.ShowPreview(_tool?.Preview(x, y));
+            return;
+        }
+
         SelectionChanged?.Invoke(this, CaptureRect.FromPoints(_anchorX, _anchorY, x, y));
     }
 
@@ -167,8 +196,33 @@ public partial class OverlayWindow : Window
     {
         base.OnPointerReleased(e);
 
+        if (!_dragging)
+        {
+            return;
+        }
+
         _dragging = false;
         e.Pointer.Capture(null);
+
+        var (x, y) = ToVirtualPixels(e.GetPosition(this));
+
+        if (_mode == OverlayMode.Drawing)
+        {
+            var annotation = _tool?.End(x, y);
+            _tool = null;
+            Surface.ShowPreview(null);
+
+            if (annotation is not null)
+            {
+                AnnotationDrawn?.Invoke(this, annotation);
+            }
+
+            return;
+        }
+
+        // The first released selection switches the overlay into drawing:
+        // from here the same three events feed the active tool.
+        _mode = OverlayMode.Drawing;
     }
 
     protected override void OnKeyDown(KeyEventArgs e)

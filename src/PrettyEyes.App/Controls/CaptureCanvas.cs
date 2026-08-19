@@ -21,6 +21,7 @@ public sealed class CaptureCanvas : Control
     private CaptureRect _monitorBounds;
     private CaptureRect _selection;
     private Document? _document;
+    private IAnnotation? _preview;
 
     public void Attach(Document document, CaptureRect monitorBounds)
     {
@@ -34,6 +35,16 @@ public sealed class CaptureCanvas : Control
     public void ShowSelection(CaptureRect selection)
     {
         _selection = selection;
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// The shape the active tool would produce if the gesture ended now. Drawn
+    /// on top of the stored annotations and never added to the document.
+    /// </summary>
+    public void ShowPreview(IAnnotation? annotation)
+    {
+        _preview = annotation;
         InvalidateVisual();
     }
 
@@ -54,6 +65,7 @@ public sealed class CaptureCanvas : Control
             _monitorBounds,
             _selection,
             annotations,
+            _preview,
             (float)(VisualRoot?.RenderScaling ?? 1.0)));
     }
 
@@ -68,11 +80,13 @@ public sealed class CaptureCanvas : Control
         private readonly CaptureRect _monitor;
         private readonly CaptureRect _selection;
         private readonly IReadOnlyList<IAnnotation> _annotations;
+        private readonly IAnnotation? _preview;
         private readonly float _scaling;
 
         public CaptureDrawOperation(
             Rect bounds, SKImage source, CaptureRect frame, CaptureRect monitor,
-            CaptureRect selection, IReadOnlyList<IAnnotation> annotations, float scaling)
+            CaptureRect selection, IReadOnlyList<IAnnotation> annotations,
+            IAnnotation? preview, float scaling)
         {
             Bounds = bounds;
             _source = source;
@@ -80,6 +94,7 @@ public sealed class CaptureCanvas : Control
             _monitor = monitor;
             _selection = selection;
             _annotations = annotations;
+            _preview = preview;
             _scaling = scaling;
         }
 
@@ -125,6 +140,8 @@ public sealed class CaptureCanvas : Control
                 {
                     annotation.Draw(canvas, _source, _frame);
                 }
+
+                _preview?.Draw(canvas, _source, _frame);
 
                 DrawSelectionFrame(canvas);
             }

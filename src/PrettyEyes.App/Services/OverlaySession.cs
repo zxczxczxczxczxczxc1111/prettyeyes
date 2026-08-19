@@ -2,6 +2,7 @@ using PrettyEyes.App.Views;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Platform;
+using PrettyEyes.Core.Tools;
 using CaptureRect = PrettyEyes.Core.Geometry.CaptureRect;
 
 namespace PrettyEyes.App.Services;
@@ -15,6 +16,7 @@ public sealed class OverlaySession
     private readonly AppServices _services;
     private readonly List<OverlayWindow> _windows = [];
     private DesktopLayout? _layout;
+    private ToolKind _activeTool = ToolKind.Blur;
     private bool _closed;
 
     public OverlaySession(AppServices services) => _services = services;
@@ -35,6 +37,10 @@ public sealed class OverlaySession
             window.SelectionChanged += OnSelectionChanged;
             window.Cancelled += (_, _) => Close();
             window.UndoRequested += OnUndoRequested;
+            window.AnnotationDrawn += OnAnnotationDrawn;
+            window.ToolFactory = () => CreateTool(_activeTool);
+            window.ToolbarControl.ToolPicked += OnToolPicked;
+            window.ToolbarControl.UndoClicked += OnUndoRequested;
 
             _windows.Add(window);
             window.PlaceOn(monitor, Document);
@@ -105,6 +111,32 @@ public sealed class OverlaySession
         }
     }
 
+    private void OnToolPicked(object? sender, ToolKind kind)
+    {
+        _activeTool = kind;
+
+        // Only the visible toolbar raised this, but the others have to agree:
+        // the selection can move to another monitor mid-session.
+        foreach (var window in _windows)
+        {
+            window.ToolbarControl.SetActive(kind);
+        }
+    }
+
+    private void OnAnnotationDrawn(object? sender, IAnnotation annotation)
+    {
+        Document?.Add(annotation);
+        Redraw();
+    }
+
+    private static ITool CreateTool(ToolKind kind) => kind switch
+    {
+        ToolKind.Blur => new BlurTool(),
+        ToolKind.Arrow => new ArrowTool(),
+        ToolKind.Rectangle => new RectangleTool(),
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown tool."),
+    };
+
     public void Redraw()
     {
         if (Document is null)
@@ -114,6 +146,8 @@ public sealed class OverlaySession
 
         foreach (var window in _windows)
         {
+            // ShowSelection repaints the canvas, which is what makes a new
+            // annotation appear on the neighbouring monitor as well.
             window.ShowSelection(Document.Selection);
         }
     }
