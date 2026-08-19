@@ -4,5 +4,6 @@ public enum ToolKind
 {
     Blur,
     Arrow,
+    Line,
     Rectangle,
 }

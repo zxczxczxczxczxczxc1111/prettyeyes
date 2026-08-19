@@ -56,6 +56,28 @@ public class ToolTests
     }
 
     [Fact]
+    public void LineTool_keeps_both_ends_inside_its_bounds()
+    {
+        var tool = new LineTool();
+        tool.Begin(100, 100);
+
+        var annotation = tool.End(20, 60);
+
+        var line = Assert.IsType<LineAnnotation>(annotation);
+        Assert.True(line.Bounds.Contains(20, 60));
+        Assert.True(line.Bounds.Contains(99, 99));
+    }
+
+    [Fact]
+    public void LineTool_ignores_a_click_without_drag()
+    {
+        var tool = new LineTool();
+        tool.Begin(10, 10);
+
+        Assert.Null(tool.End(10, 10));
+    }
+
+    [Fact]
     public void RectangleTool_ignores_zero_area_drag()
     {
         var tool = new RectangleTool();

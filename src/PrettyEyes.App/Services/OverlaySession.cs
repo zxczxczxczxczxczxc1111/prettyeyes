@@ -247,6 +247,7 @@ public sealed class OverlaySession
     {
         ToolKind.Blur => new BlurTool(),
         ToolKind.Arrow => new ArrowTool(),
+        ToolKind.Line => new LineTool(),
         ToolKind.Rectangle => new RectangleTool(),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown tool."),
     };

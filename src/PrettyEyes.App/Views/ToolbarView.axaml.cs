@@ -18,6 +18,7 @@ public partial class ToolbarView : UserControl
 
         BlurButton.Click += (_, _) => Pick(ToolKind.Blur);
         ArrowButton.Click += (_, _) => Pick(ToolKind.Arrow);
+        LineButton.Click += (_, _) => Pick(ToolKind.Line);
         RectButton.Click += (_, _) => Pick(ToolKind.Rectangle);
         UndoButton.Click += (_, _) => UndoClicked?.Invoke(this, EventArgs.Empty);
         CopyButton.Click += (_, _) => CopyClicked?.Invoke(this, EventArgs.Empty);
@@ -69,6 +70,7 @@ public partial class ToolbarView : UserControl
     {
         yield return (BlurButton, ToolKind.Blur);
         yield return (ArrowButton, ToolKind.Arrow);
+        yield return (LineButton, ToolKind.Line);
         yield return (RectButton, ToolKind.Rectangle);
     }
 }

@@ -74,6 +74,9 @@
         <Button Classes="tool" x:Name="ArrowButton" ToolTip.Tip="Стрелка">
           <Path Data="M4,12 L12,4 M12,4 H7.5 M12,4 V8.5"/>
         </Button>
+        <Button Classes="tool" x:Name="LineButton" ToolTip.Tip="Линия">
+          <Path Data="M4,12 L12,4"/>
+        </Button>
         <Button Classes="tool" x:Name="RectButton" ToolTip.Tip="Рамка">
           <Path Data="M3.5,4 H12.5 V12 H3.5 Z"/>
         </Button>
