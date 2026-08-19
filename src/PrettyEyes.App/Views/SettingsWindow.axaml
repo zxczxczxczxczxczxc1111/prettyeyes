@@ -1,0 +1,41 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:PrettyEyes.App.Controls"
+        x:Class="PrettyEyes.App.Views.SettingsWindow"
+        Title="prettyeyes"
+        Width="420" Height="240"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource Bg}">
+  <Border Margin="20"
+          Background="{StaticResource Surface}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="1"
+          CornerRadius="{StaticResource RCard}"
+          Padding="20">
+    <StackPanel Spacing="16">
+      <StackPanel Spacing="6">
+        <TextBlock Text="Комбинация клавиш" Foreground="{StaticResource TextDim}" FontSize="12"/>
+        <controls:HotkeyBox x:Name="Hotkey"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Center"
+                            Padding="10,8"
+                            Background="{StaticResource Fill}"
+                            BorderBrush="{StaticResource BorderStrong}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource RField}"
+                            Foreground="{StaticResource TextStrong}"/>
+      </StackPanel>
+
+      <CheckBox x:Name="Autostart"
+                Content="Запускать вместе с Windows"
+                Foreground="{StaticResource Text}"/>
+
+      <TextBlock x:Name="Message"
+                 Foreground="{StaticResource Danger}"
+                 FontSize="12"
+                 TextWrapping="Wrap"
+                 IsVisible="False"/>
+    </StackPanel>
+  </Border>
+</Window>

@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using PrettyEyes.App.Services;
+using PrettyEyes.App.Views;
 using PrettyEyes.Core.Platform;
 
 namespace PrettyEyes.App;
@@ -9,6 +10,7 @@ namespace PrettyEyes.App;
 public partial class App : Application
 {
     private OverlaySession? _session;
+    private SettingsWindow? _settings;
 
     public override void Initialize()
     {
@@ -59,6 +61,40 @@ public partial class App : Application
     }
 
     private void Capture_OnClick(object? sender, EventArgs e) => StartCapture();
+
+    private void Settings_OnClick(object? sender, EventArgs e) => OpenSettings();
+
+    public void OpenSettings()
+    {
+        if (Services is null)
+        {
+            return;
+        }
+
+        // One window, reused: a second copy would fight the first over the
+        // hotkey registration.
+        if (_settings is not null)
+        {
+            _settings.Activate();
+            return;
+        }
+
+        _settings = new SettingsWindow();
+        _settings.Configure(
+            Services.SettingsStore, Services.Hotkeys, Services.Autostart, Services.Settings);
+
+        _settings.Closed += (_, _) =>
+        {
+            if (_settings is not null)
+            {
+                Services.Settings = _settings.Current;
+            }
+
+            _settings = null;
+        };
+
+        _settings.Show();
+    }
 
     private void Exit_OnClick(object? sender, EventArgs e)
     {

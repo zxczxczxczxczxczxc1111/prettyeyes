@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using PrettyEyes.App.Controls;
 using PrettyEyes.Core.Platform;
+using PrettyEyes.Core.Settings;
 using PrettyEyes.Platform.Windows;
 using PrettyEyes.Platform.Windows.Native;
 
@@ -19,7 +21,10 @@ public sealed class AppServices
         IImageSink clipboard,
         IImageSink file,
         INotifier notifier,
-        IHotkeys hotkeys)
+        IHotkeys hotkeys,
+        ISettingsStore settingsStore,
+        IAutostart autostart,
+        AppSettings settings)
     {
         Host = host;
         Monitors = monitors;
@@ -28,6 +33,9 @@ public sealed class AppServices
         File = file;
         Notifier = notifier;
         Hotkeys = hotkeys;
+        SettingsStore = settingsStore;
+        Autostart = autostart;
+        Settings = settings;
     }
 
     public HostWindow Host { get; }
@@ -44,6 +52,13 @@ public sealed class AppServices
 
     public IHotkeys Hotkeys { get; }
 
+    public ISettingsStore SettingsStore { get; }
+
+    public IAutostart Autostart { get; }
+
+    /// <summary>Last known settings; the settings window updates them.</summary>
+    public AppSettings Settings { get; set; }
+
     public static AppServices Build(IClassicDesktopStyleApplicationLifetime lifetime)
     {
         // No main window: closing the last overlay must not quit the app.
@@ -59,16 +74,19 @@ public sealed class AppServices
 
         var notifier = new TrayNotifier(host.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
 
+        var settingsStore = new JsonSettingsStore(JsonSettingsStore.DefaultPath);
+        var settings = settingsStore.Load();
+
         // Built here and not lazily: the message-only window belongs to the
         // thread that creates it, and this runs on the UI thread.
         var hotkeys = new WindowsHotkeys();
-        var hotkey = HotkeyDefinition.Default;
+        var hotkey = settings.Hotkey;
 
         if (!hotkeys.TryRegister(hotkey))
         {
             notifier.Notify(
                 "prettyeyes",
-                $"Комбинация {Describe(hotkey)} занята другой программой. Смени её в настройках.");
+                $"Комбинация {HotkeyBox.Describe(hotkey)} занята другой программой. Смени её в настройках.");
         }
 
         return new AppServices(
@@ -78,38 +96,9 @@ public sealed class AppServices
             new ClipboardSink(clipboard),
             new FileSink(host.StorageProvider, () => DateTimeOffset.Now),
             notifier,
-            hotkeys);
-    }
-
-    /// <summary>Human-readable combination, e.g. "Ctrl + Shift + 4".</summary>
-    public static string Describe(HotkeyDefinition hotkey)
-    {
-        var parts = new List<string>();
-
-        if (hotkey.Modifiers.HasFlag(HotkeyModifiers.Control))
-        {
-            parts.Add("Ctrl");
-        }
-
-        if (hotkey.Modifiers.HasFlag(HotkeyModifiers.Shift))
-        {
-            parts.Add("Shift");
-        }
-
-        if (hotkey.Modifiers.HasFlag(HotkeyModifiers.Alt))
-        {
-            parts.Add("Alt");
-        }
-
-        if (hotkey.Modifiers.HasFlag(HotkeyModifiers.Win))
-        {
-            parts.Add("Win");
-        }
-
-        parts.Add(hotkey.VirtualKey == NativeKeys.PrintScreen
-            ? "PrtScn"
-            : ((char)hotkey.VirtualKey).ToString());
-
-        return string.Join(" + ", parts);
+            hotkeys,
+            settingsStore,
+            new RegistryAutostart(),
+            settings);
     }
 }
