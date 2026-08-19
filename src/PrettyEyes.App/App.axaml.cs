@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using PrettyEyes.App.Services;
 
 namespace PrettyEyes.App;
 
@@ -15,9 +16,11 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            desktop.MainWindow = new MainWindow();
+            Services = AppServices.Build(desktop);
         }
 
         base.OnFrameworkInitializationCompleted();
     }
+
+    public AppServices? Services { get; private set; }
 }
