@@ -20,7 +20,10 @@ public partial class HostWindow : Window
     /// </summary>
     public void ShowHidden()
     {
-        Position = new Avalonia.PixelPoint(-32000, -32000);
         Show();
+
+        // Position only sticks once the native window exists, so it is set
+        // after Show, not before.
+        Position = new Avalonia.PixelPoint(-32000, -32000);
     }
 }

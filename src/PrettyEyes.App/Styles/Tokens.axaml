@@ -1,0 +1,22 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <SolidColorBrush x:Key="Bg" Color="#FF000000"/>
+  <SolidColorBrush x:Key="Surface" Color="#FF0A0A0B"/>
+  <SolidColorBrush x:Key="SurfaceRaised" Color="#FF0F0F10"/>
+  <SolidColorBrush x:Key="TextStrong" Color="#EBFFFFFF"/>
+  <SolidColorBrush x:Key="Text" Color="#B8FFFFFF"/>
+  <SolidColorBrush x:Key="TextDim" Color="#99FFFFFF"/>
+  <SolidColorBrush x:Key="TextFaint" Color="#59FFFFFF"/>
+  <SolidColorBrush x:Key="Border" Color="#0FFFFFFF"/>
+  <SolidColorBrush x:Key="BorderStrong" Color="#1FFFFFFF"/>
+  <SolidColorBrush x:Key="Fill" Color="#0FFFFFFF"/>
+  <SolidColorBrush x:Key="FillHover" Color="#1AFFFFFF"/>
+  <SolidColorBrush x:Key="Accent" Color="#E3FFFFFF"/>
+  <SolidColorBrush x:Key="AccentHover" Color="#C7FFFFFF"/>
+  <SolidColorBrush x:Key="Warn" Color="#FFFBBF24"/>
+  <SolidColorBrush x:Key="Danger" Color="#FFF87171"/>
+  <CornerRadius x:Key="RCard">14</CornerRadius>
+  <CornerRadius x:Key="RField">10</CornerRadius>
+  <CornerRadius x:Key="RChip">6</CornerRadius>
+  <BoxShadows x:Key="Shadow2">0 8 24 0 #73000000</BoxShadows>
+</ResourceDictionary>
