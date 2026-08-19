@@ -58,8 +58,13 @@ public sealed class TrayNotifier : INotifier, IDisposable
     private bool Register()
     {
         var data = NewData();
-        data.uFlags = NativeMethods.NIF_TIP;
+
+        // The shell ignores an icon-less entry, and an ignored entry never
+        // raises a balloon. The stock application icon is enough: this entry
+        // exists for messages, the visible tray icon is Avalonia's.
+        data.uFlags = NativeMethods.NIF_TIP | NativeMethods.NIF_ICON;
         data.szTip = "prettyeyes";
+        data.hIcon = NativeMethods.LoadIcon(IntPtr.Zero, new IntPtr(NativeMethods.IDI_APPLICATION));
 
         _registered = NativeMethods.Shell_NotifyIcon(NativeMethods.NIM_ADD, ref data);
         return _registered;

@@ -20,6 +20,9 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             Services = AppServices.Build(desktop);
+            Services.Hotkeys.Pressed += (_, _) => StartCapture();
+
+            desktop.ShutdownRequested += (_, _) => Services.Hotkeys.Dispose();
         }
 
         base.OnFrameworkInitializationCompleted();

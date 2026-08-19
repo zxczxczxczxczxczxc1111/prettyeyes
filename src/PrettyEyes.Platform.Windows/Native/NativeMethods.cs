@@ -95,8 +95,60 @@ internal static class NativeMethods
         internal IntPtr hBalloonIcon;
     }
 
+    internal const int IDI_APPLICATION = 32512;
+
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     internal static extern bool Shell_NotifyIcon(int message, ref NotifyIconData data);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    internal static extern IntPtr LoadIcon(IntPtr instance, IntPtr iconName);
+
+    internal const int HWND_MESSAGE = -3;
+    internal const int WM_HOTKEY = 0x0312;
+    internal const uint VK_SNAPSHOT = 0x2C;
+
+    internal delegate IntPtr WndProc(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct WndClassEx
+    {
+        internal int cbSize;
+        internal int style;
+        internal WndProc lpfnWndProc;
+        internal int cbClsExtra;
+        internal int cbWndExtra;
+        internal IntPtr hInstance;
+        internal IntPtr hIcon;
+        internal IntPtr hCursor;
+        internal IntPtr hbrBackground;
+        internal string? lpszMenuName;
+        internal string lpszClassName;
+        internal IntPtr hIconSm;
+    }
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern ushort RegisterClassEx(ref WndClassEx windowClass);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern IntPtr CreateWindowEx(
+        int exStyle, string className, string windowName, int style,
+        int x, int y, int width, int height,
+        IntPtr parent, IntPtr menu, IntPtr instance, IntPtr param);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern bool DestroyWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    internal static extern IntPtr DefWindowProc(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint virtualKey);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    internal static extern IntPtr GetModuleHandle(string? moduleName);
 
     [DllImport("user32.dll")]
     internal static extern int GetSystemMetrics(int index);

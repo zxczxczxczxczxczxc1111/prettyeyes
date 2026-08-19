@@ -18,7 +18,8 @@ public sealed class AppServices
         IScreenCapture capture,
         IImageSink clipboard,
         IImageSink file,
-        INotifier notifier)
+        INotifier notifier,
+        IHotkeys hotkeys)
     {
         Host = host;
         Monitors = monitors;
@@ -26,6 +27,7 @@ public sealed class AppServices
         Clipboard = clipboard;
         File = file;
         Notifier = notifier;
+        Hotkeys = hotkeys;
     }
 
     public HostWindow Host { get; }
@@ -40,6 +42,8 @@ public sealed class AppServices
 
     public INotifier Notifier { get; }
 
+    public IHotkeys Hotkeys { get; }
+
     public static AppServices Build(IClassicDesktopStyleApplicationLifetime lifetime)
     {
         // No main window: closing the last overlay must not quit the app.
@@ -53,12 +57,59 @@ public sealed class AppServices
         var clipboard = host.Clipboard
             ?? throw new InvalidOperationException("The host window exposes no clipboard.");
 
+        var notifier = new TrayNotifier(host.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
+
+        // Built here and not lazily: the message-only window belongs to the
+        // thread that creates it, and this runs on the UI thread.
+        var hotkeys = new WindowsHotkeys();
+        var hotkey = HotkeyDefinition.Default;
+
+        if (!hotkeys.TryRegister(hotkey))
+        {
+            notifier.Notify(
+                "prettyeyes",
+                $"Комбинация {Describe(hotkey)} занята другой программой. Смени её в настройках.");
+        }
+
         return new AppServices(
             host,
             monitors,
             new GdiScreenCapture(monitors),
             new ClipboardSink(clipboard),
             new FileSink(host.StorageProvider, () => DateTimeOffset.Now),
-            new TrayNotifier(host.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero));
+            notifier,
+            hotkeys);
+    }
+
+    /// <summary>Human-readable combination, e.g. "Ctrl + Shift + 4".</summary>
+    public static string Describe(HotkeyDefinition hotkey)
+    {
+        var parts = new List<string>();
+
+        if (hotkey.Modifiers.HasFlag(HotkeyModifiers.Control))
+        {
+            parts.Add("Ctrl");
+        }
+
+        if (hotkey.Modifiers.HasFlag(HotkeyModifiers.Shift))
+        {
+            parts.Add("Shift");
+        }
+
+        if (hotkey.Modifiers.HasFlag(HotkeyModifiers.Alt))
+        {
+            parts.Add("Alt");
+        }
+
+        if (hotkey.Modifiers.HasFlag(HotkeyModifiers.Win))
+        {
+            parts.Add("Win");
+        }
+
+        parts.Add(hotkey.VirtualKey == NativeKeys.PrintScreen
+            ? "PrtScn"
+            : ((char)hotkey.VirtualKey).ToString());
+
+        return string.Join(" + ", parts);
     }
 }
