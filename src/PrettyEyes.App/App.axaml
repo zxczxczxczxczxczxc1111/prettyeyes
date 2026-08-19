@@ -11,6 +11,20 @@
         </ResourceDictionary>
     </Application.Resources>
 
+    <TrayIcon.Icons>
+        <TrayIcons>
+            <TrayIcon Icon="/Assets/prettyeyes.ico" ToolTipText="prettyeyes">
+                <TrayIcon.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="Снимок" Click="Capture_OnClick"/>
+                        <NativeMenuItemSeparator/>
+                        <NativeMenuItem Header="Выход" Click="Exit_OnClick"/>
+                    </NativeMenu>
+                </TrayIcon.Menu>
+            </TrayIcon>
+        </TrayIcons>
+    </TrayIcon.Icons>
+
     <Application.Styles>
         <FluentTheme/>
         <Style Selector="Window">

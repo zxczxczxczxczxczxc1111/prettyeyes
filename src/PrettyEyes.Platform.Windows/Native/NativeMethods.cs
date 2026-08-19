@@ -58,6 +58,46 @@ internal static class NativeMethods
         internal int bmiColors;
     }
 
+    internal const int NIM_ADD = 0x00000000;
+    internal const int NIM_DELETE = 0x00000002;
+    internal const int NIM_MODIFY = 0x00000001;
+    internal const int NIF_ICON = 0x00000002;
+    internal const int NIF_TIP = 0x00000004;
+    internal const int NIF_INFO = 0x00000010;
+    internal const int NIIF_INFO = 0x00000001;
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    internal struct NotifyIconData
+    {
+        internal int cbSize;
+        internal IntPtr hWnd;
+        internal int uID;
+        internal int uFlags;
+        internal int uCallbackMessage;
+        internal IntPtr hIcon;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
+        internal string szTip;
+
+        internal int dwState;
+        internal int dwStateMask;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+        internal string szInfo;
+
+        internal int uTimeoutOrVersion;
+
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)]
+        internal string szInfoTitle;
+
+        internal int dwInfoFlags;
+        internal Guid guidItem;
+        internal IntPtr hBalloonIcon;
+    }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    internal static extern bool Shell_NotifyIcon(int message, ref NotifyIconData data);
+
     [DllImport("user32.dll")]
     internal static extern int GetSystemMetrics(int index);
 
