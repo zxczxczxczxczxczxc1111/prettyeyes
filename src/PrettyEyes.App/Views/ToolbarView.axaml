@@ -1,0 +1,52 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PrettyEyes.App.Views.ToolbarView">
+  <UserControl.Styles>
+    <Style Selector="Button.tool">
+      <Setter Property="Width" Value="32"/>
+      <Setter Property="Height" Value="32"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+      <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    </Style>
+    <Style Selector="Button.tool /template/ ContentPresenter">
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.15"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.tool:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource Fill}"/>
+    </Style>
+    <Style Selector="Button.tool.active /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource FillHover}"/>
+      <Setter Property="TextElement.Foreground" Value="{StaticResource TextStrong}"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Border x:Name="Card"
+          Background="{StaticResource Surface}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="1"
+          CornerRadius="{StaticResource RCard}"
+          Padding="6"
+          BoxShadow="{StaticResource Shadow2}"
+          Opacity="0">
+    <Border.Transitions>
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.15"/>
+      </Transitions>
+    </Border.Transitions>
+    <StackPanel Orientation="Horizontal" Spacing="2">
+      <Button Classes="tool active" x:Name="BlurButton" Content="B"/>
+      <Button Classes="tool" x:Name="ArrowButton" Content="A"/>
+      <Button Classes="tool" x:Name="RectButton" Content="R"/>
+      <Rectangle Width="1" Margin="4,4" Fill="{StaticResource Border}"/>
+      <Button Classes="tool" x:Name="UndoButton" Content="U"/>
+      <Button Classes="tool" x:Name="CopyButton" Content="C"/>
+      <Button Classes="tool" x:Name="SaveButton" Content="S"/>
+    </StackPanel>
+  </Border>
+</UserControl>

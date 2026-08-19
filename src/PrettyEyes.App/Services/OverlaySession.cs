@@ -1,4 +1,5 @@
 using PrettyEyes.App.Views;
+using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Platform;
 using CaptureRect = PrettyEyes.Core.Geometry.CaptureRect;
@@ -13,6 +14,7 @@ public sealed class OverlaySession
 {
     private readonly AppServices _services;
     private readonly List<OverlayWindow> _windows = [];
+    private DesktopLayout? _layout;
     private bool _closed;
 
     public OverlaySession(AppServices services) => _services = services;
@@ -24,6 +26,7 @@ public sealed class OverlaySession
     public void Start(CaptureResult capture)
     {
         _closed = false;
+        _layout = capture.Layout;
         Document = new Document(capture.Image, capture.Bounds);
 
         foreach (var monitor in capture.Layout.Monitors)
@@ -56,6 +59,37 @@ public sealed class OverlaySession
         foreach (var window in _windows)
         {
             window.ShowSelection(selection);
+        }
+
+        PlaceToolbar(selection);
+    }
+
+    /// <summary>
+    /// The toolbar belongs to the monitor holding the selection's bottom-right
+    /// corner - otherwise every window would draw its own copy.
+    /// </summary>
+    private void PlaceToolbar(CaptureRect selection)
+    {
+        if (_layout is null)
+        {
+            return;
+        }
+
+        var owner = selection.IsEmpty
+            ? null
+            : _layout.MonitorAt(selection.Right - 1, selection.Bottom - 1)
+              ?? _layout.MonitorAt(selection.X, selection.Y);
+
+        for (var i = 0; i < _windows.Count; i++)
+        {
+            if (owner is not null && _layout.Monitors[i].DeviceId == owner.DeviceId)
+            {
+                _windows[i].PlaceToolbar(selection);
+            }
+            else
+            {
+                _windows[i].HideToolbar();
+            }
         }
     }
 
@@ -99,6 +133,7 @@ public sealed class OverlaySession
         }
 
         _windows.Clear();
+        _layout = null;
 
         // The frame is roughly 29 MB on two 2K monitors - one leak per hotkey
         // press adds up fast.

@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="using:PrettyEyes.App.Controls"
+        xmlns:views="using:PrettyEyes.App.Views"
         x:Class="PrettyEyes.App.Views.OverlayWindow"
         SystemDecorations="None"
         Topmost="True"
@@ -9,5 +10,7 @@
         CanResize="False">
   <Panel x:Name="Root">
     <controls:CaptureCanvas x:Name="Surface"/>
+    <views:SizeChip x:Name="Chip" HorizontalAlignment="Left" VerticalAlignment="Top" IsVisible="False"/>
+    <views:ToolbarView x:Name="Toolbar" HorizontalAlignment="Left" VerticalAlignment="Top" IsVisible="False"/>
   </Panel>
 </Window>

@@ -9,6 +9,8 @@ namespace PrettyEyes.App.Views;
 
 public partial class OverlayWindow : Window
 {
+    private const double Gap = 8;
+
     private CaptureRect _monitorBounds;
     private int _anchorX;
     private int _anchorY;
@@ -44,6 +46,83 @@ public partial class OverlayWindow : Window
     }
 
     public void ShowSelection(CaptureRect selection) => Surface.ShowSelection(selection);
+
+    public ToolbarView ToolbarControl => Toolbar;
+
+    /// <summary>
+    /// Puts the toolbar under the selection, above it when there is no room
+    /// below, and inside it when the selection covers the whole screen.
+    /// Everything here is in logical pixels - it is layout, not model.
+    /// </summary>
+    public void PlaceToolbar(CaptureRect selection)
+    {
+        var scale = RenderScaling;
+        var localX = (selection.X - _monitorBounds.X) / scale;
+        var localBottom = (selection.Bottom - _monitorBounds.Y) / scale;
+        var localTop = (selection.Y - _monitorBounds.Y) / scale;
+
+        Toolbar.IsVisible = true;
+
+        // DesiredSize counts the control's own margin, and the margin is what
+        // this method sets. Without the reset every call would stack the
+        // previous offset on top of the measured size.
+        Toolbar.Margin = default;
+        Toolbar.Measure(Size.Infinity);
+        var size = Toolbar.DesiredSize;
+
+        var y = localBottom + Gap;
+
+        if (y + size.Height > Height)
+        {
+            y = localTop - Gap - size.Height;
+        }
+
+        if (y < 0)
+        {
+            y = Math.Max(0, localBottom - Gap - size.Height);
+        }
+
+        var x = Math.Clamp(localX, 0, Math.Max(0, Width - size.Width));
+
+        Toolbar.Margin = new Thickness(x, y, 0, 0);
+        Toolbar.FadeIn();
+
+        PlaceChip(selection, localX, localTop, toolbarAbove: y < localTop);
+    }
+
+    public void HideToolbar()
+    {
+        Toolbar.FadeOut();
+        Toolbar.IsVisible = false;
+        Chip.FadeOut();
+        Chip.IsVisible = false;
+    }
+
+    /// <summary>
+    /// Sits above the selection's top-left corner, and moves inside it when
+    /// there is no room up there - either the monitor edge is in the way or the
+    /// toolbar has already flipped into that spot.
+    /// </summary>
+    private void PlaceChip(CaptureRect selection, double localX, double localTop, bool toolbarAbove)
+    {
+        Chip.Update(selection);
+        Chip.IsVisible = true;
+        Chip.Margin = default;
+        Chip.Measure(Size.Infinity);
+        var size = Chip.DesiredSize;
+
+        var y = localTop - Gap - size.Height;
+
+        if (y < 0 || toolbarAbove)
+        {
+            y = localTop + Gap;
+        }
+
+        var x = Math.Clamp(localX, 0, Math.Max(0, Width - size.Width));
+
+        Chip.Margin = new Thickness(x, y, 0, 0);
+        Chip.FadeIn();
+    }
 
     /// <summary>
     /// Avalonia hands out logical pixels; the model speaks physical ones.
