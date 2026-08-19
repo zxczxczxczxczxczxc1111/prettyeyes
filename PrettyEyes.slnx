@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PrettyEyes.App/PrettyEyes.App.csproj" />
+    <Project Path="src/PrettyEyes.Core/PrettyEyes.Core.csproj" />
+    <Project Path="src/PrettyEyes.Platform.Windows/PrettyEyes.Platform.Windows.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PrettyEyes.Core.Tests/PrettyEyes.Core.Tests.csproj" />
+  </Folder>
+</Solution>
