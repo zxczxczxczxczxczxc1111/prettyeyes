@@ -56,6 +56,16 @@ public sealed class AppServices
 
     public IAutostart Autostart { get; }
 
+    /// <summary>
+    /// Windows.Graphics.Capture where the system has it, GDI otherwise. Only
+    /// the newer path sees hardware-accelerated windows; the older one is kept
+    /// because it needs nothing from the OS beyond BitBlt.
+    /// </summary>
+    private static IScreenCapture CreateCapture(IMonitorEnumerator monitors) =>
+        WgcScreenCapture.IsSupported
+            ? new WgcScreenCapture(monitors)
+            : new GdiScreenCapture(monitors);
+
     /// <summary>Last known settings; the settings window updates them.</summary>
     public AppSettings Settings { get; set; }
 
@@ -92,7 +102,7 @@ public sealed class AppServices
         return new AppServices(
             host,
             monitors,
-            new GdiScreenCapture(monitors),
+            CreateCapture(monitors),
             new ClipboardSink(clipboard),
             new FileSink(host.StorageProvider, () => DateTimeOffset.Now),
             notifier,

@@ -12,6 +12,8 @@
     <PackageVersion Include="Avalonia.Diagnostics" Version="11.3.20" />
     <!-- Must match what Avalonia.Skia pulls in. SkiaSharp 4.x breaks the lease. -->
     <PackageVersion Include="SkiaSharp" Version="3.116.1" />
+    <!-- D3D11 device and staging-texture copy for Windows.Graphics.Capture. -->
+    <PackageVersion Include="Vortice.Direct3D11" Version="3.8.3" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageVersion Include="xunit" Version="2.9.3" />

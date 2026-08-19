@@ -44,6 +44,35 @@ public sealed class Win32MonitorEnumerator : IMonitorEnumerator
         return new DesktopLayout(monitors);
     }
 
+    /// <summary>
+    /// Device name to HMONITOR. Handles never leave this project: Core speaks
+    /// device ids, and the capture layer needs the handle to ask for an item.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, IntPtr> Handles()
+    {
+        var handles = new Dictionary<string, IntPtr>();
+
+        NativeMethods.EnumDisplayMonitors(
+            IntPtr.Zero, IntPtr.Zero,
+            (IntPtr handle, IntPtr _, ref NativeMethods.Rect _, IntPtr _) =>
+            {
+                var info = new NativeMethods.MonitorInfoEx
+                {
+                    cbSize = System.Runtime.InteropServices.Marshal.SizeOf<NativeMethods.MonitorInfoEx>(),
+                };
+
+                if (NativeMethods.GetMonitorInfo(handle, ref info))
+                {
+                    handles[info.szDevice] = handle;
+                }
+
+                return true;
+            },
+            IntPtr.Zero);
+
+        return handles;
+    }
+
     private static MonitorInfo ToMonitorInfo(IntPtr handle, NativeMethods.MonitorInfoEx info)
     {
         var r = info.rcMonitor;

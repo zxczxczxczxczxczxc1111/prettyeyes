@@ -3,8 +3,14 @@
   <PropertyGroup>
     <!-- Win32 all the way down. A windows-specific TFM is what makes platform
          analysis agree instead of warning on every registry call. -->
-    <TargetFramework>net10.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
+    <!-- The capture interop calls COM vtables directly; see CaptureInterop. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Vortice.Direct3D11" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\PrettyEyes.Core\PrettyEyes.Core.csproj" />
