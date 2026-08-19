@@ -28,6 +28,7 @@
 
     <Application.Styles>
         <FluentTheme/>
+        <StyleInclude Source="/Styles/Controls.axaml"/>
         <Style Selector="Window">
             <Setter Property="FontFamily" Value="Inter, Segoe UI"/>
             <Setter Property="FontSize" Value="14"/>

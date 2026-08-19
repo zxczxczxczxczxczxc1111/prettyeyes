@@ -1,14 +1,17 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Media;
 using PrettyEyes.App.Controls;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Core.Settings;
+using PrettyEyes.Platform.Windows;
 
 namespace PrettyEyes.App.Views;
 
 /// <summary>
-/// Two settings, both applied the moment they change: a hotkey that only takes
-/// effect after a restart would look broken, and so would a checkbox that
-/// claims autostart is on when the registry write failed.
+/// Two hotkeys and one switch, all applied the moment they change: a hotkey
+/// that only takes effect after a restart would look broken, and so would a
+/// checkbox that claims autostart is on when the registry write failed.
 /// </summary>
 public partial class SettingsWindow : Window
 {
@@ -23,9 +26,29 @@ public partial class SettingsWindow : Window
     /// Parameterless for the XAML loader; the dependencies arrive through
     /// Configure right after construction.
     /// </summary>
-    public SettingsWindow() => InitializeComponent();
+    public SettingsWindow()
+    {
+        InitializeComponent();
 
-    public void Configure(ISettingsStore store, IHotkeys hotkeys, IAutostart autostart, AppSettings settings)
+        // The window has no system frame, so dragging is ours to implement.
+        TitleBar.PointerPressed += (_, e) => BeginMoveDrag(e);
+        CloseButton.Click += (_, _) => Close();
+
+        // Rounded corners come from the compositor, not from a transparent
+        // window: see WindowCorners.
+        Opened += (_, _) => WindowCorners.Round(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
+    }
+
+    /// <summary>The settings as they stand after every applied change.</summary>
+    public AppSettings Current => _settings;
+
+    public void Configure(
+        ISettingsStore store,
+        IHotkeys hotkeys,
+        IAutostart autostart,
+        AppSettings settings,
+        bool regionRegistered,
+        bool fullScreenRegistered)
     {
         _store = store;
         _hotkeys = hotkeys;
@@ -33,35 +56,73 @@ public partial class SettingsWindow : Window
         _settings = settings;
 
         _loading = true;
-        Hotkey.Value = settings.Hotkey;
+        RegionHotkey.Value = settings.Hotkey;
+        FullScreenHotkey.Value = settings.FullScreenHotkey;
         Autostart.IsChecked = autostart.IsEnabled;
         _loading = false;
 
-        Hotkey.HotkeyChanged += OnHotkeyChanged;
+        RegionHotkey.HotkeyChanged += (_, hotkey) => Apply(HotkeyAction.Region, hotkey);
+        FullScreenHotkey.HotkeyChanged += (_, hotkey) => Apply(HotkeyAction.FullScreen, hotkey);
         Autostart.IsCheckedChanged += OnAutostartChanged;
+
+        if (!regionRegistered || !fullScreenRegistered)
+        {
+            ShowWarning("Комбинация занята другой программой. Выбери другую.");
+        }
     }
 
-    /// <summary>The settings as they stand after every applied change.</summary>
-    public AppSettings Current => _settings;
-
-    private void OnHotkeyChanged(object? sender, HotkeyDefinition hotkey)
+    private void Apply(HotkeyAction action, HotkeyDefinition hotkey)
     {
         if (_hotkeys is null)
         {
             return;
         }
 
-        if (_hotkeys.TryRegister(hotkey))
+        if (Taken(action, hotkey))
         {
-            Hide(Message);
-            Apply(_settings with { Hotkey = hotkey });
+            Restore(action);
+            ShowWarning("Эта комбинация уже занята вторым хоткеем. Оставил прежнюю.");
+            return;
+        }
+
+        if (_hotkeys.TryRegister(action, hotkey))
+        {
+            HideMessage();
+            Store(action == HotkeyAction.Region
+                ? _settings with { Hotkey = hotkey }
+                : _settings with { FullScreenHotkey = hotkey });
             return;
         }
 
         // Put the working combination back so the user is never left without one.
-        _hotkeys.TryRegister(_settings.Hotkey);
-        Hotkey.Value = _settings.Hotkey;
-        Show(Message, "Эта комбинация занята другой программой. Оставил прежнюю.");
+        _hotkeys.TryRegister(action, Existing(action));
+        Restore(action);
+        ShowWarning("Эта комбинация занята другой программой. Оставил прежнюю.");
+    }
+
+    /// <summary>Our own two hotkeys must not fight over one combination.</summary>
+    private bool Taken(HotkeyAction action, HotkeyDefinition hotkey) =>
+        action == HotkeyAction.Region
+            ? hotkey == _settings.FullScreenHotkey
+            : hotkey == _settings.Hotkey;
+
+    private HotkeyDefinition Existing(HotkeyAction action) =>
+        action == HotkeyAction.Region ? _settings.Hotkey : _settings.FullScreenHotkey;
+
+    private void Restore(HotkeyAction action)
+    {
+        _loading = true;
+
+        if (action == HotkeyAction.Region)
+        {
+            RegionHotkey.Value = _settings.Hotkey;
+        }
+        else
+        {
+            FullScreenHotkey.Value = _settings.FullScreenHotkey;
+        }
+
+        _loading = false;
     }
 
     private void OnAutostartChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
@@ -75,28 +136,33 @@ public partial class SettingsWindow : Window
 
         if (_autostart.Set(wanted))
         {
-            Hide(Message);
-            Apply(_settings with { Autostart = wanted });
+            HideMessage();
+            Store(_settings with { Autostart = wanted });
             return;
         }
 
         _loading = true;
         Autostart.IsChecked = !wanted;
         _loading = false;
-        Show(Message, "Не удалось изменить автозапуск.");
+        ShowFailure("Не удалось изменить автозапуск.");
     }
 
-    private void Apply(AppSettings settings)
+    private void Store(AppSettings settings)
     {
         _settings = settings;
         _store?.Save(settings);
     }
 
-    private static void Show(TextBlock message, string text)
+    private void ShowWarning(string text) => Show(text, "Warn");
+
+    private void ShowFailure(string text) => Show(text, "Danger");
+
+    private void Show(string text, string brushKey)
     {
-        message.Text = text;
-        message.IsVisible = true;
+        Message.Text = text;
+        Message.Foreground = (IBrush)Application.Current!.FindResource(brushKey)!;
+        Message.IsVisible = true;
     }
 
-    private static void Hide(TextBlock message) => message.IsVisible = false;
+    private void HideMessage() => Message.IsVisible = false;
 }

@@ -3,39 +3,47 @@
         xmlns:controls="using:PrettyEyes.App.Controls"
         x:Class="PrettyEyes.App.Views.SettingsWindow"
         Title="prettyeyes"
-        Width="420" Height="240"
+        Icon="/Assets/prettyeyes.ico"
+        Width="440" Height="366"
         CanResize="False"
-        WindowStartupLocation="CenterScreen"
-        Background="{StaticResource Bg}">
-  <Border Margin="20"
-          Background="{StaticResource Surface}"
+        SystemDecorations="None"
+        Background="{StaticResource Bg}"
+        WindowStartupLocation="CenterScreen">
+  <Border Background="{StaticResource Surface}"
           BorderBrush="{StaticResource Border}"
-          BorderThickness="1"
-          CornerRadius="{StaticResource RCard}"
-          Padding="20">
-    <StackPanel Spacing="16">
-      <StackPanel Spacing="6">
-        <TextBlock Text="Комбинация клавиш" Foreground="{StaticResource TextDim}" FontSize="12"/>
-        <controls:HotkeyBox x:Name="Hotkey"
-                            HorizontalAlignment="Stretch"
-                            HorizontalContentAlignment="Center"
-                            Padding="10,8"
-                            Background="{StaticResource Fill}"
-                            BorderBrush="{StaticResource BorderStrong}"
-                            BorderThickness="1"
-                            CornerRadius="{StaticResource RField}"
-                            Foreground="{StaticResource TextStrong}"/>
+          BorderThickness="1">
+    <DockPanel>
+      <Grid DockPanel.Dock="Top" x:Name="TitleBar" Height="44" ColumnDefinitions="Auto,*,Auto">
+        <Image Grid.Column="0" Source="/Assets/prettyeyes.ico" Width="16" Height="16" Margin="16,0,0,0"/>
+        <TextBlock Grid.Column="1" Text="prettyeyes" Margin="10,0,0,0"
+                   VerticalAlignment="Center" Foreground="{StaticResource TextDim}" FontSize="12"/>
+        <Button Grid.Column="2" x:Name="CloseButton" Classes="ghost" Margin="0,0,8,0" Content="✕"/>
+      </Grid>
+
+      <StackPanel Margin="24,8,24,24" Spacing="20">
+        <StackPanel Spacing="12">
+          <TextBlock Text="Снимок" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
+
+          <StackPanel Spacing="8">
+            <TextBlock Text="Выделить область" Foreground="{StaticResource Text}"/>
+            <controls:HotkeyBox x:Name="RegionHotkey" Classes="field" HorizontalAlignment="Stretch"/>
+          </StackPanel>
+
+          <StackPanel Spacing="8">
+            <TextBlock Text="Весь монитор в буфер" Foreground="{StaticResource Text}"/>
+            <controls:HotkeyBox x:Name="FullScreenHotkey" Classes="field" HorizontalAlignment="Stretch"/>
+          </StackPanel>
+        </StackPanel>
+
+        <Rectangle Height="1" Fill="{StaticResource Border}"/>
+
+        <StackPanel Spacing="12">
+          <TextBlock Text="Система" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
+          <CheckBox x:Name="Autostart" Content="Запускать вместе с Windows"/>
+        </StackPanel>
+
+        <TextBlock x:Name="Message" FontSize="12" TextWrapping="Wrap" IsVisible="False"/>
       </StackPanel>
-
-      <CheckBox x:Name="Autostart"
-                Content="Запускать вместе с Windows"
-                Foreground="{StaticResource Text}"/>
-
-      <TextBlock x:Name="Message"
-                 Foreground="{StaticResource Danger}"
-                 FontSize="12"
-                 TextWrapping="Wrap"
-                 IsVisible="False"/>
-    </StackPanel>
+    </DockPanel>
   </Border>
 </Window>

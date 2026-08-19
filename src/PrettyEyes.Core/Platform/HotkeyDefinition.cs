@@ -19,4 +19,11 @@ public sealed record HotkeyDefinition(HotkeyModifiers Modifiers, uint VirtualKey
     /// </summary>
     public static HotkeyDefinition Default =>
         new(HotkeyModifiers.Control | HotkeyModifiers.Shift, 0x34);
+
+    /// <summary>
+    /// Ctrl+Shift+3 for the whole-monitor shot. Neighbour of the region default
+    /// so the two are remembered as a pair.
+    /// </summary>
+    public static HotkeyDefinition DefaultFullScreen =>
+        new(HotkeyModifiers.Control | HotkeyModifiers.Shift, 0x33);
 }

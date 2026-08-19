@@ -24,6 +24,7 @@ public sealed class AppServices
         IHotkeys hotkeys,
         ISettingsStore settingsStore,
         IAutostart autostart,
+        IPointerLocation pointer,
         AppSettings settings)
     {
         Host = host;
@@ -35,6 +36,7 @@ public sealed class AppServices
         Hotkeys = hotkeys;
         SettingsStore = settingsStore;
         Autostart = autostart;
+        Pointer = pointer;
         Settings = settings;
     }
 
@@ -55,6 +57,13 @@ public sealed class AppServices
     public ISettingsStore SettingsStore { get; }
 
     public IAutostart Autostart { get; }
+
+    public IPointerLocation Pointer { get; }
+
+    /// <summary>False when a combination was taken at startup.</summary>
+    public bool RegionHotkeyRegistered { get; set; }
+
+    public bool FullScreenHotkeyRegistered { get; set; }
 
     /// <summary>
     /// Windows.Graphics.Capture where the system has it, GDI otherwise. Only
@@ -90,13 +99,21 @@ public sealed class AppServices
         // Built here and not lazily: the message-only window belongs to the
         // thread that creates it, and this runs on the UI thread.
         var hotkeys = new WindowsHotkeys();
-        var hotkey = settings.Hotkey;
+        var regionRegistered = hotkeys.TryRegister(HotkeyAction.Region, settings.Hotkey);
+        var fullScreenRegistered = hotkeys.TryRegister(HotkeyAction.FullScreen, settings.FullScreenHotkey);
 
-        if (!hotkeys.TryRegister(hotkey))
+        foreach (var (registered, hotkey) in new[]
         {
-            notifier.Notify(
-                "prettyeyes",
-                $"Комбинация {HotkeyBox.Describe(hotkey)} занята другой программой. Смени её в настройках.");
+            (regionRegistered, settings.Hotkey),
+            (fullScreenRegistered, settings.FullScreenHotkey),
+        })
+        {
+            if (!registered)
+            {
+                notifier.Notify(
+                    "prettyeyes",
+                    $"Комбинация {HotkeyBox.Describe(hotkey)} занята другой программой. Смени её в настройках.");
+            }
         }
 
         return new AppServices(
@@ -109,6 +126,11 @@ public sealed class AppServices
             hotkeys,
             settingsStore,
             new RegistryAutostart(),
-            settings);
+            new Win32PointerLocation(),
+            settings)
+        {
+            RegionHotkeyRegistered = regionRegistered,
+            FullScreenHotkeyRegistered = fullScreenRegistered,
+        };
     }
 }

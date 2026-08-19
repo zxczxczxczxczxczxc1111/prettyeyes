@@ -1,0 +1,82 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Style Selector="CheckBox">
+    <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <StackPanel Orientation="Horizontal" Spacing="10" Background="Transparent">
+          <Border x:Name="Box"
+                  Width="18" Height="18"
+                  CornerRadius="6"
+                  Background="{StaticResource Fill}"
+                  BorderBrush="{StaticResource BorderStrong}"
+                  BorderThickness="1">
+            <Border.Transitions>
+              <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
+              </Transitions>
+            </Border.Transitions>
+            <Path x:Name="Check"
+                  Data="M3.5,8 L6.5,11 L12.5,4.5"
+                  Stroke="{StaticResource Surface}"
+                  StrokeThickness="2"
+                  StrokeLineCap="Round"
+                  StrokeJoin="Round"
+                  Opacity="0"/>
+          </Border>
+          <ContentPresenter Content="{TemplateBinding Content}"
+                            VerticalAlignment="Center"/>
+        </StackPanel>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="CheckBox:pointerover /template/ Border#Box">
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}"/>
+    <Setter Property="Background" Value="{StaticResource FillHover}"/>
+  </Style>
+
+  <Style Selector="CheckBox:checked /template/ Border#Box">
+    <Setter Property="Background" Value="{StaticResource Accent}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
+  </Style>
+
+  <Style Selector="CheckBox:checked /template/ Path#Check">
+    <Setter Property="Opacity" Value="1"/>
+  </Style>
+
+  <!-- Ghost button: the only button shape outside the overlay toolbar. -->
+  <Style Selector=":is(Button).ghost">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+    <Setter Property="Padding" Value="8,4"/>
+  </Style>
+
+  <Style Selector=":is(Button).ghost:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource Fill}"/>
+    <Setter Property="TextElement.Foreground" Value="{StaticResource TextStrong}"/>
+  </Style>
+
+  <!-- Hotkey field: idle, hover, and "waiting for a key" states. -->
+  <Style Selector=":is(Button).field">
+    <Setter Property="Background" Value="{StaticResource Fill}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RField}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+    <Setter Property="Padding" Value="12,10"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+  </Style>
+
+  <Style Selector=":is(Button).field:pointerover">
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}"/>
+  </Style>
+
+  <Style Selector=":is(Button).field:focus">
+    <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+  </Style>
+</Styles>

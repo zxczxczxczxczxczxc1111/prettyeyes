@@ -16,7 +16,9 @@ namespace PrettyEyes.Platform.Windows;
 /// </summary>
 public sealed class WindowsHotkeys : IHotkeys
 {
-    private const int HotkeyId = 1;
+    private const uint WM_DISPLAYCHANGE = 0x007E;
+
+    private readonly HashSet<HotkeyAction> _registered = [];
 
     // Held in a field on purpose: the delegate is passed to native code, and a
     // collected one crashes the process on the first message.
@@ -24,7 +26,6 @@ public sealed class WindowsHotkeys : IHotkeys
     private readonly string _className = $"PrettyEyesHotkey_{Guid.NewGuid():N}";
     private readonly IntPtr _hwnd;
 
-    private bool _registered;
     private bool _disposed;
 
     public WindowsHotkeys()
@@ -57,28 +58,37 @@ public sealed class WindowsHotkeys : IHotkeys
         }
     }
 
-    public event EventHandler? Pressed;
+    public event EventHandler<HotkeyAction>? Pressed;
 
-    public bool TryRegister(HotkeyDefinition hotkey)
+    public event EventHandler? DisplayChanged;
+
+    public bool TryRegister(HotkeyAction action, HotkeyDefinition hotkey)
     {
-        Unregister();
+        Unregister(action);
 
-        _registered = NativeMethods.RegisterHotKey(
-            _hwnd, HotkeyId, (uint)hotkey.Modifiers, hotkey.VirtualKey);
+        var registered = NativeMethods.RegisterHotKey(
+            _hwnd, IdOf(action), (uint)hotkey.Modifiers, hotkey.VirtualKey);
 
-        return _registered;
+        if (registered)
+        {
+            _registered.Add(action);
+        }
+
+        return registered;
     }
 
-    public void Unregister()
+    public void Unregister(HotkeyAction action)
     {
-        if (!_registered)
+        if (!_registered.Remove(action))
         {
             return;
         }
 
-        NativeMethods.UnregisterHotKey(_hwnd, HotkeyId);
-        _registered = false;
+        NativeMethods.UnregisterHotKey(_hwnd, IdOf(action));
     }
+
+    /// <summary>Win32 hotkey ids start at 1; the enum starts at 0.</summary>
+    private static int IdOf(HotkeyAction action) => (int)action + 1;
 
     public void Dispose()
     {
@@ -88,7 +98,11 @@ public sealed class WindowsHotkeys : IHotkeys
         }
 
         _disposed = true;
-        Unregister();
+
+        foreach (var action in _registered.ToArray())
+        {
+            Unregister(action);
+        }
 
         if (_hwnd != IntPtr.Zero)
         {
@@ -98,10 +112,20 @@ public sealed class WindowsHotkeys : IHotkeys
 
     private IntPtr HandleMessage(IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam)
     {
-        if (message == NativeMethods.WM_HOTKEY && wParam.ToInt32() == HotkeyId)
+        if (message == NativeMethods.WM_HOTKEY)
         {
-            Pressed?.Invoke(this, EventArgs.Empty);
-            return IntPtr.Zero;
+            var action = (HotkeyAction)(wParam.ToInt32() - 1);
+
+            if (Enum.IsDefined(action))
+            {
+                Pressed?.Invoke(this, action);
+                return IntPtr.Zero;
+            }
+        }
+
+        if (message == WM_DISPLAYCHANGE)
+        {
+            DisplayChanged?.Invoke(this, EventArgs.Empty);
         }
 
         return NativeMethods.DefWindowProc(hWnd, message, wParam, lParam);

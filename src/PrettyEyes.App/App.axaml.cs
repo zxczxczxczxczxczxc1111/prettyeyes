@@ -3,7 +3,9 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using PrettyEyes.App.Services;
 using PrettyEyes.App.Views;
+using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Platform;
+using PrettyEyes.Core.Rendering;
 
 namespace PrettyEyes.App;
 
@@ -22,7 +24,21 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             Services = AppServices.Build(desktop);
-            Services.Hotkeys.Pressed += (_, _) => StartCapture();
+            Services.Hotkeys.Pressed += (_, action) =>
+            {
+                if (action == HotkeyAction.Region)
+                {
+                    StartCapture();
+                }
+                else
+                {
+                    _ = CaptureMonitorAsync();
+                }
+            };
+
+            // A capture taken before the monitors moved is worthless: the frame
+            // and the coordinates no longer describe the same desktop.
+            Services.Hotkeys.DisplayChanged += (_, _) => _session?.Close();
 
             desktop.ShutdownRequested += (_, _) => Services.Hotkeys.Dispose();
         }
@@ -67,6 +83,44 @@ public partial class App : Application
         _session.Start(capture);
     }
 
+    /// <summary>
+    /// Whole monitor under the cursor, straight to the clipboard. No overlay:
+    /// the point of this hotkey is that nothing gets in the way.
+    /// </summary>
+    private async Task CaptureMonitorAsync()
+    {
+        if (Services is null)
+        {
+            return;
+        }
+
+        CaptureResult capture;
+
+        try
+        {
+            capture = Services.Capture.CaptureAll();
+        }
+        catch (InvalidOperationException ex)
+        {
+            Services.Notifier.Notify("prettyeyes", $"Не удалось снять экран: {ex.Message}");
+            return;
+        }
+
+        using var document = new Document(capture.Image, capture.Bounds);
+        var (x, y) = Services.Pointer.Current;
+        var monitor = capture.Layout.MonitorAt(x, y) ?? capture.Layout.Monitors[0];
+        document.Selection = monitor.Bounds;
+
+        using var image = DocumentRenderer.Render(document);
+        var result = await Services.Clipboard.SendAsync(image, CancellationToken.None);
+
+        Services.Notifier.Notify(
+            "prettyeyes",
+            result == SinkResult.Sent
+                ? "Снимок монитора скопирован в буфер."
+                : "Не удалось скопировать снимок в буфер.");
+    }
+
     private void Capture_OnClick(object? sender, EventArgs e) => StartCapture();
 
     private void Settings_OnClick(object? sender, EventArgs e) => OpenSettings();
@@ -88,7 +142,12 @@ public partial class App : Application
 
         _settings = new SettingsWindow();
         _settings.Configure(
-            Services.SettingsStore, Services.Hotkeys, Services.Autostart, Services.Settings);
+            Services.SettingsStore,
+            Services.Hotkeys,
+            Services.Autostart,
+            Services.Settings,
+            Services.RegionHotkeyRegistered,
+            Services.FullScreenHotkeyRegistered);
 
         _settings.Closed += (_, _) =>
         {
@@ -101,6 +160,10 @@ public partial class App : Application
         };
 
         _settings.Show();
+
+        // The app has no main window, so a freshly shown one can land behind
+        // whatever the user was looking at.
+        _settings.Activate();
     }
 
     private void Exit_OnClick(object? sender, EventArgs e)

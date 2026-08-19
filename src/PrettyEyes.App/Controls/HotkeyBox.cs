@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using PrettyEyes.Core.Platform;
 
 namespace PrettyEyes.App.Controls;
@@ -57,6 +58,20 @@ public sealed class HotkeyBox : Button
         parts.Add(KeyName(hotkey.VirtualKey));
 
         return string.Join(" + ", parts);
+    }
+
+    protected override void OnGotFocus(GotFocusEventArgs e)
+    {
+        base.OnGotFocus(e);
+
+        // The field is a button until it is focused; then it is a prompt.
+        Content = "нажми сочетание";
+    }
+
+    protected override void OnLostFocus(RoutedEventArgs e)
+    {
+        base.OnLostFocus(e);
+        Content = Describe(_value);
     }
 
     protected override void OnKeyDown(KeyEventArgs e)

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using PrettyEyes.Core.Platform;
 
 namespace PrettyEyes.Core.Settings;
 
@@ -29,8 +30,20 @@ public sealed class JsonSettingsStore : ISettingsStore
                 return AppSettings.Default;
             }
 
-            return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(_path), Options)
-                ?? AppSettings.Default;
+            var stored = JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(_path), Options);
+
+            if (stored is null)
+            {
+                return AppSettings.Default;
+            }
+
+            // A file written before a setting existed leaves that property null,
+            // and a missing hotkey would mean no hotkey at all.
+            return stored with
+            {
+                Hotkey = stored.Hotkey ?? HotkeyDefinition.Default,
+                FullScreenHotkey = stored.FullScreenHotkey ?? HotkeyDefinition.DefaultFullScreen,
+            };
         }
         catch (JsonException)
         {

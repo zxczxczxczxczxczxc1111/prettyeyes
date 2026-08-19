@@ -150,6 +150,23 @@ internal static class NativeMethods
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     internal static extern IntPtr GetModuleHandle(string? moduleName);
 
+    /// <summary>DWMWA_WINDOW_CORNER_PREFERENCE, with DWMWCP_ROUND as the value.</summary>
+    internal const int DwmWindowCornerPreference = 33;
+    internal const int DwmCornerRound = 2;
+
+    [DllImport("dwmapi.dll")]
+    internal static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct Point
+    {
+        internal int X;
+        internal int Y;
+    }
+
+    [DllImport("user32.dll")]
+    internal static extern bool GetCursorPos(out Point point);
+
     [DllImport("user32.dll")]
     internal static extern int GetSystemMetrics(int index);
 
