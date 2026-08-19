@@ -57,6 +57,18 @@ public class DocumentTests
     }
 
     [Fact]
+    public void Clear_removes_every_annotation()
+    {
+        using var document = NewDocument();
+        document.Add(new FakeAnnotation());
+        document.Add(new FakeAnnotation());
+
+        document.Clear();
+
+        Assert.Empty(document.Annotations);
+    }
+
+    [Fact]
     public void Undo_on_empty_document_returns_false()
     {
         using var document = NewDocument();

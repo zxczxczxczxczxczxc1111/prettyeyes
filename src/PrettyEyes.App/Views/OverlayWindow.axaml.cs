@@ -101,7 +101,6 @@ public partial class OverlayWindow : Window
         _selection = CaptureRect.Empty;
         _mode = OverlayMode.Selecting;
         _grip = SelectionGrip.None;
-        Surface.ShowHandles(false);
         Surface.FrameOpacity = 0;
         Surface.ShowSelection(CaptureRect.Empty);
     }
@@ -238,7 +237,6 @@ public partial class OverlayWindow : Window
             _anchorX = x;
             _anchorY = y;
             _mode = OverlayMode.Selecting;
-            Surface.ShowHandles(false);
             SelectionChanged?.Invoke(this, CaptureRect.FromPoints(x, y, x, y));
         }
         else
@@ -317,9 +315,8 @@ public partial class OverlayWindow : Window
             return;
         }
 
-        // The gesture is over: handles and the toolbar belong to this moment,
-        // not to every pointer move on the way here.
-        Surface.ShowHandles(true);
+        // The gesture is over: the toolbar belongs to this moment, not to every
+        // pointer move on the way here.
         SelectionSettled?.Invoke(this, _selection);
     }
 

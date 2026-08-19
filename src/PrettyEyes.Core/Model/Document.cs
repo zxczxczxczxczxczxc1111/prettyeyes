@@ -42,6 +42,12 @@ public sealed class Document : IDisposable
     }
 
     /// <summary>
+    /// Drops every annotation. Starting the selection over means starting over:
+    /// shapes drawn for the previous region have no meaning in the new one.
+    /// </summary>
+    public void Clear() => _annotations.Clear();
+
+    /// <summary>
     /// A frozen copy for the render thread. Avalonia runs ICustomDrawOperation
     /// off the UI thread, so iterating the live list races with editing.
     /// </summary>

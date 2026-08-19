@@ -145,6 +145,7 @@ public sealed class OverlaySession
 
         _activeTool = null;
         Document.Selection = CaptureRect.Empty;
+        Document.Clear();
 
         foreach (var window in _windows)
         {

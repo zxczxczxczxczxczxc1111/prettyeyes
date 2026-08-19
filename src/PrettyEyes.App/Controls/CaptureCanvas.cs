@@ -24,7 +24,6 @@ public sealed class CaptureCanvas : Control
     private CaptureRect _selection;
     private Document? _document;
     private IAnnotation? _preview;
-    private bool _showHandles;
 
     public CaptureCanvas()
     {
@@ -60,8 +59,8 @@ public sealed class CaptureCanvas : Control
         AvaloniaProperty.Register<CaptureCanvas, double>(nameof(VeilOpacity));
 
     /// <summary>
-    /// Opacity of the frame and its handles. They appear when the gesture ends,
-    /// not while the pointer is still down.
+    /// Opacity of the selection frame. Fades in with the first drag and out
+    /// when the selection is dropped.
     /// </summary>
     public static readonly StyledProperty<double> FrameOpacityProperty =
         AvaloniaProperty.Register<CaptureCanvas, double>(nameof(FrameOpacity));
@@ -91,23 +90,13 @@ public sealed class CaptureCanvas : Control
     {
         _selection = selection;
 
-        // While a region is being dragged the frame is drawn straight away;
-        // only the handles wait for the gesture to end.
+        // The frame shows up with the first movement of the drag; the toolbar
+        // is what waits for the gesture to end.
         if (!selection.IsEmpty && FrameOpacity < 1)
         {
             FrameOpacity = 1;
         }
 
-        InvalidateVisual();
-    }
-
-    /// <summary>
-    /// Handles mark a selection that can be grabbed, so they only make sense
-    /// once the pointer is up.
-    /// </summary>
-    public void ShowHandles(bool show)
-    {
-        _showHandles = show;
         InvalidateVisual();
     }
 
@@ -141,8 +130,7 @@ public sealed class CaptureCanvas : Control
             _preview,
             (float)(VisualRoot?.RenderScaling ?? 1.0),
             (float)VeilOpacity,
-            (float)FrameOpacity,
-            _showHandles));
+            (float)FrameOpacity));
     }
 
     private sealed class CaptureDrawOperation : ICustomDrawOperation
@@ -165,9 +153,6 @@ public sealed class CaptureCanvas : Control
         /// </summary>
         private const byte GlassAlpha = 26;
 
-        private const byte HandleAlpha = 235;
-        private const float HandleRadius = 4f;
-
         private readonly SKImage _source;
         private readonly CaptureRect _frame;
         private readonly CaptureRect _monitor;
@@ -177,13 +162,11 @@ public sealed class CaptureCanvas : Control
         private readonly float _scaling;
         private readonly float _veilOpacity;
         private readonly float _frameOpacity;
-        private readonly bool _showHandles;
 
         public CaptureDrawOperation(
             Rect bounds, SKImage source, CaptureRect frame, CaptureRect monitor,
             CaptureRect selection, IReadOnlyList<IAnnotation> annotations,
-            IAnnotation? preview, float scaling, float veilOpacity, float frameOpacity,
-            bool showHandles)
+            IAnnotation? preview, float scaling, float veilOpacity, float frameOpacity)
         {
             Bounds = bounds;
             _source = source;
@@ -195,7 +178,6 @@ public sealed class CaptureCanvas : Control
             _scaling = scaling;
             _veilOpacity = veilOpacity;
             _frameOpacity = frameOpacity;
-            _showHandles = showHandles;
         }
 
         public Rect Bounds { get; }
@@ -281,33 +263,6 @@ public sealed class CaptureCanvas : Control
             glassEdge.Inflate(-1.5f, -1.5f);
             canvas.DrawRect(glassEdge, glass);
 
-            if (!_showHandles)
-            {
-                return;
-            }
-
-            using var fill = new SKPaint
-            {
-                Color = new SKColor(255, 255, 255, Scaled(HandleAlpha)),
-                Style = SKPaintStyle.Fill,
-                IsAntialias = true,
-            };
-
-            using var ring = Stroke(new SKColor(0, 0, 0, Scaled(FrameDarkAlpha)));
-
-            var midX = hole.Left + (hole.Width / 2f);
-            var midY = hole.Top + (hole.Height / 2f);
-
-            foreach (var (x, y) in new[]
-            {
-                (hole.Left, hole.Top), (midX, hole.Top), (hole.Right, hole.Top),
-                (hole.Right, midY), (hole.Right, hole.Bottom), (midX, hole.Bottom),
-                (hole.Left, hole.Bottom), (hole.Left, midY),
-            })
-            {
-                canvas.DrawCircle(x, y, HandleRadius, fill);
-                canvas.DrawCircle(x, y, HandleRadius, ring);
-            }
         }
 
         private byte Scaled(byte alpha) => (byte)(alpha * _frameOpacity);
