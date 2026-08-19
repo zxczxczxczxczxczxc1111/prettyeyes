@@ -61,6 +61,21 @@ public class CaptureRectTests
         Assert.Equal(new CaptureRect(1800, 1000, 120, 80), selection.Intersect(frame));
     }
 
+    [Theory]
+    // inside stays put
+    [InlineData(15, 15, 15, 15)]
+    // outside on every side snaps to the last pixel that belongs to the rect
+    [InlineData(5, 15, 10, 15)]
+    [InlineData(99, 15, 29, 15)]
+    [InlineData(15, 5, 15, 10)]
+    [InlineData(15, 99, 15, 29)]
+    public void ClampPoint_keeps_a_point_inside(int x, int y, int expectedX, int expectedY)
+    {
+        var rect = new CaptureRect(10, 10, 20, 20);
+
+        Assert.Equal((expectedX, expectedY), rect.ClampPoint(x, y));
+    }
+
     [Fact]
     public void Contains_is_half_open_on_the_right_and_bottom_edges()
     {

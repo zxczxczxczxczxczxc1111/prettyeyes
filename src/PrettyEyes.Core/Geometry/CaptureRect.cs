@@ -44,4 +44,11 @@ public readonly record struct CaptureRect(int X, int Y, int Width, int Height)
 
     public bool Contains(int x, int y) =>
         x >= X && x < Right && y >= Y && y < Bottom;
+
+    /// <summary>
+    /// Nearest point that still belongs to this rectangle. Right and bottom are
+    /// exclusive, same as Contains, so the last valid pixel is one less.
+    /// </summary>
+    public (int X, int Y) ClampPoint(int x, int y) =>
+        (Math.Clamp(x, X, Math.Max(X, Right - 1)), Math.Clamp(y, Y, Math.Max(Y, Bottom - 1)));
 }
