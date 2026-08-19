@@ -131,7 +131,7 @@ public sealed class OverlaySession
         }
     }
 
-    private void OnToolPicked(object? sender, ToolKind kind)
+    private void OnToolPicked(object? sender, ToolKind? kind)
     {
         _activeTool = kind;
 
@@ -140,7 +140,7 @@ public sealed class OverlaySession
         foreach (var window in _windows)
         {
             window.ToolbarControl.SetActive(kind);
-            window.SetToolActive(active: true);
+            window.SetToolActive(kind is not null);
         }
     }
 

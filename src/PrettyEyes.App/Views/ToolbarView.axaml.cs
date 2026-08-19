@@ -12,6 +12,8 @@ public partial class ToolbarView : UserControl
 {
     private const string ActiveClass = "active";
 
+    private ToolKind? _active;
+
     public ToolbarView()
     {
         InitializeComponent();
@@ -25,7 +27,11 @@ public partial class ToolbarView : UserControl
         SaveButton.Click += (_, _) => SaveClicked?.Invoke(this, EventArgs.Empty);
     }
 
-    public event EventHandler<ToolKind>? ToolPicked;
+    /// <summary>
+    /// The chosen tool, or null when the active one was switched off and the
+    /// pointer goes back to editing the selection.
+    /// </summary>
+    public event EventHandler<ToolKind?>? ToolPicked;
 
     public event EventHandler? UndoClicked;
 
@@ -36,6 +42,8 @@ public partial class ToolbarView : UserControl
     /// <summary>Null means no tool is picked and the pointer edits the selection.</summary>
     public void SetActive(ToolKind? kind)
     {
+        _active = kind;
+
         foreach (var (button, buttonKind) in Buttons())
         {
             button.Classes.Remove(ActiveClass);
@@ -60,10 +68,16 @@ public partial class ToolbarView : UserControl
         Card.RenderTransform = TransformOperations.Parse("translateY(8px)");
     }
 
+    /// <summary>
+    /// A second click on the active tool switches it off: with a tool held the
+    /// pointer draws, and there would be no way back to moving the frame.
+    /// </summary>
     private void Pick(ToolKind kind)
     {
-        SetActive(kind);
-        ToolPicked?.Invoke(this, kind);
+        var next = _active == kind ? (ToolKind?)null : kind;
+
+        SetActive(next);
+        ToolPicked?.Invoke(this, next);
     }
 
     private IEnumerable<(Button Button, ToolKind Kind)> Buttons()
