@@ -2,6 +2,7 @@ using PrettyEyes.App.Views;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Platform;
+using PrettyEyes.Core.Rendering;
 using PrettyEyes.Core.Tools;
 using CaptureRect = PrettyEyes.Core.Geometry.CaptureRect;
 
@@ -41,6 +42,8 @@ public sealed class OverlaySession
             window.ToolFactory = () => CreateTool(_activeTool);
             window.ToolbarControl.ToolPicked += OnToolPicked;
             window.ToolbarControl.UndoClicked += OnUndoRequested;
+            window.ToolbarControl.CopyClicked += async (_, _) => await SendAsync(_services.Clipboard);
+            window.ToolbarControl.SaveClicked += async (_, _) => await SendAsync(_services.File);
 
             _windows.Add(window);
             window.PlaceOn(monitor, Document);
@@ -127,6 +130,61 @@ public sealed class OverlaySession
     {
         Document?.Add(annotation);
         Redraw();
+    }
+
+    private async Task SendAsync(IImageSink sink)
+    {
+        if (Document is null)
+        {
+            return;
+        }
+
+        // The overlays are Topmost, and a system dialog would open underneath
+        // them. Drop it for the duration and put it back if the user cancels.
+        SetTopmost(false);
+
+        try
+        {
+            using var image = DocumentRenderer.Render(Document);
+            var result = await sink.SendAsync(image, CancellationToken.None);
+
+            switch (result)
+            {
+                case SinkResult.Sent:
+                    Close();
+                    break;
+                case SinkResult.Cancelled:
+                    SetTopmost(true);
+                    break;
+                case SinkResult.Failed:
+                    SetTopmost(true);
+
+                    // Work in progress must survive a failed save.
+                    ShowError("Не удалось сохранить снимок. Попробуй ещё раз.");
+                    break;
+            }
+        }
+        catch (InvalidOperationException ex)
+        {
+            SetTopmost(true);
+            ShowError(ex.Message);
+        }
+    }
+
+    private void SetTopmost(bool value)
+    {
+        foreach (var window in _windows)
+        {
+            window.Topmost = value;
+        }
+    }
+
+    private void ShowError(string message)
+    {
+        foreach (var window in _windows)
+        {
+            window.ShowError(message);
+        }
     }
 
     private static ITool CreateTool(ToolKind kind) => kind switch

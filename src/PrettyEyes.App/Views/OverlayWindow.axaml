@@ -12,5 +12,17 @@
     <controls:CaptureCanvas x:Name="Surface"/>
     <views:SizeChip x:Name="Chip" HorizontalAlignment="Left" VerticalAlignment="Top" IsVisible="False"/>
     <views:ToolbarView x:Name="Toolbar" HorizontalAlignment="Left" VerticalAlignment="Top" IsVisible="False"/>
+    <Border x:Name="ErrorBanner"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Top"
+            Margin="0,24,0,0"
+            Background="{StaticResource SurfaceRaised}"
+            BorderBrush="{StaticResource Border}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource RCard}"
+            Padding="16,10"
+            IsVisible="False">
+      <TextBlock x:Name="ErrorText" Foreground="{StaticResource Danger}"/>
+    </Border>
   </Panel>
 </Window>

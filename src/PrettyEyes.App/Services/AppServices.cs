@@ -11,11 +11,18 @@ namespace PrettyEyes.App.Services;
 /// </summary>
 public sealed class AppServices
 {
-    private AppServices(HostWindow host, IMonitorEnumerator monitors, IScreenCapture capture)
+    private AppServices(
+        HostWindow host,
+        IMonitorEnumerator monitors,
+        IScreenCapture capture,
+        IImageSink clipboard,
+        IImageSink file)
     {
         Host = host;
         Monitors = monitors;
         Capture = capture;
+        Clipboard = clipboard;
+        File = file;
     }
 
     public HostWindow Host { get; }
@@ -23,6 +30,10 @@ public sealed class AppServices
     public IMonitorEnumerator Monitors { get; }
 
     public IScreenCapture Capture { get; }
+
+    public IImageSink Clipboard { get; }
+
+    public IImageSink File { get; }
 
     public static AppServices Build(IClassicDesktopStyleApplicationLifetime lifetime)
     {
@@ -34,6 +45,14 @@ public sealed class AppServices
 
         var monitors = new Win32MonitorEnumerator();
 
-        return new AppServices(host, monitors, new GdiScreenCapture(monitors));
+        var clipboard = host.Clipboard
+            ?? throw new InvalidOperationException("The host window exposes no clipboard.");
+
+        return new AppServices(
+            host,
+            monitors,
+            new GdiScreenCapture(monitors),
+            new ClipboardSink(clipboard),
+            new FileSink(host.StorageProvider, () => DateTimeOffset.Now));
     }
 }

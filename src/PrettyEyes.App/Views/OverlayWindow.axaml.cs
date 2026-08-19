@@ -59,6 +59,18 @@ public partial class OverlayWindow : Window
 
     public void ShowSelection(CaptureRect selection) => Surface.ShowSelection(selection);
 
+    /// <summary>
+    /// A failed copy or save must not throw the capture away, so the message
+    /// lands inside the overlay and goes away on the next click.
+    /// </summary>
+    public void ShowError(string message)
+    {
+        ErrorText.Text = message;
+        ErrorBanner.IsVisible = true;
+    }
+
+    public void HideError() => ErrorBanner.IsVisible = false;
+
     public ToolbarView ToolbarControl => Toolbar;
 
     /// <summary>
@@ -151,6 +163,8 @@ public partial class OverlayWindow : Window
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
+
+        HideError();
 
         var (x, y) = ToVirtualPixels(e.GetPosition(this));
 
