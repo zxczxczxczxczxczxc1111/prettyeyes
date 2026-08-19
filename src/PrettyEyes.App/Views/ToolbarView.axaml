@@ -20,9 +20,20 @@
     <Style Selector="Button.tool:pointerover /template/ ContentPresenter">
       <Setter Property="Background" Value="{StaticResource Fill}"/>
     </Style>
+    <Style Selector="Button.tool.active">
+      <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+    </Style>
     <Style Selector="Button.tool.active /template/ ContentPresenter">
       <Setter Property="Background" Value="{StaticResource FillHover}"/>
-      <Setter Property="TextElement.Foreground" Value="{StaticResource TextStrong}"/>
+    </Style>
+    <Style Selector="Button.tool Path">
+      <Setter Property="Stroke" Value="{Binding $parent[Button].Foreground}"/>
+      <Setter Property="StrokeThickness" Value="1.5"/>
+      <Setter Property="StrokeLineCap" Value="Round"/>
+      <Setter Property="StrokeJoin" Value="Round"/>
+      <Setter Property="Width" Value="16"/>
+      <Setter Property="Height" Value="16"/>
+      <Setter Property="Stretch" Value="None"/>
     </Style>
   </UserControl.Styles>
 
@@ -40,13 +51,25 @@
       </Transitions>
     </Border.Transitions>
     <StackPanel Orientation="Horizontal" Spacing="2">
-      <Button Classes="tool active" x:Name="BlurButton" Content="B"/>
-      <Button Classes="tool" x:Name="ArrowButton" Content="A"/>
-      <Button Classes="tool" x:Name="RectButton" Content="R"/>
+      <Button Classes="tool active" x:Name="BlurButton">
+        <Path Data="M4,4 H6.5 V6.5 H4 Z M9.5,4 H12 V6.5 H9.5 Z M6.5,6.5 H9 V9 H6.5 Z M4,9.5 H6.5 V12 H4 Z M9.5,9.5 H12 V12 H9.5 Z"/>
+      </Button>
+      <Button Classes="tool" x:Name="ArrowButton">
+        <Path Data="M4,12 L12,4 M12,4 H7.5 M12,4 V8.5"/>
+      </Button>
+      <Button Classes="tool" x:Name="RectButton">
+        <Path Data="M3.5,4 H12.5 V12 H3.5 Z"/>
+      </Button>
       <Rectangle Width="1" Margin="4,4" Fill="{StaticResource Border}"/>
-      <Button Classes="tool" x:Name="UndoButton" Content="U"/>
-      <Button Classes="tool" x:Name="CopyButton" Content="C"/>
-      <Button Classes="tool" x:Name="SaveButton" Content="S"/>
+      <Button Classes="tool" x:Name="UndoButton">
+        <Path Data="M6,4.5 L3,7.5 L6,10.5 M3,7.5 H9.5 A3.25,3.25 0 1 1 9.5,14 H7"/>
+      </Button>
+      <Button Classes="tool" x:Name="CopyButton">
+        <Path Data="M6,3 H13 V10 M3,6 H10 V13 H3 Z"/>
+      </Button>
+      <Button Classes="tool" x:Name="SaveButton">
+        <Path Data="M8,3 V10 M5,7.5 L8,10.5 L11,7.5 M3,12.5 H13"/>
+      </Button>
     </StackPanel>
   </Border>
 </UserControl>
