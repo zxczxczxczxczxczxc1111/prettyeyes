@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Media.Transformation;
 using PrettyEyes.Core.Geometry;
 
 namespace PrettyEyes.App.Views;
@@ -14,7 +15,15 @@ public partial class SizeChip : UserControl
     public void Update(CaptureRect selection) =>
         Label.Text = $"{selection.Width} x {selection.Height}";
 
-    public void FadeIn() => Card.Opacity = 1;
+    public void FadeIn()
+    {
+        Card.Opacity = 1;
+        Card.RenderTransform = TransformOperations.Parse("translateY(0px)");
+    }
 
-    public void FadeOut() => Card.Opacity = 0;
+    public void FadeOut()
+    {
+        Card.Opacity = 0;
+        Card.RenderTransform = TransformOperations.Parse("translateY(8px)");
+    }
 }

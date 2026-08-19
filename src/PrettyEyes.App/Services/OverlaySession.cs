@@ -17,7 +17,7 @@ public sealed class OverlaySession
     private readonly AppServices _services;
     private readonly List<OverlayWindow> _windows = [];
     private DesktopLayout? _layout;
-    private ToolKind _activeTool = ToolKind.Blur;
+    private ToolKind? _activeTool;
     private bool _closed;
 
     public OverlaySession(AppServices services) => _services = services;
@@ -36,10 +36,11 @@ public sealed class OverlaySession
         {
             var window = new OverlayWindow();
             window.SelectionChanged += OnSelectionChanged;
+            window.SelectionSettled += OnSelectionSettled;
             window.Cancelled += (_, _) => Close();
             window.UndoRequested += OnUndoRequested;
             window.AnnotationDrawn += OnAnnotationDrawn;
-            window.ToolFactory = () => CreateTool(_activeTool);
+            window.ToolFactory = () => _activeTool is null ? null : CreateTool(_activeTool.Value);
             window.ToolbarControl.ToolPicked += OnToolPicked;
             window.ToolbarControl.UndoClicked += OnUndoRequested;
             window.ToolbarControl.CopyClicked += async (_, _) => await SendAsync(_services.Clipboard);
@@ -69,9 +70,13 @@ public sealed class OverlaySession
         {
             window.ShowSelection(selection);
         }
-
-        PlaceToolbar(selection);
     }
+
+    /// <summary>
+    /// Panel and chip belong to the finished gesture: while the pointer is down
+    /// they would just trail after the cursor.
+    /// </summary>
+    private void OnSelectionSettled(object? sender, CaptureRect selection) => PlaceToolbar(selection);
 
     /// <summary>
     /// The toolbar belongs to the monitor holding the selection's bottom-right
@@ -123,6 +128,30 @@ public sealed class OverlaySession
         foreach (var window in _windows)
         {
             window.ToolbarControl.SetActive(kind);
+            window.SetToolActive(active: true);
+        }
+    }
+
+    /// <summary>
+    /// Pressing the hotkey again drops the tool and the current selection
+    /// without taking a new capture: the screen is already frozen.
+    /// </summary>
+    public void Restart()
+    {
+        if (Document is null)
+        {
+            return;
+        }
+
+        _activeTool = null;
+        Document.Selection = CaptureRect.Empty;
+
+        foreach (var window in _windows)
+        {
+            window.ToolbarControl.SetActive(null);
+            window.SetToolActive(active: false);
+            window.ResetSelection();
+            window.HideToolbar();
         }
     }
 

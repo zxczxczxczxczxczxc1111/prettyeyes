@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Media.Transformation;
 using PrettyEyes.Core.Tools;
 
 namespace PrettyEyes.App.Views;
@@ -31,23 +32,32 @@ public partial class ToolbarView : UserControl
 
     public event EventHandler? SaveClicked;
 
-    public void SetActive(ToolKind kind)
+    /// <summary>Null means no tool is picked and the pointer edits the selection.</summary>
+    public void SetActive(ToolKind? kind)
     {
         foreach (var (button, buttonKind) in Buttons())
         {
             button.Classes.Remove(ActiveClass);
 
-            if (buttonKind == kind)
+            if (kind is not null && buttonKind == kind)
             {
                 button.Classes.Add(ActiveClass);
             }
         }
     }
 
-    /// <summary>Fades the card in; the transition lives in the XAML.</summary>
-    public void FadeIn() => Card.Opacity = 1;
+    /// <summary>Fades and lifts the card in; the transition lives in the XAML.</summary>
+    public void FadeIn()
+    {
+        Card.Opacity = 1;
+        Card.RenderTransform = TransformOperations.Parse("translateY(0px)");
+    }
 
-    public void FadeOut() => Card.Opacity = 0;
+    public void FadeOut()
+    {
+        Card.Opacity = 0;
+        Card.RenderTransform = TransformOperations.Parse("translateY(8px)");
+    }
 
     private void Pick(ToolKind kind)
     {

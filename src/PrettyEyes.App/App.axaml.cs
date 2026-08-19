@@ -38,8 +38,15 @@ public partial class App : Application
     /// </summary>
     public void StartCapture()
     {
-        if (Services is null || _session is not null)
+        if (Services is null)
         {
+            return;
+        }
+
+        if (_session is not null)
+        {
+            // The overlay is already up: the hotkey means "let me pick again".
+            _session.Restart();
             return;
         }
 

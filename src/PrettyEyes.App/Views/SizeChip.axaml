@@ -8,9 +8,14 @@
           CornerRadius="{StaticResource RChip}"
           Padding="6,2"
           Opacity="0">
+    <Border.RenderTransform>
+      <TranslateTransform Y="8"/>
+    </Border.RenderTransform>
     <Border.Transitions>
       <Transitions>
-        <DoubleTransition Property="Opacity" Duration="0:0:0.15"/>
+        <!-- Delayed so the chip follows the toolbar instead of racing it. -->
+        <DoubleTransition Property="Opacity" Duration="0:0:0.15" Delay="0:0:0.04" Easing="CubicEaseOut"/>
+        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15" Delay="0:0:0.04" Easing="CubicEaseOut"/>
       </Transitions>
     </Border.Transitions>
     <TextBlock x:Name="Label"

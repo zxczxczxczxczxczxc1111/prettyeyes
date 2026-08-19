@@ -12,10 +12,18 @@ public partial class OverlayWindow : Window
 {
     private const double Gap = 8;
 
+    /// <summary>How far from an edge a pointer still counts as grabbing it.</summary>
+    private const int GripReach = 8;
+
     private CaptureRect _monitorBounds;
+    private CaptureRect _frameBounds;
+    private CaptureRect _selection;
     private int _anchorX;
     private int _anchorY;
+    private int _lastX;
+    private int _lastY;
     private bool _dragging;
+    private SelectionGrip _grip = SelectionGrip.None;
     private OverlayMode _mode = OverlayMode.Selecting;
     private ITool? _tool;
 
@@ -27,6 +35,12 @@ public partial class OverlayWindow : Window
 
     public event EventHandler? UndoRequested;
 
+    /// <summary>
+    /// The selection gesture finished. The toolbar and the size chip appear on
+    /// this, not on every pointer move.
+    /// </summary>
+    public event EventHandler<CaptureRect>? SelectionSettled;
+
     /// <summary>Raised once a tool gesture produced a shape.</summary>
     public event EventHandler<IAnnotation>? AnnotationDrawn;
 
@@ -34,7 +48,7 @@ public partial class OverlayWindow : Window
     /// Asks the session for a fresh tool instance, one per gesture. Null means
     /// no tool is active yet, which keeps the window free of tool state.
     /// </summary>
-    public Func<ITool>? ToolFactory { get; set; }
+    public Func<ITool?>? ToolFactory { get; set; }
 
     /// <summary>
     /// Places the window over one monitor. Show() comes first on purpose: the
@@ -45,6 +59,7 @@ public partial class OverlayWindow : Window
     public void PlaceOn(MonitorInfo monitor, Document document)
     {
         _monitorBounds = monitor.Bounds;
+        _frameBounds = document.SourceBounds;
 
         Position = new PixelPoint(monitor.Bounds.X, monitor.Bounds.Y);
         Show();
@@ -55,9 +70,41 @@ public partial class OverlayWindow : Window
         Height = monitor.Bounds.Height / scale;
 
         Surface.Attach(document, monitor.Bounds);
+
+        // Fades the veil in; the value itself is animated by the canvas.
+        Surface.VeilOpacity = 1;
     }
 
-    public void ShowSelection(CaptureRect selection) => Surface.ShowSelection(selection);
+    public void ShowSelection(CaptureRect selection)
+    {
+        _selection = selection;
+        Surface.ShowSelection(selection);
+    }
+
+    /// <summary>
+    /// Called by the session whenever the picked tool changes. Without a tool
+    /// the pointer goes back to editing the selection.
+    /// </summary>
+    public void SetToolActive(bool active)
+    {
+        if (_selection.IsEmpty)
+        {
+            return;
+        }
+
+        _mode = active ? OverlayMode.Drawing : OverlayMode.Adjusting;
+    }
+
+    /// <summary>Back to picking a region, with the frame gone.</summary>
+    public void ResetSelection()
+    {
+        _selection = CaptureRect.Empty;
+        _mode = OverlayMode.Selecting;
+        _grip = SelectionGrip.None;
+        Surface.ShowHandles(false);
+        Surface.FrameOpacity = 0;
+        Surface.ShowSelection(CaptureRect.Empty);
+    }
 
     /// <summary>
     /// A failed copy or save must not throw the capture away, so the message
@@ -167,43 +214,70 @@ public partial class OverlayWindow : Window
         HideError();
 
         var (x, y) = ToVirtualPixels(e.GetPosition(this));
-
-        if (_mode == OverlayMode.Drawing)
-        {
-            _tool = ToolFactory?.Invoke();
-            _tool?.Begin(x, y);
-            _dragging = true;
-            e.Pointer.Capture(this);
-            return;
-        }
-
-        _anchorX = x;
-        _anchorY = y;
+        _lastX = x;
+        _lastY = y;
         _dragging = true;
 
         // Without capture the drag dies the moment the cursor leaves this
         // window - which is exactly what happens on the way to the next monitor.
         e.Pointer.Capture(this);
+
+        if (_mode == OverlayMode.Drawing)
+        {
+            var (toolX, toolY) = _selection.ClampPoint(x, y);
+            _tool = ToolFactory?.Invoke();
+            _tool?.Begin(toolX, toolY);
+            return;
+        }
+
+        _grip = SelectionGrips.HitTest(_selection, x, y, GripReach);
+
+        if (_grip == SelectionGrip.None)
+        {
+            // Nowhere near the current selection: start a fresh one.
+            _anchorX = x;
+            _anchorY = y;
+            _mode = OverlayMode.Selecting;
+            Surface.ShowHandles(false);
+            SelectionChanged?.Invoke(this, CaptureRect.FromPoints(x, y, x, y));
+        }
+        else
+        {
+            _mode = OverlayMode.Adjusting;
+        }
     }
 
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
 
-        if (!_dragging)
-        {
-            return;
-        }
-
         var (x, y) = ToVirtualPixels(e.GetPosition(this));
 
-        if (_mode == OverlayMode.Drawing)
+        if (!_dragging)
         {
-            Surface.ShowPreview(_tool?.Preview(x, y));
+            UpdateCursor(x, y);
             return;
         }
 
-        SelectionChanged?.Invoke(this, CaptureRect.FromPoints(_anchorX, _anchorY, x, y));
+        switch (_mode)
+        {
+            case OverlayMode.Drawing:
+                var (toolX, toolY) = _selection.ClampPoint(x, y);
+                Surface.ShowPreview(_tool?.Preview(toolX, toolY));
+                break;
+
+            case OverlayMode.Selecting:
+                SelectionChanged?.Invoke(this, CaptureRect.FromPoints(_anchorX, _anchorY, x, y));
+                break;
+
+            case OverlayMode.Adjusting:
+                var moved = SelectionGrips.Apply(_selection, _grip, x - _lastX, y - _lastY, _frameBounds);
+                SelectionChanged?.Invoke(this, moved);
+                break;
+        }
+
+        _lastX = x;
+        _lastY = y;
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -222,7 +296,8 @@ public partial class OverlayWindow : Window
 
         if (_mode == OverlayMode.Drawing)
         {
-            var annotation = _tool?.End(x, y);
+            var (toolX, toolY) = _selection.ClampPoint(x, y);
+            var annotation = _tool?.End(toolX, toolY);
             _tool = null;
             Surface.ShowPreview(null);
 
@@ -234,9 +309,38 @@ public partial class OverlayWindow : Window
             return;
         }
 
-        // The first released selection switches the overlay into drawing:
-        // from here the same three events feed the active tool.
-        _mode = OverlayMode.Drawing;
+        _grip = SelectionGrip.None;
+        _mode = OverlayMode.Adjusting;
+
+        if (_selection.IsEmpty)
+        {
+            return;
+        }
+
+        // The gesture is over: handles and the toolbar belong to this moment,
+        // not to every pointer move on the way here.
+        Surface.ShowHandles(true);
+        SelectionSettled?.Invoke(this, _selection);
+    }
+
+    /// <summary>The cursor says what the next press will do.</summary>
+    private void UpdateCursor(int x, int y)
+    {
+        if (_mode == OverlayMode.Drawing)
+        {
+            Cursor = new Cursor(StandardCursorType.Cross);
+            return;
+        }
+
+        Cursor = SelectionGrips.HitTest(_selection, x, y, GripReach) switch
+        {
+            SelectionGrip.TopLeft or SelectionGrip.BottomRight => new Cursor(StandardCursorType.TopLeftCorner),
+            SelectionGrip.TopRight or SelectionGrip.BottomLeft => new Cursor(StandardCursorType.TopRightCorner),
+            SelectionGrip.Left or SelectionGrip.Right => new Cursor(StandardCursorType.SizeWestEast),
+            SelectionGrip.Top or SelectionGrip.Bottom => new Cursor(StandardCursorType.SizeNorthSouth),
+            SelectionGrip.Inside => new Cursor(StandardCursorType.SizeAll),
+            _ => new Cursor(StandardCursorType.Cross),
+        };
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
