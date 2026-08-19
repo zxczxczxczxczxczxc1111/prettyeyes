@@ -29,8 +29,10 @@
     <Application.Styles>
         <FluentTheme/>
         <StyleInclude Source="/Styles/Controls.axaml"/>
-        <Style Selector="Window">
-            <Setter Property="FontFamily" Value="Inter, Segoe UI"/>
+        <!-- :is(Window) rather than Window: an Avalonia type selector matches the
+             exact type, so a bare Window selector skips every window we have. -->
+        <Style Selector=":is(Window)">
+            <Setter Property="FontFamily" Value="{StaticResource AppFont}"/>
             <Setter Property="FontSize" Value="14"/>
         </Style>
     </Application.Styles>

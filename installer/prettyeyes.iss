@@ -189,6 +189,9 @@ begin
   WizardForm.StatusLabel.Font.Color := TextDim;
   WizardForm.FilenameLabel.Font.Color := TextDim;
 
+  // InnerPage is the container the other pages sit inside; unpainted it shows
+  // as a white ring around every dark page.
+  PaintPage(WizardForm.InnerPage);
   PaintPage(WizardForm.WelcomePage);
   PaintPage(WizardForm.SelectDirPage);
   PaintPage(WizardForm.SelectComponentsPage);

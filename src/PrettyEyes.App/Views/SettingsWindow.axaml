@@ -17,7 +17,8 @@
         <Image Grid.Column="0" Source="/Assets/prettyeyes.ico" Width="16" Height="16" Margin="16,0,0,0"/>
         <TextBlock Grid.Column="1" Text="prettyeyes" Margin="10,0,0,0"
                    VerticalAlignment="Center" Foreground="{StaticResource TextDim}" FontSize="12"/>
-        <Button Grid.Column="2" x:Name="CloseButton" Classes="ghost" Margin="0,0,8,0" Content="✕"/>
+        <Button Grid.Column="2" x:Name="CloseButton" Classes="ghost close"
+                Margin="0,0,10,0" Content="✕"/>
       </Grid>
 
       <StackPanel Margin="24,8,24,24" Spacing="20">

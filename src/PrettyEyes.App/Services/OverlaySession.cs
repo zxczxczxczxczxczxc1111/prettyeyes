@@ -18,6 +18,7 @@ public sealed class OverlaySession
     private readonly List<OverlayWindow> _windows = [];
     private DesktopLayout? _layout;
     private ToolKind? _activeTool;
+    private bool _toolbarShown;
     private bool _closed;
 
     public OverlaySession(AppServices services) => _services = services;
@@ -70,13 +71,24 @@ public sealed class OverlaySession
         {
             window.ShowSelection(selection);
         }
+
+        // Once the toolbar is up it follows the frame; leaving it behind and
+        // teleporting it at the end of the gesture reads as a glitch.
+        if (_toolbarShown)
+        {
+            PlaceToolbar(selection);
+        }
     }
 
     /// <summary>
     /// Panel and chip belong to the finished gesture: while the pointer is down
     /// they would just trail after the cursor.
     /// </summary>
-    private void OnSelectionSettled(object? sender, CaptureRect selection) => PlaceToolbar(selection);
+    private void OnSelectionSettled(object? sender, CaptureRect selection)
+    {
+        _toolbarShown = true;
+        PlaceToolbar(selection);
+    }
 
     /// <summary>
     /// The toolbar belongs to the monitor holding the selection's bottom-right
@@ -144,6 +156,7 @@ public sealed class OverlaySession
         }
 
         _activeTool = null;
+        _toolbarShown = false;
         Document.Selection = CaptureRect.Empty;
         Document.Clear();
 
@@ -283,6 +296,7 @@ public sealed class OverlaySession
 
         _windows.Clear();
         _layout = null;
+        _toolbarShown = false;
 
         // The frame is roughly 29 MB on two 2K monitors - one leak per hotkey
         // press adds up fast.

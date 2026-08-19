@@ -152,7 +152,10 @@ public partial class OverlayWindow : Window
             y = Math.Max(0, localBottom - Gap - size.Height);
         }
 
-        var x = Math.Clamp(localX, 0, Math.Max(0, Width - size.Width));
+        // Anchored to the right edge of the selection: a right-handed drag ends
+        // there, so that is where the hand already is.
+        var localRight = (selection.Right - _monitorBounds.X) / scale;
+        var x = Math.Clamp(localRight - size.Width, 0, Math.Max(0, Width - size.Width));
 
         Toolbar.Margin = new Thickness(x, y, 0, 0);
         Toolbar.FadeIn();

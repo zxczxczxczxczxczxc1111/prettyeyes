@@ -15,6 +15,9 @@
   <SolidColorBrush x:Key="AccentHover" Color="#C7FFFFFF"/>
   <SolidColorBrush x:Key="Warn" Color="#FFFBBF24"/>
   <SolidColorBrush x:Key="Danger" Color="#FFF87171"/>
+  <!-- Inter ships inside Avalonia.Fonts.Inter; by bare name it silently falls
+       back to the system font, so it is referenced by its resource address. -->
+  <FontFamily x:Key="AppFont">avares://Avalonia.Fonts.Inter/Assets#Inter</FontFamily>
   <CornerRadius x:Key="RCard">14</CornerRadius>
   <CornerRadius x:Key="RField">10</CornerRadius>
   <CornerRadius x:Key="RChip">6</CornerRadius>
