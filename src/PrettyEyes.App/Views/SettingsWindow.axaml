@@ -9,9 +9,20 @@
         SystemDecorations="None"
         Background="{StaticResource Bg}"
         WindowStartupLocation="CenterScreen">
-  <Border Background="{StaticResource Surface}"
+  <Border x:Name="Card"
+          Background="{StaticResource Surface}"
           BorderBrush="{StaticResource Border}"
-          BorderThickness="1">
+          BorderThickness="1"
+          Opacity="0">
+    <Border.RenderTransform>
+      <TranslateTransform Y="6"/>
+    </Border.RenderTransform>
+    <Border.Transitions>
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.15" Easing="CubicEaseOut"/>
+        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15" Easing="CubicEaseOut"/>
+      </Transitions>
+    </Border.Transitions>
     <DockPanel>
       <Grid DockPanel.Dock="Top" x:Name="TitleBar" Height="44" ColumnDefinitions="Auto,*,Auto">
         <Image Grid.Column="0" Source="/Assets/prettyeyes.ico" Width="16" Height="16" Margin="16,0,0,0"/>

@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using PrettyEyes.App.Services;
 using PrettyEyes.App.Views;
 using PrettyEyes.Core.Model;
@@ -13,6 +14,7 @@ public partial class App : Application
 {
     private OverlaySession? _session;
     private SettingsWindow? _settings;
+    private TrayMenuWindow? _menu;
 
     public override void Initialize()
     {
@@ -24,6 +26,9 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             Services = AppServices.Build(desktop);
+            Services.Tray.Clicked += (_, _) => Dispatcher.UIThread.Post(StartCapture);
+            Services.Tray.MenuRequested += (_, _) => Dispatcher.UIThread.Post(ShowTrayMenu);
+
             Services.Hotkeys.Pressed += (_, action) =>
             {
                 if (action == HotkeyAction.Region)
@@ -121,9 +126,49 @@ public partial class App : Application
                 : "Не удалось скопировать снимок в буфер.");
     }
 
-    private void Capture_OnClick(object? sender, EventArgs e) => StartCapture();
+    /// <summary>
+    /// The tray menu, rebuilt on every right click: it is a short-lived popup,
+    /// and keeping one around only invites stale state.
+    /// </summary>
+    private void ShowTrayMenu()
+    {
+        if (Services is null || _menu is not null)
+        {
+            return;
+        }
 
-    private void Settings_OnClick(object? sender, EventArgs e) => OpenSettings();
+        var (x, y) = Services.Pointer.Current;
+        var layout = Services.Monitors.Enumerate();
+        var monitor = layout.MonitorAt(x, y) ?? layout.Monitors[0];
+
+        _menu = new TrayMenuWindow();
+        _menu.Picked += (_, choice) =>
+        {
+            switch (choice)
+            {
+                case TrayMenuChoice.Capture:
+                    StartCapture();
+                    break;
+                case TrayMenuChoice.Settings:
+                    OpenSettings();
+                    break;
+                case TrayMenuChoice.Exit:
+                    Exit();
+                    break;
+            }
+        };
+        _menu.Closed += (_, _) => _menu = null;
+
+        _menu.ShowAt(x, y, monitor.Bounds, monitor.Scale);
+    }
+
+    private void Exit()
+    {
+        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            desktop.Shutdown();
+        }
+    }
 
     public void OpenSettings()
     {
@@ -164,13 +209,5 @@ public partial class App : Application
         // The app has no main window, so a freshly shown one can land behind
         // whatever the user was looking at.
         _settings.Activate();
-    }
-
-    private void Exit_OnClick(object? sender, EventArgs e)
-    {
-        if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-        {
-            desktop.Shutdown();
-        }
     }
 }

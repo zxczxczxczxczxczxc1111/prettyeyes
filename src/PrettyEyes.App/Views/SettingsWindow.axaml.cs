@@ -1,6 +1,8 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using Avalonia.Media.Transformation;
+using Avalonia.Threading;
 using PrettyEyes.App.Controls;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Core.Settings;
@@ -36,7 +38,20 @@ public partial class SettingsWindow : Window
 
         // Rounded corners come from the compositor, not from a transparent
         // window: see WindowCorners.
-        Opened += (_, _) => WindowCorners.Round(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
+        Opened += (_, _) =>
+        {
+            WindowCorners.Round(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
+
+            // Fades in rather than snapping into place; the transition lives in
+            // the XAML and needs the value set after the first layout pass.
+            Dispatcher.UIThread.Post(
+                () =>
+                {
+                    Card.Opacity = 1;
+                    Card.RenderTransform = TransformOperations.Parse("translateY(0px)");
+                },
+                DispatcherPriority.Loaded);
+        };
     }
 
     /// <summary>The settings as they stand after every applied change.</summary>

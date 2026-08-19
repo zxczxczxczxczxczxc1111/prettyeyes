@@ -61,6 +61,11 @@ internal static class NativeMethods
     internal const int NIM_ADD = 0x00000000;
     internal const int NIM_DELETE = 0x00000002;
     internal const int NIM_MODIFY = 0x00000001;
+    internal const uint WM_APP = 0x8000;
+    internal const uint WM_LBUTTONUP = 0x0202;
+    internal const uint WM_RBUTTONUP = 0x0205;
+
+    internal const int NIF_MESSAGE = 0x00000001;
     internal const int NIF_ICON = 0x00000002;
     internal const int NIF_TIP = 0x00000004;
     internal const int NIF_INFO = 0x00000010;
@@ -102,6 +107,19 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     internal static extern IntPtr LoadIcon(IntPtr instance, IntPtr iconName);
+
+    [DllImport("user32.dll")]
+    internal static extern bool DestroyIcon(IntPtr icon);
+
+    /// <summary>
+    /// Explorer broadcasts TaskbarCreated after a restart; everyone who owns a
+    /// tray icon has to add it again or it stays gone.
+    /// </summary>
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    internal static extern uint RegisterWindowMessage(string message);
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+    internal static extern uint ExtractIconEx(string file, int index, out IntPtr large, out IntPtr small, uint count);
 
     internal const int HWND_MESSAGE = -3;
     internal const int WM_HOTKEY = 0x0312;

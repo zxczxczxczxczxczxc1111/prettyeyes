@@ -71,6 +71,30 @@
     <Setter Property="TextElement.Foreground" Value="{StaticResource Text}"/>
   </Style>
 
+  <!-- Tray menu item: a row, not a button, so hover is a film and nothing else. -->
+  <Style Selector=":is(Button).menu">
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+    <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    <Setter Property="Padding" Value="12,8"/>
+    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    <Setter Property="HorizontalContentAlignment" Value="Left"/>
+  </Style>
+
+  <Style Selector=":is(Button).menu /template/ ContentPresenter">
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.15"/>
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector=":is(Button).menu:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource Fill}"/>
+    <Setter Property="TextElement.Foreground" Value="{StaticResource TextStrong}"/>
+  </Style>
+
   <!-- Hotkey field: idle, hover, and "waiting for a key" states. -->
   <Style Selector=":is(Button).field">
     <Setter Property="Background" Value="{StaticResource Fill}"/>

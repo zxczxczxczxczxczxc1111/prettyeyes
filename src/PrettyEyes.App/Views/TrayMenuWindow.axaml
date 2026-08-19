@@ -1,0 +1,35 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="PrettyEyes.App.Views.TrayMenuWindow"
+        Title="prettyeyes"
+        SystemDecorations="None"
+        ShowInTaskbar="False"
+        CanResize="False"
+        Topmost="True"
+        SizeToContent="WidthAndHeight"
+        Background="{StaticResource Bg}">
+  <Border x:Name="Card"
+          Background="{StaticResource SurfaceRaised}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="1"
+          Padding="6"
+          Opacity="0"
+          Width="190">
+    <Border.RenderTransform>
+      <TranslateTransform Y="6"/>
+    </Border.RenderTransform>
+    <Border.Transitions>
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.15" Easing="CubicEaseOut"/>
+        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15" Easing="CubicEaseOut"/>
+      </Transitions>
+    </Border.Transitions>
+
+    <StackPanel Spacing="2">
+      <Button x:Name="CaptureItem" Classes="menu" Content="Снимок"/>
+      <Button x:Name="SettingsItem" Classes="menu" Content="Настройки"/>
+      <Rectangle Height="1" Margin="8,4" Fill="{StaticResource Border}"/>
+      <Button x:Name="ExitItem" Classes="menu" Content="Выход"/>
+    </StackPanel>
+  </Border>
+</Window>

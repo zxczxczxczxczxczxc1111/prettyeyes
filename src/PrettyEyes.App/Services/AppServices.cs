@@ -25,6 +25,7 @@ public sealed class AppServices : IDisposable
         ISettingsStore settingsStore,
         IAutostart autostart,
         IPointerLocation pointer,
+        Win32TrayIcon tray,
         AppSettings settings)
     {
         Host = host;
@@ -37,6 +38,7 @@ public sealed class AppServices : IDisposable
         SettingsStore = settingsStore;
         Autostart = autostart;
         Pointer = pointer;
+        Tray = tray;
         Settings = settings;
     }
 
@@ -59,6 +61,8 @@ public sealed class AppServices : IDisposable
     public IAutostart Autostart { get; }
 
     public IPointerLocation Pointer { get; }
+
+    public Win32TrayIcon Tray { get; }
 
     /// <summary>False when a combination was taken at startup.</summary>
     public bool RegionHotkeyRegistered { get; set; }
@@ -91,9 +95,10 @@ public sealed class AppServices : IDisposable
         var clipboard = host.Clipboard
             ?? throw new InvalidOperationException("The host window exposes no clipboard.");
 
-        var notifier = new ToastNotifier(
-            AppIdentity.AppUserModelId,
-            new TrayNotifier(host.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero));
+        // Our own tray icon: Avalonia's only comes with a native menu, and a
+        // native menu cannot be made to look like the rest of the app.
+        var tray = new Win32TrayIcon("prettyeyes");
+        var notifier = new ToastNotifier(AppIdentity.AppUserModelId, tray);
 
         var settingsStore = new JsonSettingsStore(JsonSettingsStore.DefaultPath);
         var settings = settingsStore.Load();
@@ -129,6 +134,7 @@ public sealed class AppServices : IDisposable
             settingsStore,
             new RegistryAutostart(),
             new Win32PointerLocation(),
+            tray,
             settings)
         {
             RegionHotkeyRegistered = regionRegistered,
@@ -143,7 +149,7 @@ public sealed class AppServices : IDisposable
     public void Dispose()
     {
         Hotkeys.Dispose();
+        Tray.Dispose();
         (Capture as IDisposable)?.Dispose();
-        (Notifier as IDisposable)?.Dispose();
     }
 }
