@@ -91,7 +91,9 @@ public sealed class AppServices
         var clipboard = host.Clipboard
             ?? throw new InvalidOperationException("The host window exposes no clipboard.");
 
-        var notifier = new TrayNotifier(host.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
+        var notifier = new ToastNotifier(
+            AppIdentity.AppUserModelId,
+            new TrayNotifier(host.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero));
 
         var settingsStore = new JsonSettingsStore(JsonSettingsStore.DefaultPath);
         var settings = settingsStore.Load();

@@ -1,6 +1,7 @@
 using Avalonia;
 using System;
 using System.Threading;
+using PrettyEyes.Platform.Windows;
 
 namespace PrettyEyes.App;
 
@@ -21,6 +22,10 @@ class Program
             // registration help nobody.
             return;
         }
+
+        // Must happen before any window exists, so the shell groups them under
+        // the same identity the installer's shortcut carries.
+        AppIdentity.Declare();
 
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }

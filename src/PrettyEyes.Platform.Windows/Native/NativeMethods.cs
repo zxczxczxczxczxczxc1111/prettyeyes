@@ -154,6 +154,9 @@ internal static class NativeMethods
     internal const int DwmWindowCornerPreference = 33;
     internal const int DwmCornerRound = 2;
 
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, PreserveSig = false)]
+    internal static extern void SetCurrentProcessExplicitAppUserModelID(string appId);
+
     [DllImport("dwmapi.dll")]
     internal static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
 

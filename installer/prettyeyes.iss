@@ -46,9 +46,9 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "autostart"; Description: "{cm:AutostartTask}"; GroupDescription: "{cm:GeneralGroup}"
 
 [CustomMessages]
-russian.AutostartTask=Ð—Ð°Ð¿ÑƒÑÐºÐ°Ñ‚ÑŒ Ð²Ð¼ÐµÑÑ‚Ðµ Ñ Windows
-russian.GeneralGroup=Ð”Ð¾Ð¿Ð¾Ð»Ð½Ð¸Ñ‚ÐµÐ»ÑŒÐ½Ð¾
-russian.LaunchApp=Ð—Ð°Ð¿ÑƒÑÑ‚Ð¸Ñ‚ÑŒ prettyeyes
+russian.AutostartTask=Запускать вместе с Windows
+russian.GeneralGroup=Дополнительно
+russian.LaunchApp=Запустить prettyeyes
 english.AutostartTask=Start with Windows
 english.GeneralGroup=Additional options
 english.LaunchApp=Launch prettyeyes
@@ -67,3 +67,102 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+// Inno has no dark theme, so the wizard is repainted by hand. Colours are
+// Delphi BGR literals, not the RGB used everywhere else in this project.
+const
+  Bg = $0B0A0A;          // #0A0A0B, the surface token
+  BgDeep = $000000;      // pure black, same as the app background
+  TextStrong = $F0F0F0;
+  TextDim = $9A9A9A;
+
+procedure PaintPage(Page: TNewNotebookPage);
+var
+  Index: Integer;
+  Child: TControl;
+begin
+  Page.Color := Bg;
+
+  for Index := 0 to Page.ControlCount - 1 do
+  begin
+    Child := Page.Controls[Index];
+
+    if Child is TNewStaticText then
+    begin
+      TNewStaticText(Child).Font.Color := TextStrong;
+      TNewStaticText(Child).Color := Bg;
+    end
+    else if Child is TNewCheckBox then
+    begin
+      TNewCheckBox(Child).Font.Color := TextStrong;
+      TNewCheckBox(Child).Color := Bg;
+    end
+    else if Child is TNewCheckListBox then
+    begin
+      TNewCheckListBox(Child).Color := Bg;
+      TNewCheckListBox(Child).Font.Color := TextStrong;
+      TNewCheckListBox(Child).BorderStyle := bsNone;
+    end
+    else if Child is TNewEdit then
+    begin
+      TNewEdit(Child).Color := BgDeep;
+      TNewEdit(Child).Font.Color := TextStrong;
+    end
+    else if Child is TNewMemo then
+    begin
+      TNewMemo(Child).Color := BgDeep;
+      TNewMemo(Child).Font.Color := TextStrong;
+    end
+    else if Child is TLabel then
+      TLabel(Child).Font.Color := TextDim
+    else if Child is TBevel then
+      TBevel(Child).Visible := False;
+  end;
+end;
+
+procedure PaintForm();
+var
+  Index: Integer;
+  Child: TControl;
+begin
+  // The button strip at the bottom is a panel of its own; without this it
+  // stays system-grey under an otherwise dark wizard.
+  for Index := 0 to WizardForm.ControlCount - 1 do
+  begin
+    Child := WizardForm.Controls[Index];
+
+    if Child is TPanel then
+      TPanel(Child).Color := Bg
+    else if Child is TBevel then
+      TBevel(Child).Visible := False;
+  end;
+end;
+
+procedure InitializeWizard();
+begin
+  WizardForm.Color := Bg;
+  WizardForm.MainPanel.Color := Bg;
+  PaintForm();
+  WizardForm.Bevel.Visible := False;
+  WizardForm.Bevel1.Visible := False;
+
+  WizardForm.PageNameLabel.Font.Color := TextStrong;
+  WizardForm.PageDescriptionLabel.Font.Color := TextDim;
+  WizardForm.WelcomeLabel1.Font.Color := TextStrong;
+  WizardForm.WelcomeLabel2.Font.Color := TextDim;
+  WizardForm.FinishedHeadingLabel.Font.Color := TextStrong;
+  WizardForm.FinishedLabel.Font.Color := TextDim;
+  WizardForm.StatusLabel.Font.Color := TextDim;
+  WizardForm.FilenameLabel.Font.Color := TextDim;
+
+  PaintPage(WizardForm.WelcomePage);
+  PaintPage(WizardForm.SelectDirPage);
+  PaintPage(WizardForm.SelectComponentsPage);
+  PaintPage(WizardForm.SelectProgramGroupPage);
+  PaintPage(WizardForm.SelectTasksPage);
+  PaintPage(WizardForm.ReadyPage);
+  PaintPage(WizardForm.PreparingPage);
+  PaintPage(WizardForm.InstallingPage);
+  PaintPage(WizardForm.FinishedPage);
+end;
