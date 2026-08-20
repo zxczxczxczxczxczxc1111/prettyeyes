@@ -35,8 +35,12 @@ Compression=lzma2/max
 SolidCompression=yes
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-; Refuses to install over a running copy instead of leaving a half-updated one.
-AppMutex=PrettyEyesSingleInstance
+; Closes the running copy instead of asking the user to do it. AppMutex used to
+; guard this, but its check runs first and all it can do is put up a modal that
+; says "close it yourself"; this way Setup offers to close it and puts it back
+; afterwards, which is also what the built-in updater needs.
+CloseApplications=yes
+RestartApplications=yes
 
 [Languages]
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
@@ -121,6 +125,12 @@ begin
   begin
     TNewMemo(Control).Color := BgDeep;
     TNewMemo(Control).Font.Color := TextStrong;
+    // The scrollbars are drawn by Windows, not by the wizard, and stay white
+    // against everything else here. The box holds a task list of one line, so
+    // they are taken away rather than fought with; wrapping covers the case of
+    // a long install path that would otherwise need the horizontal one.
+    TNewMemo(Control).WordWrap := True;
+    TNewMemo(Control).ScrollBars := ssNone;
   end
   else if Control is TListBox then
   begin

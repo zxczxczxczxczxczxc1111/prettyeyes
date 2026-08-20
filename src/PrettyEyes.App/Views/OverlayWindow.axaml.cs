@@ -110,6 +110,15 @@ public partial class OverlayWindow : Window
         _document = document;
 
         Position = new PixelPoint(monitor.Bounds.X, monitor.Bounds.Y);
+
+        // Everything the first frame needs goes in before the window is shown.
+        // Hiding a window does not throw away what was last composited into it,
+        // so a window shown before its new content is filled comes back with the
+        // previous capture and the previous selection frame on it for a frame or
+        // two - which is exactly the flicker, and the ghost rectangle with it.
+        Surface.Attach(document, monitor.Bounds);
+        Resize(monitor);
+
         Show();
         Position = new PixelPoint(monitor.Bounds.X, monitor.Bounds.Y);
 
@@ -117,14 +126,20 @@ public partial class OverlayWindow : Window
         // Alt+Tab, and being topmost it never needs to be switched back to.
         WindowSwitcher.Hide(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
 
-        var scale = RenderScaling;
-        Width = monitor.Bounds.Width / scale;
-        Height = monitor.Bounds.Height / scale;
-
-        Surface.Attach(document, monitor.Bounds);
+        // Again: a window moved to a monitor with different scaling only learns
+        // its new scale once it is on it.
+        Resize(monitor);
 
         // Fades the veil in; the value itself is animated by the canvas.
         Surface.VeilOpacity = 1;
+    }
+
+    private void Resize(MonitorInfo monitor)
+    {
+        var scale = RenderScaling;
+
+        Width = monitor.Bounds.Width / scale;
+        Height = monitor.Bounds.Height / scale;
     }
 
     public void ShowSelection(CaptureRect selection)
