@@ -287,6 +287,8 @@ public partial class SettingsWindow : Window
         ToolKind.Blur => "M4,4 H6.5 V6.5 H4 Z M9.5,4 H12 V6.5 H9.5 Z M6.5,6.5 H9 V9 H6.5 Z M4,9.5 H6.5 V12 H4 Z M9.5,9.5 H12 V12 H9.5 Z",
         ToolKind.Arrow => "M4,12 L12,4 M12,4 H7.5 M12,4 V8.5",
         ToolKind.Line => "M4,12 L12,4",
+        ToolKind.Pencil => "M3.5,12.5 L4.2,9.8 L10,4 L12,6 L6.2,11.8 Z M9,5.2 L10.8,7",
+        ToolKind.Marker => "M5.5,9.5 L9.8,5.2 L11.8,7.2 L7.5,11.5 H5.5 Z M3.5,13.5 H12.5",
         ToolKind.Emoji => "M8,2.5 A5.5,5.5 0 1 0 8.01,2.5 M6,6.5 V7 M10,6.5 V7 M5.5,9.5 A3,3 0 0 0 10.5,9.5",
         _ => "M3.5,4 H12.5 V12 H3.5 Z",
     };
@@ -296,6 +298,8 @@ public partial class SettingsWindow : Window
         ToolKind.Blur => "Размытие",
         ToolKind.Arrow => "Стрелка",
         ToolKind.Line => "Линия",
+        ToolKind.Pencil => "Карандаш",
+        ToolKind.Marker => "Маркер",
         ToolKind.Emoji => "Эмодзи",
         _ => "Рамка",
     };

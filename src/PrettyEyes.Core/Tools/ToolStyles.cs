@@ -31,7 +31,7 @@ public sealed class ToolStyles
     public IReadOnlyDictionary<ToolKind, ToolStyle> Stored => _styles;
 
     public ToolStyle For(ToolKind kind) =>
-        _styles.TryGetValue(kind, out var style) ? style : ToolStyle.Default;
+        _styles.TryGetValue(kind, out var style) ? style : ToolStyle.DefaultFor(kind);
 
     public void Set(ToolKind kind, ToolStyle style) => _styles[kind] = style;
 

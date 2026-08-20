@@ -39,6 +39,8 @@ public partial class ToolbarView : UserControl
         ArrowButton.Click += (_, _) => Pick(ToolKind.Arrow);
         LineButton.Click += (_, _) => Pick(ToolKind.Line);
         RectButton.Click += (_, _) => Pick(ToolKind.Rectangle);
+        PencilButton.Click += (_, _) => Pick(ToolKind.Pencil);
+        MarkerButton.Click += (_, _) => Pick(ToolKind.Marker);
         EmojiButton.Click += (_, _) => Pick(ToolKind.Emoji);
         UndoButton.Click += (_, _) => UndoClicked?.Invoke(this, EventArgs.Empty);
         CopyButton.Click += (_, _) => CopyClicked?.Invoke(this, EventArgs.Empty);
@@ -103,6 +105,8 @@ public partial class ToolbarView : UserControl
         yield return (ArrowDot, ToolKind.Arrow);
         yield return (LineDot, ToolKind.Line);
         yield return (RectDot, ToolKind.Rectangle);
+        yield return (PencilDot, ToolKind.Pencil);
+        yield return (MarkerDot, ToolKind.Marker);
     }
 
     /// <summary>Null means no tool is picked and the pointer edits the selection.</summary>
@@ -153,6 +157,8 @@ public partial class ToolbarView : UserControl
         yield return (LineButton, ToolKind.Line);
         yield return (EmojiButton, ToolKind.Emoji);
         yield return (RectButton, ToolKind.Rectangle);
+        yield return (PencilButton, ToolKind.Pencil);
+        yield return (MarkerButton, ToolKind.Marker);
     }
 
     /// <summary>Puts the chosen glyph on the emoji button.</summary>

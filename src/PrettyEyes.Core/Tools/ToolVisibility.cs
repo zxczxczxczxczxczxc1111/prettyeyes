@@ -16,7 +16,10 @@ public sealed class ToolVisibility
 
     /// <summary>Every tool there is, in the order the toolbar puts them.</summary>
     public static IReadOnlyList<ToolKind> All { get; } =
-        [ToolKind.Blur, ToolKind.Arrow, ToolKind.Line, ToolKind.Rectangle, ToolKind.Emoji];
+    [
+        ToolKind.Blur, ToolKind.Arrow, ToolKind.Line, ToolKind.Rectangle,
+        ToolKind.Pencil, ToolKind.Marker, ToolKind.Emoji,
+    ];
 
     public bool IsShown(ToolKind kind) => !_shown.TryGetValue(kind, out var shown) || shown;
 

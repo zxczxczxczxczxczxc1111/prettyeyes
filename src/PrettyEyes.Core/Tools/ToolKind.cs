@@ -6,5 +6,7 @@ public enum ToolKind
     Arrow,
     Line,
     Rectangle,
+    Pencil,
+    Marker,
     Emoji,
 }

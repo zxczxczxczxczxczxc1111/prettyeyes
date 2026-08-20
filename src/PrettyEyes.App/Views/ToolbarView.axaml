@@ -103,6 +103,22 @@
                      Margin="0,0,-3,-3"/>
           </Panel>
         </Button>
+        <Button Classes="tool" x:Name="PencilButton" ToolTip.Tip="Карандаш, правая кнопка - цвет и толщина">
+          <Panel>
+            <Path Data="M3.5,12.5 L4.2,9.8 L10,4 L12,6 L6.2,11.8 Z M9,5.2 L10.8,7"/>
+            <Ellipse x:Name="PencilDot" Width="6" Height="6"
+                     HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                     Margin="0,0,-3,-3"/>
+          </Panel>
+        </Button>
+        <Button Classes="tool" x:Name="MarkerButton" ToolTip.Tip="Маркер, правая кнопка - цвет и толщина">
+          <Panel>
+            <Path Data="M5.5,9.5 L9.8,5.2 L11.8,7.2 L7.5,11.5 H5.5 Z M3.5,13.5 H12.5"/>
+            <Ellipse x:Name="MarkerDot" Width="6" Height="6"
+                     HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                     Margin="0,0,-3,-3"/>
+          </Panel>
+        </Button>
         <Button Classes="tool" x:Name="EmojiButton" ToolTip.Tip="Эмодзи, правая кнопка - выбрать другой">
           <Panel>
             <!-- Until a glyph is chosen the button shows an outline like every

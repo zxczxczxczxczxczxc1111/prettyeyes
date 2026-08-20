@@ -556,6 +556,8 @@ public sealed class OverlaySession
         ToolKind.Arrow => new ArrowTool(_styles.For(kind)),
         ToolKind.Line => new LineTool(_styles.For(kind)),
         ToolKind.Rectangle => new RectangleTool(_styles.For(kind)),
+        ToolKind.Pencil => new StrokeTool(_styles.For(kind)),
+        ToolKind.Marker => new StrokeTool(_styles.For(kind), highlighter: true),
         ToolKind.Emoji => new EmojiTool(
             _services.Emoji.Glyph(_emoji ?? string.Empty)
                 ?? throw new InvalidOperationException("Эмодзи не выбран."),

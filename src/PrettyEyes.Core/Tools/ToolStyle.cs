@@ -18,6 +18,17 @@ public sealed record ToolStyle(uint Color, StrokeSize Size)
     /// <summary>Carmine at medium, which is what every version so far drew.</summary>
     public static ToolStyle Default => new(Palette.Carmine, StrokeSize.Medium);
 
+    /// <summary>
+    /// What a tool draws with before anyone has an opinion. Only the
+    /// highlighter differs: carmine multiplied into a page is a wound, and the
+    /// colour everyone reaches for on paper is yellow.
+    /// </summary>
+    public static ToolStyle DefaultFor(ToolKind kind) => kind switch
+    {
+        ToolKind.Marker => new(Palette.Yellow, StrokeSize.Medium),
+        _ => Default,
+    };
+
     /// <summary>Stroke width in physical pixels.</summary>
     public float StrokeWidth => Size switch
     {
