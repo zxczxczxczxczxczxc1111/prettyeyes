@@ -43,20 +43,27 @@ public class GrainTests
     [Fact]
     public void The_tile_is_anchored_to_the_canvas_not_to_the_picture()
     {
-        // Aura over a flat shot: the haze is the same colour whatever the
-        // canvas size, so anything that differs at one point is the grain.
         var style = new ExportStyle(true, 48, ExportBackground.Aura, 16, false);
 
         using var small = Shot(120);
         using var large = Shot(400);
 
-        using var one = DocumentRenderer.Render(small, style);
-        using var other = DocumentRenderer.Render(large, style);
+        // The grain by itself: the haze underneath is redrawn at a different
+        // scale for a different canvas and lands a unit off, and that has
+        // nothing to do with where the noise tile starts.
+        Assert.Equal(Speck(small, style, 7, 11), Speck(large, style, 7, 11));
+        Assert.Equal(Speck(small, style, 33, 5), Speck(large, style, 33, 5));
+    }
 
-        using var onePixels = one.PeekPixels();
-        using var otherPixels = other.PeekPixels();
+    private static int Speck(Document document, ExportStyle style, int x, int y)
+    {
+        using var grainy = DocumentRenderer.Render(document, style);
+        using var plain = DocumentRenderer.Render(document, style with { Grain = false });
 
-        Assert.Equal(onePixels.GetPixelColor(7, 11), otherPixels.GetPixelColor(7, 11));
+        using var grainyPixels = grainy.PeekPixels();
+        using var plainPixels = plain.PeekPixels();
+
+        return grainyPixels.GetPixelColor(x, y).Red - plainPixels.GetPixelColor(x, y).Red;
     }
 
     [Fact]

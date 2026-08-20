@@ -180,6 +180,22 @@ internal static class Program
         }
 
         document.Clear();
+
+        // What the decoration costs on top of the render, on a full monitor:
+        // the aura is a second blur, and it has to stay cheap enough that
+        // nobody notices the copy button got slower.
+        document.Selection = monitor;
+
+        Measure("Render монитора, без оформления", () =>
+            DocumentRenderer.Render(document, ExportStyle.None).Dispose());
+
+        Measure("Render монитора, пресет «карточка»", () =>
+            DocumentRenderer.Render(document, ExportStyle.Card).Dispose());
+
+        Measure("Render монитора, пресет «прозрачный»", () =>
+            DocumentRenderer.Render(document, ExportStyle.Cutout).Dispose());
+
+        document.Clear();
     }
 
     /// <summary>
