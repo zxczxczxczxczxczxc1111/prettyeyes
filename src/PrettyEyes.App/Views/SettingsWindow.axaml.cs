@@ -76,12 +76,15 @@ public partial class SettingsWindow : Window
         FullScreenHotkey.Value = settings.FullScreenHotkey;
         Autostart.IsChecked = autostart.IsEnabled;
         ShowMagnifier.IsChecked = settings.ShowMagnifier;
+        MagnifierGrid.IsChecked = settings.MagnifierGrid;
+        MagnifierGrid.IsEnabled = settings.ShowMagnifier;
         _loading = false;
 
         RegionHotkey.HotkeyChanged += (_, hotkey) => Apply(HotkeyAction.Region, hotkey);
         FullScreenHotkey.HotkeyChanged += (_, hotkey) => Apply(HotkeyAction.FullScreen, hotkey);
         Autostart.IsCheckedChanged += OnAutostartChanged;
         ShowMagnifier.IsCheckedChanged += OnMagnifierChanged;
+        MagnifierGrid.IsCheckedChanged += OnMagnifierGridChanged;
 
         if (!regionRegistered || !fullScreenRegistered)
         {
@@ -150,8 +153,21 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        Store(_settings with { ShowMagnifier = ShowMagnifier.IsChecked == true });
-        MagnifierChanged?.Invoke(this, ShowMagnifier.IsChecked == true);
+        var enabled = ShowMagnifier.IsChecked == true;
+
+        MagnifierGrid.IsEnabled = enabled;
+        Store(_settings with { ShowMagnifier = enabled });
+        MagnifierChanged?.Invoke(this, enabled);
+    }
+
+    private void OnMagnifierGridChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        Store(_settings with { MagnifierGrid = MagnifierGrid.IsChecked == true });
     }
 
     /// <summary>The overlay has to hear about this without waiting for a restart.</summary>

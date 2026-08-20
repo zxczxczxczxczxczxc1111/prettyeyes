@@ -7,6 +7,7 @@ public sealed record AppSettings(
     HotkeyDefinition FullScreenHotkey,
     bool Autostart,
     bool ShowMagnifier = true,
+    bool MagnifierGrid = true,
     int SchemaVersion = AppSettings.CurrentSchema)
 {
     /// <summary>
@@ -14,7 +15,7 @@ public sealed record AppSettings(
     /// older build is missing everything added since, and the reader has to
     /// know what to fill in rather than hand out nulls.
     /// </summary>
-    public const int CurrentSchema = 2;
+    public const int CurrentSchema = 3;
 
     public static AppSettings Default =>
         new(HotkeyDefinition.Default, HotkeyDefinition.DefaultFullScreen, false);

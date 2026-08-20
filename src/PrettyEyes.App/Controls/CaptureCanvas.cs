@@ -50,7 +50,8 @@ public sealed class CaptureCanvas : Control
 
     static CaptureCanvas()
     {
-        AffectsRender<CaptureCanvas>(VeilOpacityProperty, FrameOpacityProperty, MagnifierAtProperty);
+        AffectsRender<CaptureCanvas>(
+            VeilOpacityProperty, FrameOpacityProperty, MagnifierAtProperty, MagnifierGridProperty);
     }
 
     /// <summary>
@@ -91,6 +92,20 @@ public sealed class CaptureCanvas : Control
     {
         get => GetValue(MagnifierAtProperty);
         set => SetValue(MagnifierAtProperty, value);
+    }
+
+    /// <summary>
+    /// The pixel grid inside the magnifier. Off turns the magnifier into plain
+    /// magnification, which is what somebody looking at a picture wants rather
+    /// than somebody aiming at an edge.
+    /// </summary>
+    public static readonly StyledProperty<bool> MagnifierGridProperty =
+        AvaloniaProperty.Register<CaptureCanvas, bool>(nameof(MagnifierGrid), defaultValue: true);
+
+    public bool MagnifierGrid
+    {
+        get => GetValue(MagnifierGridProperty);
+        set => SetValue(MagnifierGridProperty, value);
     }
 
     /// <summary>
@@ -183,7 +198,8 @@ public sealed class CaptureCanvas : Control
             (float)(VisualRoot?.RenderScaling ?? 1.0),
             (float)VeilOpacity,
             (float)FrameOpacity,
-            MagnifierAt));
+            MagnifierAt,
+            MagnifierGrid));
     }
 
     private sealed class CaptureDrawOperation : ICustomDrawOperation
@@ -228,14 +244,16 @@ public sealed class CaptureCanvas : Control
         private readonly float _veilOpacity;
         private readonly float _frameOpacity;
         private readonly PixelPoint? _magnifierAt;
+        private readonly bool _magnifierGrid;
 
         public CaptureDrawOperation(
             Rect bounds, SKImage source, CaptureRect frame, CaptureRect monitor,
             CaptureRect selection, IReadOnlyList<IAnnotation> annotations,
             IAnnotation? preview, float scaling, float veilOpacity, float frameOpacity,
-            PixelPoint? magnifierAt)
+            PixelPoint? magnifierAt, bool magnifierGrid)
         {
             _magnifierAt = magnifierAt;
+            _magnifierGrid = magnifierGrid;
             Bounds = bounds;
             _source = source;
             _frame = frame;
@@ -383,7 +401,11 @@ public sealed class CaptureCanvas : Control
             var sampling = new SKSamplingOptions(SKFilterMode.Nearest, SKMipmapMode.None);
             canvas.DrawImage(_source, source, destination, sampling, null);
 
-            DrawPixelGrid(canvas, destination);
+            if (_magnifierGrid)
+            {
+                DrawPixelGrid(canvas, destination);
+            }
+
             DrawCrosshair(canvas, destination);
 
             canvas.Restore();

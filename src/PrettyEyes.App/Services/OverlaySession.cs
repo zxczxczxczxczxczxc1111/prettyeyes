@@ -59,6 +59,7 @@ public sealed class OverlaySession
             window.ToolbarControl.SaveClicked += OnSaveClicked;
 
             window.SetMagnifierEnabled(_services.Settings.ShowMagnifier);
+            window.SetMagnifierGrid(_services.Settings.MagnifierGrid);
             window.PlaceOn(capture.Layout.Monitors[i], Document);
         }
 

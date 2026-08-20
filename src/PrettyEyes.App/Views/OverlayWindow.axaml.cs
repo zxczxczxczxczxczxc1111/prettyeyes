@@ -161,6 +161,9 @@ public partial class OverlayWindow : Window
         }
     }
 
+    /// <summary>The pixel grid inside the magnifier, on or off.</summary>
+    public void SetMagnifierGrid(bool grid) => Surface.MagnifierGrid = grid;
+
     /// <summary>
     /// Aims the magnifier, or takes it away. It has no business being up while
     /// a tool is drawing, while the pointer is over the toolbar, or when the

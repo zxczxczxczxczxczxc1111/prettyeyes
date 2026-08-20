@@ -68,6 +68,9 @@ public sealed class JsonSettingsStore : ISettingsStore
         // missing, and JSON leaves a missing bool false - which would silently
         // switch off a feature that ships switched on, for everyone updating.
         ShowMagnifier = stored.SchemaVersion >= 2 ? stored.ShowMagnifier : true,
+
+        // Schema 3 added the pixel grid, on by default for the same reason.
+        MagnifierGrid = stored.SchemaVersion >= 3 ? stored.MagnifierGrid : true,
         SchemaVersion = AppSettings.CurrentSchema,
     };
 

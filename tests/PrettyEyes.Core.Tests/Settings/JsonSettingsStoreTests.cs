@@ -135,4 +135,38 @@ public class JsonSettingsStoreTests
 
         Assert.False(store.Load().ShowMagnifier);
     }
+
+    [Fact]
+    public void A_file_older_than_the_pixel_grid_gets_it_switched_on()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pe-{Guid.NewGuid()}.json");
+
+        // Schema 2: the magnifier existed, its grid did not.
+        File.WriteAllText(path, """
+            {
+              "Hotkey": { "Modifiers": 1, "VirtualKey": 71 },
+              "FullScreenHotkey": { "Modifiers": 6, "VirtualKey": 51 },
+              "Autostart": false,
+              "ShowMagnifier": false,
+              "SchemaVersion": 2
+            }
+            """);
+
+        var settings = new JsonSettingsStore(path).Load();
+
+        Assert.False(settings.ShowMagnifier);
+        Assert.True(settings.MagnifierGrid);
+    }
+
+    [Fact]
+    public void A_grid_switched_off_on_purpose_stays_off()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pe-{Guid.NewGuid()}.json");
+        var store = new JsonSettingsStore(path);
+
+        store.Save(AppSettings.Default with { MagnifierGrid = false });
+
+        Assert.False(store.Load().MagnifierGrid);
+        Assert.True(store.Load().ShowMagnifier);
+    }
 }

@@ -51,7 +51,12 @@
                 <controls:HotkeyBox x:Name="FullScreenHotkey" Classes="field" HorizontalAlignment="Stretch"/>
               </StackPanel>
 
-              <CheckBox x:Name="ShowMagnifier" Content="Показывать лупу при выделении"/>
+              <StackPanel Spacing="8">
+                <CheckBox x:Name="ShowMagnifier" Content="Показывать лупу при выделении"/>
+                <!-- Nested under the magnifier, and greyed out rather than
+                     hidden when there is no magnifier to put a grid in. -->
+                <CheckBox x:Name="MagnifierGrid" Margin="26,0,0,0" Content="Сетка пикселей в лупе"/>
+              </StackPanel>
             </StackPanel>
           </StackPanel>
 
