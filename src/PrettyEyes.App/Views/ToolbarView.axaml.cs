@@ -151,8 +151,8 @@ public partial class ToolbarView : UserControl
         yield return (BlurButton, ToolKind.Blur);
         yield return (ArrowButton, ToolKind.Arrow);
         yield return (LineButton, ToolKind.Line);
-        yield return (RectButton, ToolKind.Rectangle);
         yield return (EmojiButton, ToolKind.Emoji);
+        yield return (RectButton, ToolKind.Rectangle);
     }
 
     /// <summary>Puts the chosen glyph on the emoji button.</summary>

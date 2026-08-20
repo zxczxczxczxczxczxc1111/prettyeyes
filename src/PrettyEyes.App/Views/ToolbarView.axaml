@@ -95,6 +95,14 @@
                      Margin="0,0,-3,-3"/>
           </Panel>
         </Button>
+        <Button Classes="tool" x:Name="RectButton" ToolTip.Tip="Рамка, правая кнопка - цвет и толщина">
+          <Panel>
+            <Path Data="M3.5,4 H12.5 V12 H3.5 Z"/>
+            <Ellipse x:Name="RectDot" Width="6" Height="6"
+                     HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                     Margin="0,0,-3,-3"/>
+          </Panel>
+        </Button>
         <Button Classes="tool" x:Name="EmojiButton" ToolTip.Tip="Эмодзи, правая кнопка - выбрать другой">
           <Panel>
             <!-- Until a glyph is chosen the button shows an outline like every
@@ -102,14 +110,6 @@
             <Path x:Name="EmojiOutline"
                   Data="M8,2.5 A5.5,5.5 0 1 0 8.01,2.5 M6,6.5 V7 M10,6.5 V7 M5.5,9.5 A3,3 0 0 0 10.5,9.5"/>
             <Image x:Name="EmojiGlyph" Width="18" Height="18" IsVisible="False"/>
-          </Panel>
-        </Button>
-        <Button Classes="tool" x:Name="RectButton" ToolTip.Tip="Рамка, правая кнопка - цвет и толщина">
-          <Panel>
-            <Path Data="M3.5,4 H12.5 V12 H3.5 Z"/>
-            <Ellipse x:Name="RectDot" Width="6" Height="6"
-                     HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                     Margin="0,0,-3,-3"/>
           </Panel>
         </Button>
       </StackPanel>
