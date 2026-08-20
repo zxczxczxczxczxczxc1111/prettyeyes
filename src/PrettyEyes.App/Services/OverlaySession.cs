@@ -348,6 +348,9 @@ public sealed class OverlaySession
         _layout = null;
         _toolbarShown = false;
 
+        // Blurred slices belong to the capture that is going away.
+        BlurCache.Shared.Clear();
+
         // The frame is roughly 29 MB on two 2K monitors - one leak per hotkey
         // press adds up fast.
         Document?.Dispose();
