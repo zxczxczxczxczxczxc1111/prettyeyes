@@ -78,12 +78,15 @@ public sealed class Win32MonitorEnumerator : IMonitorEnumerator
         var r = info.rcMonitor;
         var bounds = new CaptureRect(r.Left, r.Top, r.Right - r.Left, r.Bottom - r.Top);
 
+        var w = info.rcWork;
+        var work = new CaptureRect(w.Left, w.Top, w.Right - w.Left, w.Bottom - w.Top);
+
         var scale = 1.0;
         if (NativeMethods.GetDpiForMonitor(handle, MdtEffectiveDpi, out var dpiX, out _) == 0)
         {
             scale = dpiX / BaselineDpi;
         }
 
-        return new MonitorInfo(info.szDevice, bounds, scale);
+        return new MonitorInfo(info.szDevice, bounds, scale, work.IsEmpty ? null : work);
     }
 }

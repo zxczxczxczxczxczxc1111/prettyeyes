@@ -39,6 +39,10 @@ public partial class OverlayWindow : Window
     private static readonly Cursor Move = new(StandardCursorType.SizeAll);
 
     private CaptureRect _monitorBounds;
+
+    /// <summary>The monitor minus the taskbar. Panels stay inside it.</summary>
+    private CaptureRect _monitorUsable;
+
     private CaptureRect _frameBounds;
     private CaptureRect _selection;
     private int _anchorX;
@@ -66,6 +70,12 @@ public partial class OverlayWindow : Window
     private int _moveFromX;
     private int _moveFromY;
     private SelectionGrip _grip = SelectionGrip.None;
+
+    /// <summary>The selection as it stood when the current click began.</summary>
+    private CaptureRect _beforeGesture;
+
+    /// <summary>What a second double click puts back. Null once it has.</summary>
+    private CaptureRect? _restore;
     private OverlayMode _mode = OverlayMode.Selecting;
     private Size? _toolbarSize;
     private bool _magnifierWanted = true;
@@ -122,6 +132,13 @@ public partial class OverlayWindow : Window
     public void PlaceOn(MonitorInfo monitor, Document document)
     {
         _monitorBounds = monitor.Bounds;
+        _monitorUsable = monitor.Usable;
+
+        // Windows are pooled, so nothing here is fresh unless it is made
+        // fresh: a selection remembered from the previous capture would come
+        // back on the first double click of this one.
+        _beforeGesture = CaptureRect.Empty;
+        _restore = null;
         _frameBounds = document.SourceBounds;
         _document = document;
 
@@ -465,16 +482,20 @@ public partial class OverlayWindow : Window
         card.Measure(Size.Infinity);
 
         var size = card.DesiredSize;
-        var y = panel.Y + Toolbar.DesiredSize.Height + Gap;
 
-        if (y + size.Height > Height)
-        {
-            y = panel.Y - Gap - size.Height;
-        }
+        // The toolbar stands in for the selection here: the card belongs to the
+        // panel, not to the frame.
+        var y = PanelPlacement.Vertical(
+            panel.Y,
+            panel.Y + Toolbar.DesiredSize.Height,
+            size.Height,
+            Gap,
+            LimitTop,
+            LimitBottom);
 
         card.RenderTransform = new TranslateTransform(
             Math.Clamp(panel.X, 0, Math.Max(0, Width - size.Width)),
-            Math.Max(0, y));
+            y);
     }
 
     public void HideStyleCard() => StyleCard.Close();
@@ -503,17 +524,7 @@ public partial class OverlayWindow : Window
 
         var size = _toolbarSize.Value;
 
-        var y = localBottom + Gap;
-
-        if (y + size.Height > Height)
-        {
-            y = localTop - Gap - size.Height;
-        }
-
-        if (y < 0)
-        {
-            y = Math.Max(0, localBottom - Gap - size.Height);
-        }
+        var y = PanelPlacement.Vertical(localTop, localBottom, size.Height, Gap, LimitTop, LimitBottom);
 
         // Anchored to the right edge of the selection: a right-handed drag ends
         // there, so that is where the hand already is.
@@ -527,6 +538,21 @@ public partial class OverlayWindow : Window
 
         PlaceChip(selection, localX, localTop, toolbarAbove: y < localTop);
     }
+
+    /// <summary>
+    /// The rows a panel is allowed to use, in this window's logical pixels.
+    /// Bounded by the taskbar rather than by the screen: the overlay stops one
+    /// pixel short of the monitor so that Windows does not call it a game, and
+    /// the price of that is a taskbar drawn on top of us. A panel put under it
+    /// is simply gone - which is what a whole-monitor selection used to do to
+    /// the toolbar.
+    /// </summary>
+    private double LimitTop => Math.Max(0, (Usable.Y - _monitorBounds.Y) / RenderScaling);
+
+    private double LimitBottom =>
+        Math.Min(Height, (Usable.Bottom - _monitorBounds.Y) / RenderScaling);
+
+    private CaptureRect Usable => _monitorUsable.IsEmpty ? _monitorBounds : _monitorUsable;
 
     public void HideToolbar()
     {
@@ -605,15 +631,42 @@ public partial class OverlayWindow : Window
 
         var (x, y) = ToVirtualPixels(e.GetPosition(this));
 
+        // What the selection was before this click started changing it. The
+        // first click of a double click already wipes it, so by the time the
+        // second one arrives the only witness left is this field.
+        if (e.ClickCount == 1)
+        {
+            _beforeGesture = _selection;
+        }
+
         // Double click means the whole monitor: dragging across the screen for
-        // the most common capture there is makes no sense.
+        // the most common capture there is makes no sense. Doing it again puts
+        // back whatever was selected before - a whole screen where a small
+        // frame used to be is the kind of mistake worth one click to undo.
         if (e.ClickCount == 2 && _mode != OverlayMode.Drawing)
         {
             _dragging = false;
             _grip = SelectionGrip.None;
-            _mode = OverlayMode.Adjusting;
-            SelectionChanged?.Invoke(this, _monitorBounds);
-            SelectionSettled?.Invoke(this, _monitorBounds);
+
+            CaptureRect selection;
+
+            if (_beforeGesture == _monitorBounds && _restore is not null)
+            {
+                selection = _restore.Value;
+                _restore = null;
+            }
+            else
+            {
+                _restore = _beforeGesture;
+                selection = _monitorBounds;
+            }
+
+            // Nothing selected is a legal thing to go back to: the first double
+            // click of a capture replaces exactly that.
+            _mode = selection.IsEmpty ? OverlayMode.Selecting : OverlayMode.Adjusting;
+
+            SelectionChanged?.Invoke(this, selection);
+            SelectionSettled?.Invoke(this, selection);
             return;
         }
         _lastX = x;
