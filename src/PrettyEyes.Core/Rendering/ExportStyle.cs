@@ -7,6 +7,13 @@ public enum ExportBackground
     Gradient,
     White,
     Transparent,
+
+    /// <summary>
+    /// The screenshot's own blurred copy. Added last on purpose: the value is
+    /// stored as a number, so inserting it anywhere else would silently turn
+    /// somebody's white background into a transparent one.
+    /// </summary>
+    Aura,
 }
 
 /// <summary>
@@ -21,10 +28,19 @@ public sealed record ExportStyle(
     int Padding,
     ExportBackground Background,
     int CornerRadius,
-    bool Shadow)
+    bool Shadow,
+    bool Grain = true,
+    bool Sheen = true)
 {
     /// <summary>Exactly what every version so far produced.</summary>
     public static ExportStyle None => new(false, 0, ExportBackground.Black, 0, false);
+
+    /// <summary>
+    /// Grain is backdrop work: over transparency it would replace the empty
+    /// space with an even haze of noise, which is the opposite of what a
+    /// transparent export is for.
+    /// </summary>
+    public bool GrainAllowed => Grain && Background != ExportBackground.Transparent;
 
     /// <summary>
     /// A shadow needs somewhere to fall. With no padding it lands outside the

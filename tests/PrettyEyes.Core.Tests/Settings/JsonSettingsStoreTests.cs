@@ -1,4 +1,5 @@
 using PrettyEyes.Core.Platform;
+using PrettyEyes.Core.Rendering;
 using PrettyEyes.Core.Settings;
 using PrettyEyes.Core.Tools;
 using Xunit;
@@ -16,6 +17,45 @@ public class JsonSettingsStoreTests
 
         Assert.Equal(HotkeyDefinition.Default, settings.Hotkey);
         Assert.False(settings.Autostart);
+    }
+
+    [Fact]
+    public void Grain_and_light_are_on_for_a_file_written_before_they_existed()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pe-{Guid.NewGuid()}.json");
+        File.WriteAllText(path, """
+            { "Export": { "Enabled": true, "Padding": 48, "Background": 1, "CornerRadius": 16, "Shadow": true } }
+            """);
+
+        var export = new JsonSettingsStore(path).Load().Export;
+
+        Assert.NotNull(export);
+        Assert.True(export!.Grain);
+        Assert.True(export.Sheen);
+    }
+
+    [Fact]
+    public void The_stored_background_keeps_its_meaning_after_a_new_one_was_added()
+    {
+        // Backgrounds are numbers in the file. Anything but appending to the
+        // enum turns somebody's white into transparent without a word.
+        var path = Path.Combine(Path.GetTempPath(), $"pe-{Guid.NewGuid()}.json");
+        File.WriteAllText(path, """
+            { "Export": { "Enabled": true, "Padding": 48, "Background": 2, "CornerRadius": 16, "Shadow": true } }
+            """);
+
+        var export = new JsonSettingsStore(path).Load().Export;
+
+        Assert.Equal(ExportBackground.White, export!.Background);
+    }
+
+    [Fact]
+    public void Grain_stays_off_the_transparent_background()
+    {
+        var style = new ExportStyle(true, 48, ExportBackground.Transparent, 16, true);
+
+        Assert.True(style.Grain);
+        Assert.False(style.GrainAllowed);
     }
 
     [Fact]
