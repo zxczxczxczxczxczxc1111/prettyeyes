@@ -83,6 +83,16 @@ const
 
 procedure PaintControl(Control: TControl); forward;
 
+// The two radios on the "preparing to install" page draw their own captions
+// through the Windows theme and ignore every colour they are given, so on this
+// dark page they came out as dark text on black. Taking the theme off them did
+// not help either. So they lose their captions and get labels of ours instead,
+// which are ordinary controls that do as they are told - and clicking a label
+// picks its radio, so nothing is lost but the theme's opinion.
+var
+  PreparingYesText: TNewStaticText;
+  PreparingNoText: TNewStaticText;
+
 procedure PaintChildren(Parent: TWinControl);
 var
   Index: Integer;
@@ -109,6 +119,19 @@ begin
   begin
     TNewRadioButton(Control).Font.Color := TextStrong;
     TNewRadioButton(Control).Color := Bg;
+  end
+  // The two radios on the "preparing to install" page are plain VCL controls,
+  // not the TNew* ones the rest of the wizard is built from, so they slipped
+  // through and stayed black on black.
+  else if Control is TRadioButton then
+  begin
+    TRadioButton(Control).Font.Color := TextStrong;
+    TRadioButton(Control).Color := Bg;
+  end
+  else if Control is TCheckBox then
+  begin
+    TCheckBox(Control).Font.Color := TextStrong;
+    TCheckBox(Control).Color := Bg;
   end
   else if Control is TNewCheckListBox then
   begin
@@ -209,6 +232,51 @@ begin
   PaintPage(WizardForm.SelectTasksPage);
   PaintPage(WizardForm.ReadyPage);
   PaintPage(WizardForm.PreparingPage);
+
+  // By name as well as by class: this page is the one the updater walks through
+  // unattended, and a choice nobody can read is worse here than anywhere else.
+  WizardForm.PreparingLabel.Font.Color := TextStrong;
+  WizardForm.PreparingYesRadio.Color := Bg;
+  WizardForm.PreparingNoRadio.Color := Bg;
   PaintPage(WizardForm.InstallingPage);
   PaintPage(WizardForm.FinishedPage);
+end;
+
+procedure PickYes(Sender: TObject);
+begin
+  WizardForm.PreparingYesRadio.Checked := True;
+end;
+
+procedure PickNo(Sender: TObject);
+begin
+  WizardForm.PreparingNoRadio.Checked := True;
+end;
+
+function NewLabel(Radio: TNewRadioButton; Text: String; Handler: TNotifyEvent): TNewStaticText;
+begin
+  Result := TNewStaticText.Create(WizardForm);
+  Result.Parent := Radio.Parent;
+  Result.Left := Radio.Left + ScaleX(20);
+  Result.Top := Radio.Top + ScaleY(1);
+  Result.Width := Radio.Width - ScaleX(20);
+  Result.Font.Color := TextStrong;
+  Result.Caption := Text;
+  Result.OnClick := Handler;
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if CurPageID <> wpPreparing then
+    Exit;
+
+  if PreparingYesText = nil then
+  begin
+    PreparingYesText := NewLabel(WizardForm.PreparingYesRadio, WizardForm.PreparingYesRadio.Caption, @PickYes);
+    PreparingNoText := NewLabel(WizardForm.PreparingNoRadio, WizardForm.PreparingNoRadio.Caption, @PickNo);
+  end;
+
+  // Emptied every time: the captions are refilled from the message file when
+  // the page is prepared.
+  WizardForm.PreparingYesRadio.Caption := '';
+  WizardForm.PreparingNoRadio.Caption := '';
 end;
