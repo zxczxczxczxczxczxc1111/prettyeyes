@@ -14,6 +14,7 @@ using SkiaSharp;
 using PrettyEyes.Core.Rendering;
 using PrettyEyes.App.Services;
 using PrettyEyes.Core.Settings;
+using PrettyEyes.Core.Tools;
 using PrettyEyes.Core.Updates;
 using PrettyEyes.Platform.Windows;
 
@@ -33,6 +34,7 @@ public partial class SettingsWindow : Window
     private IAutostart? _autostart;
 
     private AppSettings _settings = AppSettings.Default;
+    private ToolVisibility _tools = new();
     private ExportStyle _export = ExportStyle.None;
     private bool _loading;
 
@@ -101,6 +103,9 @@ public partial class SettingsWindow : Window
         ShowAutosaveState(save.Enabled);
         ShowExample();
 
+        _tools = new ToolVisibility(settings.Tools);
+        BuildToolRow();
+
         CheckUpdates.IsChecked = settings.CheckUpdates;
         CurrentVersion.Text = $"установлена {UpdateService.Current}";
         ShowUpdateState(updates.State);
@@ -138,6 +143,94 @@ public partial class SettingsWindow : Window
             ShowWarning("Комбинация занята другой программой. Выбери другую.");
         }
     }
+
+    /// <summary>
+    /// One checkbox per tool, named the way the toolbar tooltip names it.
+    /// </summary>
+    private void BuildToolRow()
+    {
+        ToolRow.Children.Clear();
+
+        foreach (var kind in ToolVisibility.All)
+        {
+            var button = new Button
+            {
+                Tag = kind,
+                Content = new Avalonia.Controls.Shapes.Path
+                {
+                    Data = Avalonia.Media.Geometry.Parse(ToolIcon(kind)),
+                },
+            };
+
+            button.Classes.Add("toolpick");
+            ToolTip.SetTip(button, ToolName(kind));
+            button.Click += OnToolToggled;
+
+            ToolRow.Children.Add(button);
+        }
+
+        ShowToolRow();
+    }
+
+    /// <summary>Which of them are on, right now.</summary>
+    private void ShowToolRow()
+    {
+        foreach (var child in ToolRow.Children)
+        {
+            if (child is not Button button || button.Tag is not ToolKind kind)
+            {
+                continue;
+            }
+
+            button.Classes.Remove("active");
+
+            if (_tools.IsShown(kind))
+            {
+                button.Classes.Add("active");
+            }
+        }
+    }
+
+    private void OnToolToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_loading || sender is not Button button || button.Tag is not ToolKind kind)
+        {
+            return;
+        }
+
+        if (!_tools.TrySet(kind, !_tools.IsShown(kind)))
+        {
+            ShowWarning("Хотя бы один инструмент должен остаться.");
+
+            return;
+        }
+
+        ShowToolRow();
+        Store(_settings with { Tools = _tools.ToDictionary() });
+    }
+
+    /// <summary>
+    /// The same outlines the toolbar draws. Duplicated rather than shared: a
+    /// resource dictionary for five path strings buys nothing, and the toolbar
+    /// markup is where anyone would go looking for them anyway.
+    /// </summary>
+    private static string ToolIcon(ToolKind kind) => kind switch
+    {
+        ToolKind.Blur => "M4,4 H6.5 V6.5 H4 Z M9.5,4 H12 V6.5 H9.5 Z M6.5,6.5 H9 V9 H6.5 Z M4,9.5 H6.5 V12 H4 Z M9.5,9.5 H12 V12 H9.5 Z",
+        ToolKind.Arrow => "M4,12 L12,4 M12,4 H7.5 M12,4 V8.5",
+        ToolKind.Line => "M4,12 L12,4",
+        ToolKind.Emoji => "M8,2.5 A5.5,5.5 0 1 0 8.01,2.5 M6,6.5 V7 M10,6.5 V7 M5.5,9.5 A3,3 0 0 0 10.5,9.5",
+        _ => "M3.5,4 H12.5 V12 H3.5 Z",
+    };
+
+    private static string ToolName(ToolKind kind) => kind switch
+    {
+        ToolKind.Blur => "Размытие",
+        ToolKind.Arrow => "Стрелка",
+        ToolKind.Line => "Линия",
+        ToolKind.Emoji => "Эмодзи",
+        _ => "Рамка",
+    };
 
     private void OnCheckUpdatesChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {

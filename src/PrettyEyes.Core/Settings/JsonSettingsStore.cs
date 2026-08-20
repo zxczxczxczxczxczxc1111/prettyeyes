@@ -93,6 +93,10 @@ public sealed class JsonSettingsStore : ISettingsStore
         // that has the property missing, and a missing bool reads as false -
         // which would leave every existing install checking for nothing.
         CheckUpdates = stored.SchemaVersion >= 8 ? stored.CheckUpdates : true,
+
+        // Schema 9 let the toolbar be cut down. Nothing recorded means nothing
+        // was turned off, which is every tool shown.
+        Tools = stored.Tools ?? [],
         SchemaVersion = AppSettings.CurrentSchema,
     };
 

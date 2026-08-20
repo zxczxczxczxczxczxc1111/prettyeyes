@@ -91,6 +91,19 @@ public partial class ToolbarView : UserControl
         StyleRequested?.Invoke(this, kind);
     }
 
+    /// <summary>
+    /// Hides the tools that were turned off in the settings. Hidden and not
+    /// disabled: a greyed-out row of buttons is the clutter the setting exists
+    /// to get rid of.
+    /// </summary>
+    public void ShowTools(ToolVisibility tools)
+    {
+        foreach (var (button, kind) in Buttons())
+        {
+            button.IsVisible = tools.IsShown(kind);
+        }
+    }
+
     private IEnumerable<(Ellipse Dot, ToolKind Kind)> Dots()
     {
         yield return (ArrowDot, ToolKind.Arrow);

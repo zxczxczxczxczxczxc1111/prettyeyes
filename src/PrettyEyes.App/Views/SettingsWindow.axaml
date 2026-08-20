@@ -4,7 +4,7 @@
         x:Class="PrettyEyes.App.Views.SettingsWindow"
         Title="prettyeyes"
         Icon="/Assets/prettyeyes.ico"
-        Width="880" Height="780"
+        Width="880" Height="920"
         CanResize="False"
         SystemDecorations="None"
         Background="{StaticResource Bg}"
@@ -63,7 +63,25 @@
             <Rectangle Height="1" Fill="{StaticResource Border}"/>
 
             <StackPanel Spacing="12">
-              <TextBlock Text="Сохранение" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
+              <TextBlock Text="Панель инструментов" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
+              <TextBlock Text="Выключенное не появится в панели при выделении. Наведи, чтобы прочитать название."
+                         Foreground="{StaticResource TextFaint}" FontSize="11" TextWrapping="Wrap"/>
+              <!-- The same icons the toolbar draws, in the same order, so the
+                   setting is read as a picture of the toolbar rather than as a
+                   list that happens to be about it. Filled from code: the list
+                   cannot then drift from the tools that actually exist. -->
+              <StackPanel x:Name="ToolRow" Orientation="Horizontal" Spacing="8"/>
+            </StackPanel>
+
+            <Rectangle Height="1" Fill="{StaticResource Border}"/>
+
+            <StackPanel Spacing="12">
+              <TextBlock Text="Быстрое сохранение" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
+              <!-- Says what it does, because the group heading reads like a
+                   place to pick a folder for the save dialog, and it is not:
+                   nothing here changes what Ctrl+S does. -->
+              <TextBlock Text="Каждый скопированный скриншот сразу ложится файлом в папку, без диалога и уведомлений. Буфер обмена работает как раньше."
+                         Foreground="{StaticResource TextFaint}" FontSize="11" TextWrapping="Wrap"/>
               <CheckBox x:Name="Autosave" Content="Сохранять скриншоты в папку"/>
 
               <StackPanel x:Name="AutosaveOptions" Spacing="12" Opacity="0.4" IsEnabled="False">

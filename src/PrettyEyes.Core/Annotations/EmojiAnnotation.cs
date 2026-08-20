@@ -11,7 +11,7 @@ namespace PrettyEyes.Core.Annotations;
 /// stamped many times, and an annotation that disposed it would take the rest
 /// with it.
 /// </summary>
-public sealed class EmojiAnnotation : IAnnotation
+public sealed class EmojiAnnotation : IMovable
 {
     private readonly SKImage _glyph;
 
@@ -22,6 +22,9 @@ public sealed class EmojiAnnotation : IAnnotation
     }
 
     public CaptureRect Bounds { get; }
+
+    public IMovable MovedBy(int dx, int dy) =>
+        new EmojiAnnotation(Bounds with { X = Bounds.X + dx, Y = Bounds.Y + dy }, _glyph);
 
     public void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin)
     {

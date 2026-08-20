@@ -59,6 +59,7 @@ public sealed class OverlaySession
             window.Cancelled += OnCancelled;
             window.UndoRequested += OnUndoRequested;
             window.AnnotationDrawn += OnAnnotationDrawn;
+            window.AnnotationMoved += OnAnnotationMoved;
             window.CopyRequested += OnCopyClicked;
             window.SaveRequested += OnSaveRequested;
             window.ColourCopyRequested += OnColourCopyRequested;
@@ -73,6 +74,7 @@ public sealed class OverlaySession
                 window.ToolbarControl.ShowGlyph(_emoji);
             }
             window.ToolbarControl.ShowStyles(_styles);
+            window.ToolbarControl.ShowTools(new ToolVisibility(_services.Settings.Tools));
             window.ToolFactory = () => _activeTool is null ? null : CreateTool(_activeTool.Value);
             window.ToolbarControl.ToolPicked += OnToolPicked;
             window.ToolbarControl.UndoClicked += OnUndoRequested;
@@ -101,6 +103,7 @@ public sealed class OverlaySession
         window.Cancelled -= OnCancelled;
         window.UndoRequested -= OnUndoRequested;
         window.AnnotationDrawn -= OnAnnotationDrawn;
+        window.AnnotationMoved -= OnAnnotationMoved;
         window.CopyRequested -= OnCopyClicked;
         window.SaveRequested -= OnSaveRequested;
         window.ColourCopyRequested -= OnColourCopyRequested;
@@ -399,6 +402,16 @@ public sealed class OverlaySession
     private void OnAnnotationDrawn(object? sender, IAnnotation annotation)
     {
         Document?.Add(annotation);
+        Redraw();
+    }
+
+    /// <summary>
+    /// A carried glyph was put down. A drop that went nowhere still redraws:
+    /// that is how a cancelled carry gets the glyph back on screen.
+    /// </summary>
+    private void OnAnnotationMoved(object? sender, (IMovable Annotation, int Dx, int Dy) move)
+    {
+        Document?.Move(move.Annotation, move.Dx, move.Dy);
         Redraw();
     }
 

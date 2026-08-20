@@ -44,6 +44,14 @@ public partial class OverlayWindow : Window
     private int _lastX;
     private int _lastY;
     private bool _dragging;
+
+    /// <summary>The document, for finding what is under the pointer.</summary>
+    private Document? _document;
+
+    /// <summary>The glyph being carried, and where it was picked up.</summary>
+    private IMovable? _moving;
+    private int _moveFromX;
+    private int _moveFromY;
     private SelectionGrip _grip = SelectionGrip.None;
     private OverlayMode _mode = OverlayMode.Selecting;
     private Size? _toolbarSize;
@@ -67,6 +75,9 @@ public partial class OverlayWindow : Window
 
     /// <summary>Raised once a tool gesture produced a shape.</summary>
     public event EventHandler<IAnnotation>? AnnotationDrawn;
+
+    /// <summary>A stamped glyph was carried somewhere else and let go.</summary>
+    public event EventHandler<(IMovable Annotation, int Dx, int Dy)>? AnnotationMoved;
 
     /// <summary>Ctrl+C or Enter: the same thing the copy button does.</summary>
     public event EventHandler? CopyRequested;
@@ -96,6 +107,7 @@ public partial class OverlayWindow : Window
     {
         _monitorBounds = monitor.Bounds;
         _frameBounds = document.SourceBounds;
+        _document = document;
 
         Position = new PixelPoint(monitor.Bounds.X, monitor.Bounds.Y);
         Show();
@@ -232,6 +244,24 @@ public partial class OverlayWindow : Window
         }
 
         Loupe.Show();
+    }
+
+    /// <summary>
+    /// Puts the carried glyph back into the picture. Whether it lands where it
+    /// was or somewhere new is the caller's next line.
+    /// </summary>
+    private void DropCarried()
+    {
+        _moving = null;
+
+        // Back into the document first: ShowPreview redraws, and a frame drawn
+        // between the two would show the glyph nowhere at all.
+        if (_document is not null)
+        {
+            _document.Detached = null;
+        }
+
+        Surface.ShowPreview(null);
     }
 
     private void HideMagnifier()
@@ -519,6 +549,20 @@ public partial class OverlayWindow : Window
         // window - which is exactly what happens on the way to the next monitor.
         e.Pointer.Capture(this);
 
+        // Ctrl picks a stamped glyph up instead of drawing on top of it. Held
+        // rather than plain, because a plain drag over a glyph has to keep
+        // meaning what it means with every tool: draw a new one.
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && _document?.MovableAt(x, y) is { } carried)
+        {
+            _moving = carried;
+            _moveFromX = x;
+            _moveFromY = y;
+            _document.Detached = carried;
+            Surface.ShowPreview(carried);
+            HideMagnifier();
+            return;
+        }
+
         if (_mode == OverlayMode.Drawing)
         {
             var (toolX, toolY) = _selection.ClampPoint(x, y);
@@ -558,8 +602,16 @@ public partial class OverlayWindow : Window
 
         if (!_dragging)
         {
-            UpdateCursor(x, y);
+            UpdateCursor(x, y, e.KeyModifiers);
             UpdateMagnifier(x, y);
+            return;
+        }
+
+        if (_moving is not null)
+        {
+            Surface.ShowPreview(_moving.MovedBy(x - _moveFromX, y - _moveFromY));
+            _lastX = x;
+            _lastY = y;
             return;
         }
 
@@ -600,6 +652,14 @@ public partial class OverlayWindow : Window
 
         var (x, y) = ToVirtualPixels(e.GetPosition(this));
 
+        if (_moving is { } carried)
+        {
+            DropCarried();
+            AnnotationMoved?.Invoke(this, (carried, x - _moveFromX, y - _moveFromY));
+
+            return;
+        }
+
         if (_mode == OverlayMode.Drawing)
         {
             var (toolX, toolY) = _selection.ClampPoint(x, y);
@@ -629,8 +689,16 @@ public partial class OverlayWindow : Window
     }
 
     /// <summary>The cursor says what the next press will do.</summary>
-    private void UpdateCursor(int x, int y)
+    private void UpdateCursor(int x, int y, KeyModifiers modifiers)
     {
+        // Ctrl over a stamped glyph picks it up, whatever tool is armed. The
+        // cursor is the only place that says so.
+        if (modifiers.HasFlag(KeyModifiers.Control) && _document?.MovableAt(x, y) is not null)
+        {
+            Cursor = Move;
+            return;
+        }
+
         if (_mode == OverlayMode.Drawing)
         {
             Cursor = Cross;
@@ -658,6 +726,16 @@ public partial class OverlayWindow : Window
         {
             // One step of undo per press: the open card first, then the tool,
             // and only then the overlay itself.
+            // Before the rest of the ladder: a glyph in mid-air is the most
+            // recent thing started, so it is the first thing Esc takes back.
+            case Key.Escape when _moving is { } dropped:
+                DropCarried();
+
+                // Nowhere is a legal destination, and reporting it as a move
+                // gets every monitor redrawn by the one place that can do it.
+                AnnotationMoved?.Invoke(this, (dropped, 0, 0));
+                break;
+
             case Key.Escape when StyleCard.IsVisible || EmojiCard.IsVisible:
                 StyleCard.Close();
                 EmojiCard.Close();

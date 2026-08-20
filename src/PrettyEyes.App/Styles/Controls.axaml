@@ -140,6 +140,44 @@
     <Setter Property="Background" Value="{StaticResource FillHover}"/>
   </Style>
 
+  <!-- The toolbar, in miniature, as a row of switches. Square, because the
+       content is the tool's own icon: a chip shaped like a label would promise
+       a word. Off is faded rather than crossed out - the row then reads as the
+       toolbar it is about, with some of it turned down. -->
+  <Style Selector=":is(Button).toolpick">
+    <Setter Property="Width" Value="38"/>
+    <Setter Property="Height" Value="38"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="Background" Value="{StaticResource Fill}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+    <Setter Property="Opacity" Value="0.45"/>
+  </Style>
+
+  <Style Selector=":is(Button).toolpick:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource FillHover}"/>
+  </Style>
+
+  <Style Selector=":is(Button).toolpick.active">
+    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}"/>
+    <Setter Property="Opacity" Value="1"/>
+  </Style>
+
+  <Style Selector=":is(Button).toolpick Path">
+    <Setter Property="Stroke" Value="{Binding $parent[Button].Foreground}"/>
+    <Setter Property="StrokeThickness" Value="1.5"/>
+    <Setter Property="StrokeLineCap" Value="Round"/>
+    <Setter Property="StrokeJoin" Value="Round"/>
+    <Setter Property="Width" Value="16"/>
+    <Setter Property="Height" Value="16"/>
+    <Setter Property="Stretch" Value="None"/>
+    <Setter Property="HorizontalAlignment" Value="Center"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+
   <!-- A text field that looks like the hotkey field next to it: same fill,
        same hairline, same radius. The default Avalonia box brings its own
        light theme with it. -->

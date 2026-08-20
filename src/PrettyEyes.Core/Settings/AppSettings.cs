@@ -16,6 +16,7 @@ public sealed record AppSettings(
     SaveOptions? Save = null,
     ExportStyle? Export = null,
     bool CheckUpdates = true,
+    Dictionary<ToolKind, bool>? Tools = null,
     int SchemaVersion = AppSettings.CurrentSchema)
 {
     /// <summary>
@@ -23,7 +24,7 @@ public sealed record AppSettings(
     /// older build is missing everything added since, and the reader has to
     /// know what to fill in rather than hand out nulls.
     /// </summary>
-    public const int CurrentSchema = 8;
+    public const int CurrentSchema = 9;
 
     public static AppSettings Default =>
         new(HotkeyDefinition.Default, HotkeyDefinition.DefaultFullScreen, false);
