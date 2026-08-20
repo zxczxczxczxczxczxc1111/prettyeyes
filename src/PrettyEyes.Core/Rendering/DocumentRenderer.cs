@@ -15,6 +15,22 @@ public static class DocumentRenderer
 
     private const float ShadowOffset = 0.25f;
 
+    /// <summary>Short side of the copy the aura is built from.</summary>
+    private const int AuraThumbnail = 64;
+
+    /// <summary>Blur radius on that copy, not on the screenshot.</summary>
+    private const float AuraSigma = 12f;
+
+    /// <summary>How far past the canvas the haze is stretched.</summary>
+    private const float AuraSpread = 1.6f;
+
+    /// <summary>Below this the screenshot counts as dark and the haze is lifted.</summary>
+    private const double AuraThreshold = 0.5;
+
+    private const byte AuraLift = 90;
+
+    private const byte AuraShade = 60;
+
     public static SKImage Render(Document document) => Render(document, ExportStyle.None);
 
     public static SKImage Render(Document document, ExportStyle style)
@@ -80,7 +96,7 @@ public static class DocumentRenderer
         var canvas = surface.Canvas;
         canvas.Clear(SKColors.Transparent);
 
-        DrawBackground(canvas, style.Background, width, height);
+        DrawBackground(canvas, style, shot, width, height);
 
         var destination = SKRect.Create(style.Padding, style.Padding, shot.Width, shot.Height);
         using var paint = new SKPaint { IsAntialias = true };
@@ -114,12 +130,16 @@ public static class DocumentRenderer
         return surface.Snapshot();
     }
 
-    private static void DrawBackground(SKCanvas canvas, ExportBackground background, int width, int height)
+    private static void DrawBackground(SKCanvas canvas, ExportStyle style, SKImage shot, int width, int height)
     {
         var area = SKRect.Create(0, 0, width, height);
 
-        switch (background)
+        switch (style.Background)
         {
+            case ExportBackground.Aura:
+                DrawAura(canvas, shot, width, height);
+                return;
+
             case ExportBackground.Transparent:
                 return;
 
@@ -146,5 +166,110 @@ public static class DocumentRenderer
                 canvas.Clear(SKColors.Black);
                 return;
         }
+    }
+
+    /// <summary>
+    /// The screenshot's own blurred copy, blown up past the edges.
+    ///
+    /// A gradient is a decision somebody made once for every screenshot there
+    /// will ever be; this one is made by the picture itself, so the colours
+    /// behind it are always its own.
+    /// </summary>
+    private static void DrawAura(SKCanvas canvas, SKImage shot, int width, int height)
+    {
+        using var thumbnail = Thumbnail(shot);
+        using var haze = Blur(thumbnail);
+
+        // Bigger than the canvas so the blurred edges stay off screen: a blur
+        // clamped at the border leaves a visible seam along it.
+        var spread = SKRect.Create(
+            (width - (width * AuraSpread)) / 2f,
+            (height - (height * AuraSpread)) / 2f,
+            width * AuraSpread,
+            height * AuraSpread);
+
+        // Linear with mipmaps, because this is a 64 pixel image stretched
+        // across a whole canvas: the default in SkiaSharp 3 is nearest
+        // neighbour, and that turns the haze into forty pixel squares.
+        canvas.DrawImage(haze, spread, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
+
+        // Away from the screenshot's own lightness, never towards it. A dark
+        // shot on a dark haze is the illness this whole thing is curing, and a
+        // white page on a white haze is the same illness from the other side.
+        var veil = Luminance(thumbnail) < AuraThreshold
+            ? new SKColor(255, 255, 255, AuraLift)
+            : new SKColor(0, 0, 0, AuraShade);
+
+        using var paint = new SKPaint { Color = veil };
+        canvas.DrawRect(SKRect.Create(0, 0, width, height), paint);
+    }
+
+    /// <summary>
+    /// A copy small enough that blurring it is free. Only ever smaller: a forty
+    /// pixel selection blown up to sixty-four before being blurred would be
+    /// paying for detail that is not there.
+    /// </summary>
+    private static SKImage Thumbnail(SKImage shot)
+    {
+        var shorter = Math.Min(shot.Width, shot.Height);
+        var scale = Math.Min(1f, (float)AuraThumbnail / shorter);
+
+        var width = Math.Max(1, (int)(shot.Width * scale));
+        var height = Math.Max(1, (int)(shot.Height * scale));
+
+        using var surface = SKSurface.Create(new SKImageInfo(width, height))
+            ?? throw new InvalidOperationException($"Could not allocate a {width}x{height} surface.");
+
+        surface.Canvas.DrawImage(
+            shot,
+            SKRect.Create(0, 0, width, height),
+            new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
+
+        return surface.Snapshot();
+    }
+
+    private static SKImage Blur(SKImage thumbnail)
+    {
+        using var surface = SKSurface.Create(new SKImageInfo(thumbnail.Width, thumbnail.Height))
+            ?? throw new InvalidOperationException("Could not allocate a surface for the aura.");
+
+        using var filter = SKImageFilter.CreateBlur(AuraSigma, AuraSigma, SKShaderTileMode.Clamp);
+        using var paint = new SKPaint { ImageFilter = filter };
+
+        surface.Canvas.DrawImage(thumbnail, 0, 0, new SKSamplingOptions(SKFilterMode.Linear), paint);
+
+        return surface.Snapshot();
+    }
+
+    /// <summary>
+    /// How light the screenshot is, from the thumbnail that already exists.
+    /// Reading the full picture would be three and a half million pixels for a
+    /// number that a sixty-four pixel copy answers just as well.
+    /// </summary>
+    private static double Luminance(SKImage thumbnail)
+    {
+        using var pixels = thumbnail.PeekPixels();
+
+        if (pixels is null)
+        {
+            return 0;
+        }
+
+        var total = 0.0;
+        var counted = 0;
+
+        for (var y = 0; y < pixels.Height; y++)
+        {
+            for (var x = 0; x < pixels.Width; x++)
+            {
+                var colour = pixels.GetPixelColor(x, y);
+
+                // Rec. 601, the same weights the crosshair and the highlighter use.
+                total += ((colour.Red * 0.299) + (colour.Green * 0.587) + (colour.Blue * 0.114)) / 255.0;
+                counted++;
+            }
+        }
+
+        return counted == 0 ? 0 : total / counted;
     }
 }
