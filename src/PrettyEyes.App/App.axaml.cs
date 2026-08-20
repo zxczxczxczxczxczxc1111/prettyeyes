@@ -5,6 +5,7 @@ using Avalonia.Threading;
 using PrettyEyes.App.Services;
 using PrettyEyes.App.Views;
 using PrettyEyes.Core.Model;
+using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Core.Rendering;
 
@@ -75,6 +76,7 @@ public partial class App : Application
 
         try
         {
+            using var scope = Log.Default.Scope("capture");
             capture = Services.Capture.CaptureAll();
         }
         catch (InvalidOperationException ex)
@@ -103,6 +105,7 @@ public partial class App : Application
 
         try
         {
+            using var scope = Log.Default.Scope("capture");
             capture = Services.Capture.CaptureAll();
         }
         catch (InvalidOperationException ex)

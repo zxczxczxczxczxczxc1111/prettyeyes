@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Platform;
@@ -31,11 +32,20 @@ public sealed class WgcScreenCapture : IScreenCapture, IDisposable
     private readonly ID3D11Device _device;
     private readonly ID3D11DeviceContext _context;
     private readonly IDirect3DDevice _winrtDevice;
+
+    /// <summary>
+    /// Where the per-step timings go. Null in the application: the numbers are
+    /// only wanted by the benchmark, and measuring the parts is the only way to
+    /// know which one is worth optimising.
+    /// </summary>
+    private readonly Action<string, double>? _timing;
+
     private bool _disposed;
 
-    public WgcScreenCapture(IMonitorEnumerator monitors)
+    public WgcScreenCapture(IMonitorEnumerator monitors, Action<string, double>? timing = null)
     {
         _monitors = monitors;
+        _timing = timing;
 
         // BgraSupport is required: the capture frames arrive as BGRA textures.
         var result = D3D11.D3D11CreateDevice(
@@ -73,11 +83,15 @@ public sealed class WgcScreenCapture : IScreenCapture, IDisposable
         var handles = Win32MonitorEnumerator.Handles();
 
         var info = new SKImageInfo(bounds.Width, bounds.Height, SKColorType.Bgra8888, SKAlphaType.Opaque);
-        using var surface = SKSurface.Create(info)
+        using var surface = Step("surface", () => SKSurface.Create(info))
             ?? throw new InvalidOperationException($"Could not allocate a {bounds.Width}x{bounds.Height} surface.");
 
         var canvas = surface.Canvas;
-        canvas.Clear(SKColors.Black);
+        Step("clear", () =>
+        {
+            canvas.Clear(SKColors.Black);
+            return 0;
+        });
 
         foreach (var monitor in layout.Monitors)
         {
@@ -86,11 +100,16 @@ public sealed class WgcScreenCapture : IScreenCapture, IDisposable
                 throw new InvalidOperationException($"No display handle for {monitor.DeviceId}.");
             }
 
-            using var image = CaptureMonitor(handle, monitor.Bounds);
-            canvas.DrawImage(image, monitor.Bounds.X - bounds.X, monitor.Bounds.Y - bounds.Y);
+            using var image = Step("monitor всего", () => CaptureMonitor(handle, monitor.Bounds));
+            var target = image;
+            Step("stitch", () =>
+            {
+                canvas.DrawImage(target, monitor.Bounds.X - bounds.X, monitor.Bounds.Y - bounds.Y);
+                return 0;
+            });
         }
 
-        return new CaptureResult(surface.Snapshot(), layout);
+        return new CaptureResult(Step("snapshot", surface.Snapshot), layout);
     }
 
     public void Dispose()
@@ -107,14 +126,30 @@ public sealed class WgcScreenCapture : IScreenCapture, IDisposable
         _device.Dispose();
     }
 
+    /// <summary>Times one step and reports it, when anyone is listening.</summary>
+    private T Step<T>(string name, Func<T> body)
+    {
+        if (_timing is null)
+        {
+            return body();
+        }
+
+        var watch = Stopwatch.StartNew();
+        var result = body();
+        watch.Stop();
+        _timing(name, watch.Elapsed.TotalMilliseconds);
+
+        return result;
+    }
+
     private SKImage CaptureMonitor(IntPtr handle, CaptureRect monitorBounds)
     {
-        var item = CaptureInterop.CreateItemForMonitor(handle);
+        var item = Step("item", () => CaptureInterop.CreateItemForMonitor(handle));
 
-        using var pool = Direct3D11CaptureFramePool.CreateFreeThreaded(
-            _winrtDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 1, item.Size);
+        using var pool = Step("pool", () => Direct3D11CaptureFramePool.CreateFreeThreaded(
+            _winrtDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 1, item.Size));
 
-        using var session = pool.CreateCaptureSession(item);
+        using var session = Step("session", () => pool.CreateCaptureSession(item));
         session.IsCursorCaptureEnabled = false;
 
         // The yellow capture border is a Windows 11 addition; older builds do
@@ -138,9 +173,13 @@ public sealed class WgcScreenCapture : IScreenCapture, IDisposable
             }
         };
 
-        session.StartCapture();
+        var delivered = Step("start+frame", () =>
+        {
+            session.StartCapture();
+            return arrived.Wait(FrameTimeout);
+        });
 
-        if (!arrived.Wait(FrameTimeout) || frame is null)
+        if (!delivered || frame is null)
         {
             throw new InvalidOperationException("Windows.Graphics.Capture delivered no frame in time.");
         }
@@ -173,7 +212,7 @@ public sealed class WgcScreenCapture : IScreenCapture, IDisposable
         var description = source.Description;
 
         // A staging texture is the only kind the CPU is allowed to read.
-        using var staging = _device.CreateTexture2D(new Texture2DDescription
+        using var staging = Step("staging", () => _device.CreateTexture2D(new Texture2DDescription
         {
             Width = description.Width,
             Height = description.Height,
@@ -185,11 +224,15 @@ public sealed class WgcScreenCapture : IScreenCapture, IDisposable
             BindFlags = BindFlags.None,
             CPUAccessFlags = CpuAccessFlags.Read,
             MiscFlags = ResourceOptionFlags.None,
+        }));
+
+        Step("copy+map", () =>
+        {
+            _context.CopyResource(staging, source);
+            return 0;
         });
 
-        _context.CopyResource(staging, source);
-
-        var mapped = _context.Map(staging, 0, MapMode.Read, Vortice.Direct3D11.MapFlags.None);
+        var mapped = Step("map", () => _context.Map(staging, 0, MapMode.Read, Vortice.Direct3D11.MapFlags.None));
 
         try
         {
@@ -199,20 +242,30 @@ public sealed class WgcScreenCapture : IScreenCapture, IDisposable
             var height = Math.Min((int)description.Height, monitorBounds.Height);
 
             var info = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Opaque);
-            var buffer = new byte[width * height * 4];
-
-            for (var row = 0; row < height; row++)
+            var buffer = Step("rows", () =>
             {
-                Marshal.Copy(mapped.DataPointer + (row * (int)mapped.RowPitch), buffer, row * width * 4, width * 4);
-            }
+                var bytes = new byte[width * height * 4];
+
+                for (var row = 0; row < height; row++)
+                {
+                    Marshal.Copy(mapped.DataPointer + (row * (int)mapped.RowPitch), bytes, row * width * 4, width * 4);
+                }
+
+                return bytes;
+            });
 
             // The capture leaves alpha unset on opaque desktops; force it.
-            for (var i = 3; i < buffer.Length; i += 4)
+            Step("alpha", () =>
             {
-                buffer[i] = 255;
-            }
+                for (var i = 3; i < buffer.Length; i += 4)
+                {
+                    buffer[i] = 255;
+                }
 
-            return SKImage.FromPixelCopy(info, buffer)
+                return 0;
+            });
+
+            return Step("toimage", () => SKImage.FromPixelCopy(info, buffer))
                 ?? throw new InvalidOperationException("Skia rejected the captured pixel buffer.");
         }
         finally

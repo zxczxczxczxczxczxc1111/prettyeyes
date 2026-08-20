@@ -1,4 +1,5 @@
 using PrettyEyes.App.Views;
+using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Platform;
@@ -29,6 +30,8 @@ public sealed class OverlaySession
 
     public void Start(CaptureResult capture)
     {
+        using var scope = Log.Default.Scope("overlay");
+
         _closed = false;
         _layout = capture.Layout;
         Document = new Document(capture.Image, capture.Bounds);
@@ -189,15 +192,16 @@ public sealed class OverlaySession
         {
             await SendAsync(sink);
         }
-        catch (IOException ex)
+        catch (Exception ex)
         {
+            // An async void handler is the one place where an exception has
+            // nowhere to go: it would take the whole process with it. Even a
+            // COMException from the clipboard has to end up on screen instead.
+            Log.Default.Error("вывод снимка не удался", ex);
             SetTopmost(true);
-            ShowError(ex.Message);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            SetTopmost(true);
-            ShowError(ex.Message);
+            ShowError(ex is IOException or UnauthorizedAccessException
+                ? ex.Message
+                : "Не удалось отдать снимок. Подробности в журнале.");
         }
     }
 

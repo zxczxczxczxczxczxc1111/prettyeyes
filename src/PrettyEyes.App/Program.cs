@@ -1,6 +1,8 @@
 using Avalonia;
 using System;
 using System.Threading;
+using System.Threading.Tasks;
+using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Platform.Windows;
 
 namespace PrettyEyes.App;
@@ -23,11 +25,39 @@ class Program
             return;
         }
 
+        // Nothing here is allowed to die quietly: a tray application shows no
+        // window when it crashes, so the log file is the only witness.
+        AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            if (e.ExceptionObject is Exception error)
+            {
+                Log.Default.Error("необработанное исключение", error);
+            }
+        };
+
+        TaskScheduler.UnobservedTaskException += (_, e) =>
+        {
+            Log.Default.Error("незамеченная ошибка задачи", e.Exception);
+            e.SetObserved();
+        };
+
         // Must happen before any window exists, so the shell groups them under
         // the same identity the installer's shortcut carries.
         AppIdentity.Declare();
 
-        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        Log.Default.Info("запуск");
+
+        try
+        {
+            BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+        }
+        catch (Exception error)
+        {
+            Log.Default.Error("приложение упало на старте или в цикле сообщений", error);
+            throw;
+        }
+
+        Log.Default.Info("выход");
     }
 
     // Avalonia configuration, don't remove; also used by visual designer.
