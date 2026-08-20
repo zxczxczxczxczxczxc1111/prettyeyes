@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Platform.Windows.Native;
@@ -11,6 +12,7 @@ using Vortice.Direct3D;
 using Vortice.Direct3D11;
 using Vortice.DXGI;
 using global::Windows.Graphics.Capture;
+using global::Windows.Security.Authorization.AppCapabilityAccess;
 using global::Windows.Graphics.DirectX;
 using global::Windows.Graphics.DirectX.Direct3D11;
 
@@ -79,6 +81,54 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
     public static bool IsSupported => GraphicsCaptureSession.IsSupported();
 
     /// <summary>
+    /// Whether Windows agreed to leave the yellow capture border off.
+    ///
+    /// Setting IsBorderRequired to false is not enough on its own: Windows 11
+    /// keeps drawing the border until the user has consented through
+    /// RequestAccessAsync, and the documented way to ask is a packaged app with
+    /// the graphicsCaptureWithoutBorder capability. Asked once anyway, because
+    /// the answer costs a call and the alternative is guessing. What comes back
+    /// goes in the log; nothing else depends on it.
+    /// </summary>
+    private static bool? _borderless;
+
+    private static void AskForBorderless()
+    {
+        if (_borderless is not null)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!global::Windows.Foundation.Metadata.ApiInformation.IsTypePresent(
+                    "Windows.Graphics.Capture.GraphicsCaptureAccess"))
+            {
+                _borderless = false;
+                Log.Default.Info("рамка захвата: эта сборка Windows про неё не знает");
+
+                return;
+            }
+
+            var access = GraphicsCaptureAccess
+                .RequestAccessAsync(GraphicsCaptureAccessKind.Borderless)
+                .AsTask()
+                .GetAwaiter()
+                .GetResult();
+
+            _borderless = access == AppCapabilityAccessStatus.Allowed;
+            Log.Default.Info($"рамка захвата: {access}");
+        }
+        catch (Exception error)
+        {
+            // A refusal is an answer; an exception is one too. Neither is worth
+            // failing a screenshot over.
+            _borderless = false;
+            Log.Default.Error("не удалось спросить про рамку захвата", error);
+        }
+    }
+
+    /// <summary>
     /// Runs on the worker thread, never on the caller's.
     ///
     /// The application's UI thread is a single-threaded apartment, and every
@@ -95,6 +145,8 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
 
     private CaptureResult CaptureOnWorker()
     {
+        AskForBorderless();
+
         var layout = _monitors.Enumerate();
         var bounds = layout.VirtualBounds;
 
