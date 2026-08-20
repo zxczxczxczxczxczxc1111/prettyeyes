@@ -83,16 +83,6 @@ const
 
 procedure PaintControl(Control: TControl); forward;
 
-// The two radios on the "preparing to install" page draw their own captions
-// through the Windows theme and ignore every colour they are given, so on this
-// dark page they came out as dark text on black. Taking the theme off them did
-// not help either. So they lose their captions and get labels of ours instead,
-// which are ordinary controls that do as they are told - and clicking a label
-// picks its radio, so nothing is lost but the theme's opinion.
-var
-  PreparingYesText: TNewStaticText;
-  PreparingNoText: TNewStaticText;
-
 procedure PaintChildren(Parent: TWinControl);
 var
   Index: Integer;
@@ -242,45 +232,20 @@ begin
   PaintPage(WizardForm.FinishedPage);
 end;
 
-procedure PickYes(Sender: TObject);
-begin
-  WizardForm.PreparingYesRadio.Checked := True;
-end;
-
-procedure PickNo(Sender: TObject);
-begin
-  WizardForm.PreparingNoRadio.Checked := True;
-end;
-
-function NewLabel(Radio: TNewRadioButton; Text: String; Handler: TNotifyEvent): TNewStaticText;
-begin
-  Result := TNewStaticText.Create(WizardForm);
-  Result.Parent := Radio.Parent;
-
-  // Caption first, then let it size itself: a label given a width but never a
-  // height is a label nobody can see.
-  Result.AutoSize := True;
-  Result.Caption := Text;
-  Result.Font.Color := TextStrong;
-  Result.Color := Bg;
-  Result.Left := Radio.Left + ScaleX(20);
-  Result.Top := Radio.Top + ScaleY(1);
-  Result.OnClick := Handler;
-end;
-
 procedure CurPageChanged(CurPageID: Integer);
 begin
   if CurPageID <> wpPreparing then
     Exit;
 
-  if PreparingYesText = nil then
-  begin
-    PreparingYesText := NewLabel(WizardForm.PreparingYesRadio, WizardForm.PreparingYesRadio.Caption, @PickYes);
-    PreparingNoText := NewLabel(WizardForm.PreparingNoRadio, WizardForm.PreparingNoRadio.Caption, @PickNo);
-  end;
+  // No choice offered here, and none needed: this installer is run to update
+  // prettyeyes, closing it is the only way to replace its own executable, and
+  // it is started again afterwards. The radios that used to ask are gone -
+  // their captions are drawn by the Windows theme, which ignores every colour
+  // it is given and left them as dark text on this dark page.
+  WizardForm.PreparingYesRadio.Checked := True;
+  WizardForm.PreparingYesRadio.Visible := False;
+  WizardForm.PreparingNoRadio.Visible := False;
 
-  // Emptied every time: the captions are refilled from the message file when
-  // the page is prepared.
-  WizardForm.PreparingYesRadio.Caption := '';
-  WizardForm.PreparingNoRadio.Caption := '';
+  WizardForm.PreparingLabel.Caption :=
+    'prettyeyes сейчас запущен. Программа установки закроет его, обновит и запустит снова.';
 end;
