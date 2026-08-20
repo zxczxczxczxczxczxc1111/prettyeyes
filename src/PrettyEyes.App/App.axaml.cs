@@ -44,7 +44,14 @@ public partial class App : Application
 
             // A capture taken before the monitors moved is worthless: the frame
             // and the coordinates no longer describe the same desktop.
-            Services.Hotkeys.DisplayChanged += (_, _) => _session?.Close();
+            Services.Hotkeys.DisplayChanged += (_, _) => Dispatcher.UIThread.Post(() =>
+            {
+                // Arrives on the message-only window's thread. Closing a
+                // session and rebuilding windows from there is asking for it.
+                Log.Default.Info("конфигурация мониторов изменилась");
+                _session?.Close();
+                Services?.OverlayWindows.Rebuild(Services.Monitors.Enumerate().Monitors.Count);
+            });
 
             desktop.ShutdownRequested += (_, _) => Services.Dispose();
         }

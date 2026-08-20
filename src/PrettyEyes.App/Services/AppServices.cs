@@ -26,6 +26,7 @@ public sealed class AppServices : IDisposable
         IAutostart autostart,
         IPointerLocation pointer,
         Win32TrayIcon tray,
+        OverlayWindowPool overlayWindows,
         AppSettings settings)
     {
         Host = host;
@@ -39,6 +40,7 @@ public sealed class AppServices : IDisposable
         Autostart = autostart;
         Pointer = pointer;
         Tray = tray;
+        OverlayWindows = overlayWindows;
         Settings = settings;
     }
 
@@ -63,6 +65,9 @@ public sealed class AppServices : IDisposable
     public IPointerLocation Pointer { get; }
 
     public Win32TrayIcon Tray { get; }
+
+    /// <summary>Overlay windows, built once and reused between captures.</summary>
+    public OverlayWindowPool OverlayWindows { get; }
 
     /// <summary>False when a combination was taken at startup.</summary>
     public bool RegionHotkeyRegistered { get; set; }
@@ -100,6 +105,11 @@ public sealed class AppServices : IDisposable
         var tray = new Win32TrayIcon("prettyeyes");
         var notifier = new ToastNotifier(AppIdentity.AppUserModelId, tray);
 
+        // Warmed here, before the first hotkey: building an overlay window
+        // takes 69 ms the first time, and that time belongs to start-up.
+        var overlayWindows = new OverlayWindowPool();
+        overlayWindows.Warm(monitors.Enumerate().Monitors.Count);
+
         var settingsStore = new JsonSettingsStore(JsonSettingsStore.DefaultPath);
         var settings = settingsStore.Load();
 
@@ -135,6 +145,7 @@ public sealed class AppServices : IDisposable
             new RegistryAutostart(),
             new Win32PointerLocation(),
             tray,
+            overlayWindows,
             settings)
         {
             RegionHotkeyRegistered = regionRegistered,

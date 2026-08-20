@@ -103,4 +103,40 @@ public class DocumentTests
         // only safe thing to assert on.
         Assert.Equal(IntPtr.Zero, document.Source.Handle);
     }
+
+    [Fact]
+    public void Snapshot_is_reused_until_the_list_changes()
+    {
+        using var document = NewDocument();
+        document.Add(new FakeAnnotation());
+
+        var first = document.SnapshotAnnotations();
+        var again = document.SnapshotAnnotations();
+
+        // Same instance: the overlay asks for this on every rendered frame.
+        Assert.Same(first, again);
+
+        document.Add(new FakeAnnotation());
+
+        Assert.NotSame(first, document.SnapshotAnnotations());
+    }
+
+    [Fact]
+    public void Undo_and_clear_invalidate_the_snapshot_too()
+    {
+        using var document = NewDocument();
+        document.Add(new FakeAnnotation());
+
+        var afterAdd = document.SnapshotAnnotations();
+        document.Undo();
+        var afterUndo = document.SnapshotAnnotations();
+
+        Assert.NotSame(afterAdd, afterUndo);
+
+        document.Add(new FakeAnnotation());
+        var afterSecondAdd = document.SnapshotAnnotations();
+        document.Clear();
+
+        Assert.NotSame(afterSecondAdd, document.SnapshotAnnotations());
+    }
 }

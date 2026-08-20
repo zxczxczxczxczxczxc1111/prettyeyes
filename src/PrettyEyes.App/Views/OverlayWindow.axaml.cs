@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Media;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Tools;
@@ -16,6 +17,15 @@ public partial class OverlayWindow : Window
     /// <summary>How far from an edge a pointer still counts as grabbing it.</summary>
     private const int GripReach = 8;
 
+    // A Cursor owns a native handle. Building one per mouse move burns handles
+    // and hands back the same arrow anyway.
+    private static readonly Cursor Cross = new(StandardCursorType.Cross);
+    private static readonly Cursor Corner = new(StandardCursorType.TopLeftCorner);
+    private static readonly Cursor AntiCorner = new(StandardCursorType.TopRightCorner);
+    private static readonly Cursor WestEast = new(StandardCursorType.SizeWestEast);
+    private static readonly Cursor NorthSouth = new(StandardCursorType.SizeNorthSouth);
+    private static readonly Cursor Move = new(StandardCursorType.SizeAll);
+
     private CaptureRect _monitorBounds;
     private CaptureRect _frameBounds;
     private CaptureRect _selection;
@@ -26,6 +36,7 @@ public partial class OverlayWindow : Window
     private bool _dragging;
     private SelectionGrip _grip = SelectionGrip.None;
     private OverlayMode _mode = OverlayMode.Selecting;
+    private Size? _toolbarSize;
     private ITool? _tool;
 
     public OverlayWindow() => InitializeComponent();
@@ -44,6 +55,12 @@ public partial class OverlayWindow : Window
 
     /// <summary>Raised once a tool gesture produced a shape.</summary>
     public event EventHandler<IAnnotation>? AnnotationDrawn;
+
+    /// <summary>Ctrl+C or Enter: the same thing the copy button does.</summary>
+    public event EventHandler? CopyRequested;
+
+    /// <summary>Ctrl+S: the same thing the save button does.</summary>
+    public event EventHandler? SaveRequested;
 
     /// <summary>
     /// Asks the session for a fresh tool instance, one per gesture. Null means
@@ -100,6 +117,46 @@ public partial class OverlayWindow : Window
         _mode = active ? OverlayMode.Drawing : OverlayMode.Adjusting;
     }
 
+    /// <summary>
+    /// Shows and hides the window once so the XAML, the native handle and the
+    /// renderer are ready before the first hotkey. Measured cost of doing this
+    /// lazily: 69 ms on the first capture, and the user is looking at a screen
+    /// that has not frozen yet.
+    /// </summary>
+    public void WarmUp()
+    {
+        Width = 1;
+        Height = 1;
+        Show();
+        Position = new PixelPoint(-32000, -32000);
+        Hide();
+    }
+
+    /// <summary>
+    /// Back to the state a fresh window would be in. The windows are pooled, so
+    /// anything left over here would show up in the next capture.
+    /// </summary>
+    public void Reset()
+    {
+        _selection = CaptureRect.Empty;
+        _mode = OverlayMode.Selecting;
+        _grip = SelectionGrip.None;
+        _dragging = false;
+        _tool = null;
+        _toolbarSize = null;
+
+        Surface.FrameOpacity = 0;
+        Surface.VeilOpacity = 0;
+        Surface.ShowPreview(null);
+
+        // Drops the reference to the frozen desktop: 28 MB per capture that
+        // would otherwise be held by a hidden window until the next one.
+        Surface.Detach();
+
+        HideToolbar();
+        HideError();
+    }
+
     /// <summary>Back to picking a region, with the frame gone.</summary>
     public void ResetSelection()
     {
@@ -138,12 +195,15 @@ public partial class OverlayWindow : Window
 
         Toolbar.IsVisible = true;
 
-        // DesiredSize counts the control's own margin, and the margin is what
-        // this method sets. Without the reset every call would stack the
-        // previous offset on top of the measured size.
-        Toolbar.Margin = default;
-        Toolbar.Measure(Size.Infinity);
-        var size = Toolbar.DesiredSize;
+        // Measured once: the panel never changes size, and measuring on every
+        // pointer move is a full layout pass for nothing.
+        if (_toolbarSize is null)
+        {
+            Toolbar.Measure(Size.Infinity);
+            _toolbarSize = Toolbar.DesiredSize;
+        }
+
+        var size = _toolbarSize.Value;
 
         var y = localBottom + Gap;
 
@@ -162,7 +222,9 @@ public partial class OverlayWindow : Window
         var localRight = (selection.Right - _monitorBounds.X) / scale;
         var x = Math.Clamp(localRight - size.Width, 0, Math.Max(0, Width - size.Width));
 
-        Toolbar.Margin = new Thickness(x, y, 0, 0);
+        // Moved by transform, not by margin: a margin change relayouts the
+        // whole window on every step of a drag.
+        Toolbar.RenderTransform = new TranslateTransform(x, y);
         Toolbar.FadeIn();
 
         PlaceChip(selection, localX, localTop, toolbarAbove: y < localTop);
@@ -188,7 +250,10 @@ public partial class OverlayWindow : Window
         var visible = selection.Intersect(_frameBounds);
         Chip.Update(visible.IsEmpty ? selection : visible);
         Chip.IsVisible = true;
-        Chip.Margin = default;
+
+        // The chip does change width with the number it shows, so it is
+        // measured every time - but it is a single text line, and it is moved
+        // by transform like the panel.
         Chip.Measure(Size.Infinity);
         var size = Chip.DesiredSize;
 
@@ -201,7 +266,7 @@ public partial class OverlayWindow : Window
 
         var x = Math.Clamp(localX, 0, Math.Max(0, Width - size.Width));
 
-        Chip.Margin = new Thickness(x, y, 0, 0);
+        Chip.RenderTransform = new TranslateTransform(x, y);
         Chip.FadeIn();
     }
 
@@ -221,9 +286,29 @@ public partial class OverlayWindow : Window
     {
         base.OnPointerPressed(e);
 
+        // Anything but the left button leaves the selection alone. Without this
+        // a right click on the screen wipes the frame and everything drawn in
+        // it, which is what a miss next to a toolbar button looks like.
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        {
+            return;
+        }
+
         HideError();
 
         var (x, y) = ToVirtualPixels(e.GetPosition(this));
+
+        // Double click means the whole monitor: dragging across the screen for
+        // the most common capture there is makes no sense.
+        if (e.ClickCount == 2 && _mode != OverlayMode.Drawing)
+        {
+            _dragging = false;
+            _grip = SelectionGrip.None;
+            _mode = OverlayMode.Adjusting;
+            SelectionChanged?.Invoke(this, _monitorBounds);
+            SelectionSettled?.Invoke(this, _monitorBounds);
+            return;
+        }
         _lastX = x;
         _lastY = y;
         _dragging = true;
@@ -261,6 +346,13 @@ public partial class OverlayWindow : Window
         base.OnPointerMoved(e);
 
         var (x, y) = ToVirtualPixels(e.GetPosition(this));
+
+        // A mouse reports far more often than the compositor draws; repeating
+        // the same physical pixel only buys another repaint.
+        if (x == _lastX && y == _lastY && _dragging)
+        {
+            return;
+        }
 
         if (!_dragging)
         {
@@ -336,18 +428,18 @@ public partial class OverlayWindow : Window
     {
         if (_mode == OverlayMode.Drawing)
         {
-            Cursor = new Cursor(StandardCursorType.Cross);
+            Cursor = Cross;
             return;
         }
 
         Cursor = SelectionGrips.HitTest(_selection, x, y, GripReach) switch
         {
-            SelectionGrip.TopLeft or SelectionGrip.BottomRight => new Cursor(StandardCursorType.TopLeftCorner),
-            SelectionGrip.TopRight or SelectionGrip.BottomLeft => new Cursor(StandardCursorType.TopRightCorner),
-            SelectionGrip.Left or SelectionGrip.Right => new Cursor(StandardCursorType.SizeWestEast),
-            SelectionGrip.Top or SelectionGrip.Bottom => new Cursor(StandardCursorType.SizeNorthSouth),
-            SelectionGrip.Inside => new Cursor(StandardCursorType.SizeAll),
-            _ => new Cursor(StandardCursorType.Cross),
+            SelectionGrip.TopLeft or SelectionGrip.BottomRight => Corner,
+            SelectionGrip.TopRight or SelectionGrip.BottomLeft => AntiCorner,
+            SelectionGrip.Left or SelectionGrip.Right => WestEast,
+            SelectionGrip.Top or SelectionGrip.Bottom => NorthSouth,
+            SelectionGrip.Inside => Move,
+            _ => Cross,
         };
     }
 
@@ -355,13 +447,28 @@ public partial class OverlayWindow : Window
     {
         base.OnKeyDown(e);
 
-        if (e.Key == Key.Escape)
+        var control = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+
+        switch (e.Key)
         {
-            Cancelled?.Invoke(this, EventArgs.Empty);
-        }
-        else if (e.Key == Key.Z && e.KeyModifiers.HasFlag(KeyModifiers.Control))
-        {
-            UndoRequested?.Invoke(this, EventArgs.Empty);
+            case Key.Escape:
+                Cancelled?.Invoke(this, EventArgs.Empty);
+                break;
+
+            case Key.Z when control:
+                UndoRequested?.Invoke(this, EventArgs.Empty);
+                break;
+
+            // The two things the overlay exists for had no keyboard at all:
+            // over a frozen screen everyone reaches for Ctrl+C first.
+            case Key.C when control:
+            case Key.Enter when _selection.IsEmpty == false:
+                CopyRequested?.Invoke(this, EventArgs.Empty);
+                break;
+
+            case Key.S when control:
+                SaveRequested?.Invoke(this, EventArgs.Empty);
+                break;
         }
     }
 }

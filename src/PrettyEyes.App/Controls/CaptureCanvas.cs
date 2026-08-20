@@ -6,6 +6,7 @@ using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
+using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Model;
 using SkiaSharp;
 using CaptureRect = PrettyEyes.Core.Geometry.CaptureRect;
@@ -83,6 +84,19 @@ public sealed class CaptureCanvas : Control
         _source = document.Source;
         _frameBounds = document.SourceBounds;
         _monitorBounds = monitorBounds;
+        InvalidateVisual();
+    }
+
+    /// <summary>
+    /// Lets go of the captured frame. The windows outlive a capture now, and a
+    /// hidden window holding 28 MB of pixels is a leak with extra steps.
+    /// </summary>
+    public void Detach()
+    {
+        _document = null;
+        _source = null;
+        _selection = CaptureRect.Empty;
+        _preview = null;
         InvalidateVisual();
     }
 
@@ -182,7 +196,35 @@ public sealed class CaptureCanvas : Control
 
         public Rect Bounds { get; }
 
+        /// <summary>
+        /// A frame that misses this has been seen by the user as a stutter.
+        /// 60 Hz gives 16.7 ms; the budget keeps a little for the compositor.
+        /// </summary>
+        private const double FrameBudgetMs = 16;
+
         public void Render(ImmediateDrawingContext context)
+        {
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+
+            try
+            {
+                Draw(context);
+            }
+            finally
+            {
+                watch.Stop();
+
+                // Only the frames that missed: a line per frame would bury the
+                // log, and a frame nobody noticed is not worth a line.
+                if (watch.Elapsed.TotalMilliseconds > FrameBudgetMs)
+                {
+                    Log.Default.Info($"медленный кадр: {watch.Elapsed.TotalMilliseconds:F1} мс, "
+                        + $"объектов {_annotations.Count}");
+                }
+            }
+        }
+
+        private void Draw(ImmediateDrawingContext context)
         {
             var lease = context.TryGetFeature<ISkiaSharpApiLeaseFeature>();
             if (lease is null)
@@ -200,7 +242,19 @@ public sealed class CaptureCanvas : Control
             canvas.Scale(1f / _scaling);
             canvas.Translate(-_monitor.X, -_monitor.Y);
 
-            canvas.DrawImage(_source, _frame.X, _frame.Y);
+            // Only the part of the frozen desktop this monitor shows. Handing
+            // Skia the whole 5120x1440 image for every window on every frame
+            // makes it clip the same pixels over and over.
+            var visible = _monitor.Intersect(_frame);
+
+            if (!visible.IsEmpty)
+            {
+                var source = SKRect.Create(
+                    visible.X - _frame.X, visible.Y - _frame.Y, visible.Width, visible.Height);
+                var destination = SKRect.Create(visible.X, visible.Y, visible.Width, visible.Height);
+
+                canvas.DrawImage(_source, source, destination, SKSamplingOptions.Default, null);
+            }
 
             using var veil = new SKPaint { Color = new SKColor(0, 0, 0, (byte)(VeilAlpha * _veilOpacity)) };
             var monitorRect = SKRect.Create(_monitor.X, _monitor.Y, _monitor.Width, _monitor.Height);

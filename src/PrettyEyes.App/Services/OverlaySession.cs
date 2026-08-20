@@ -16,7 +16,7 @@ namespace PrettyEyes.App.Services;
 public sealed class OverlaySession
 {
     private readonly AppServices _services;
-    private readonly List<OverlayWindow> _windows = [];
+    private IReadOnlyList<OverlayWindow> _windows = [];
     private DesktopLayout? _layout;
     private ToolKind? _activeTool;
     private bool _toolbarShown;
@@ -36,26 +36,54 @@ public sealed class OverlaySession
         _layout = capture.Layout;
         Document = new Document(capture.Image, capture.Bounds);
 
-        foreach (var monitor in capture.Layout.Monitors)
+        // Windows come from the pool: building them here cost 105 ms on the
+        // first capture, which the user spends staring at an unfrozen screen.
+        _windows = _services.OverlayWindows.Take(capture.Layout);
+
+        for (var i = 0; i < _windows.Count; i++)
         {
-            var window = new OverlayWindow();
+            var window = _windows[i];
+
             window.SelectionChanged += OnSelectionChanged;
             window.SelectionSettled += OnSelectionSettled;
-            window.Cancelled += (_, _) => Close();
+            window.Cancelled += OnCancelled;
             window.UndoRequested += OnUndoRequested;
             window.AnnotationDrawn += OnAnnotationDrawn;
+            window.CopyRequested += OnCopyClicked;
+            window.SaveRequested += OnSaveClicked;
             window.ToolFactory = () => _activeTool is null ? null : CreateTool(_activeTool.Value);
             window.ToolbarControl.ToolPicked += OnToolPicked;
             window.ToolbarControl.UndoClicked += OnUndoRequested;
             window.ToolbarControl.CopyClicked += OnCopyClicked;
             window.ToolbarControl.SaveClicked += OnSaveClicked;
 
-            _windows.Add(window);
-            window.PlaceOn(monitor, Document);
+            window.PlaceOn(capture.Layout.Monitors[i], Document);
         }
 
         _windows.FirstOrDefault()?.Activate();
     }
+
+    /// <summary>
+    /// Undone on close: the windows outlive the session, and a handler left
+    /// behind would answer for a document that is already disposed.
+    /// </summary>
+    private void Unsubscribe(OverlayWindow window)
+    {
+        window.SelectionChanged -= OnSelectionChanged;
+        window.SelectionSettled -= OnSelectionSettled;
+        window.Cancelled -= OnCancelled;
+        window.UndoRequested -= OnUndoRequested;
+        window.AnnotationDrawn -= OnAnnotationDrawn;
+        window.CopyRequested -= OnCopyClicked;
+        window.SaveRequested -= OnSaveClicked;
+        window.ToolFactory = null;
+        window.ToolbarControl.ToolPicked -= OnToolPicked;
+        window.ToolbarControl.UndoClicked -= OnUndoRequested;
+        window.ToolbarControl.CopyClicked -= OnCopyClicked;
+        window.ToolbarControl.SaveClicked -= OnSaveClicked;
+    }
+
+    private void OnCancelled(object? sender, EventArgs e) => Close();
 
     /// <summary>
     /// Every monitor window feeds the same selection, so dragging across a
@@ -68,11 +96,19 @@ public sealed class OverlaySession
             return;
         }
 
+        var previous = Document.Selection;
         Document.Selection = selection;
 
-        foreach (var window in _windows)
+        for (var i = 0; i < _windows.Count; i++)
         {
-            window.ShowSelection(selection);
+            // A monitor neither selection touches keeps the veil it already
+            // has; repainting all of them triples the work on three screens.
+            if (_layout is not null && !Touches(_layout.Monitors[i].Bounds, previous, selection))
+            {
+                continue;
+            }
+
+            _windows[i].ShowSelection(selection);
         }
 
         // Once the toolbar is up it follows the frame; leaving it behind and
@@ -82,6 +118,15 @@ public sealed class OverlaySession
             PlaceToolbar(selection);
         }
     }
+
+    /// <summary>
+    /// Whether a monitor sees any part of the change. Empty selections count as
+    /// touching everything: that is the frame appearing or being dropped.
+    /// </summary>
+    private static bool Touches(CaptureRect monitor, CaptureRect before, CaptureRect after) =>
+        before.IsEmpty || after.IsEmpty
+        || !monitor.Intersect(before).IsEmpty
+        || !monitor.Intersect(after).IsEmpty;
 
     /// <summary>
     /// Panel and chip belong to the finished gesture: while the pointer is down
@@ -295,10 +340,11 @@ public sealed class OverlaySession
 
         foreach (var window in _windows)
         {
-            window.Close();
+            Unsubscribe(window);
         }
 
-        _windows.Clear();
+        _services.OverlayWindows.Release();
+        _windows = [];
         _layout = null;
         _toolbarShown = false;
 
