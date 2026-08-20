@@ -548,7 +548,7 @@ public partial class SettingsWindow : Window
     [
         ("нет", ExportStyle.None),
         ("карточка", ExportStyle.Card),
-        ("прозрачный", ExportStyle.Cutout),
+        ("на белом", ExportStyle.Sheet),
     ];
 
     /// <summary>
@@ -577,11 +577,12 @@ public partial class SettingsWindow : Window
             PresetRow.Children.Add(NewPreset(label, preview, chosen, () => ApplyExport(style)));
         }
 
-        // The one thing about the transparent export that cannot be seen in a
-        // preview, and the one thing people will otherwise report as a bug.
+        // Shown only to whoever went looking for a transparent background in
+        // the parameters: from the presets it is not offered at all, because
+        // the clipboard cannot deliver it.
         PresetHint.IsVisible = _export is { Enabled: true, Background: ExportBackground.Transparent };
-        PresetHint.Text = "Прозрачность сохраняется в файле. В буфере обмена фона нет, "
-            + "поэтому при вставке он будет белым.";
+        PresetHint.Text = "Прозрачность попадёт только в файл. Буфер обмена в Windows "
+            + "не умеет её переносить, поэтому при вставке фон будет белым.";
     }
 
     private void ShowAdvanced(bool shown)

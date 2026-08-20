@@ -42,12 +42,18 @@ public sealed record ExportStyle(
     public static ExportStyle Card => new(true, 48, ExportBackground.Aura, 16, true);
 
     /// <summary>
-    /// The same object with nothing behind it, for dropping onto a page that
-    /// already has a background of its own. Grain is off because there is
-    /// nothing for it to be grain on.
+    /// The same object on a clean white sheet, for a screenshot that is going
+    /// into a document. Grain is off: white is chosen for being clean.
+    ///
+    /// This is where a transparent background would have gone, and it is not
+    /// here on purpose. Windows has no way to put transparency on the
+    /// clipboard - the format it pastes from carries no alpha channel - so a
+    /// preset promising a cut-out delivers a white sheet everywhere it is
+    /// pasted anyway. A transparent background is still available under the
+    /// parameters, where it does what it says: it saves a file with alpha.
     /// </summary>
-    public static ExportStyle Cutout =>
-        new(true, 48, ExportBackground.Transparent, 16, true, Grain: false);
+    public static ExportStyle Sheet =>
+        new(true, 48, ExportBackground.White, 16, true, Grain: false);
 
     /// <summary>
     /// Grain belongs to the backdrops that are meant to be atmosphere, and to

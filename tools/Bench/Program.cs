@@ -192,8 +192,8 @@ internal static class Program
         Measure("Render монитора, пресет «карточка»", () =>
             DocumentRenderer.Render(document, ExportStyle.Card).Dispose());
 
-        Measure("Render монитора, пресет «прозрачный»", () =>
-            DocumentRenderer.Render(document, ExportStyle.Cutout).Dispose());
+        Measure("Render монитора, пресет «на белом»", () =>
+            DocumentRenderer.Render(document, ExportStyle.Sheet).Dispose());
 
         document.Clear();
     }
