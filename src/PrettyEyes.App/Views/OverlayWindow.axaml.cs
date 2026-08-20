@@ -52,6 +52,15 @@ public partial class OverlayWindow : Window
 
     private CursorStyle _cursorStyle = CursorStyle.Cross;
 
+    /// <summary>Which ink the cursor is drawn with at the moment.</summary>
+    private bool _darkInk;
+
+    /// <summary>
+    /// How far around the pointer the picture is measured to choose the ink.
+    /// Roughly what the cursor itself covers.
+    /// </summary>
+    private const int CursorReach = 12;
+
     /// <summary>The glyph being carried, and where it was picked up.</summary>
     private IMovable? _moving;
     private int _moveFromX;
@@ -793,7 +802,12 @@ public partial class OverlayWindow : Window
     /// screenshot, dark on a light one. The pixel is already being sampled for
     /// the magnifier, so this costs a comparison.
     /// </summary>
-    private Cursor Aim(int x, int y) => Crosshair.For(_cursorStyle, Surface.ColorAt(x, y));
+    private Cursor Aim(int x, int y)
+    {
+        _darkInk = Crosshair.PrefersDark(Surface.LuminanceAround(x, y, CursorReach), _darkInk);
+
+        return Crosshair.For(_cursorStyle, _darkInk);
+    }
 
     protected override void OnKeyDown(KeyEventArgs e)
     {

@@ -149,6 +149,56 @@ public sealed class CaptureCanvas : Control
         Transitions = transitions;
     }
 
+    /// <summary>
+    /// How bright the picture is around a point, from 0 to 1, or null when the
+    /// point is off the captured frame.
+    ///
+    /// Around, not at: the cursor covers two dozen pixels, and a decision taken
+    /// from the single pixel under its tip flips on every speck of dust in a
+    /// photograph. Sampled on a coarse grid - the answer only has to be right
+    /// enough to choose between two inks.
+    /// </summary>
+    public double? LuminanceAround(int x, int y, int reach)
+    {
+        if (_source is null)
+        {
+            return null;
+        }
+
+        using var pixels = _source.PeekPixels();
+
+        if (pixels is null)
+        {
+            return null;
+        }
+
+        const int Step = 4;
+
+        var total = 0.0;
+        var counted = 0;
+
+        for (var dy = -reach; dy <= reach; dy += Step)
+        {
+            for (var dx = -reach; dx <= reach; dx += Step)
+            {
+                var px = x + dx - _frameBounds.X;
+                var py = y + dy - _frameBounds.Y;
+
+                if (px < 0 || py < 0 || px >= _source.Width || py >= _source.Height)
+                {
+                    continue;
+                }
+
+                var colour = pixels.GetPixelColor(px, py);
+
+                total += (0.2126 * colour.Red) + (0.7152 * colour.Green) + (0.0722 * colour.Blue);
+                counted++;
+            }
+        }
+
+        return counted == 0 ? null : total / (counted * 255.0);
+    }
+
     public void Attach(Document document, CaptureRect monitorBounds)
     {
         _document = document;

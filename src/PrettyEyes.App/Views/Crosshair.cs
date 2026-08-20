@@ -69,11 +69,26 @@ public static class Crosshair
     public static string Icon(CursorStyle style) => Shapes[style];
 
     /// <summary>
-    /// The cursor for this shape against this colour: light ink on something
-    /// dark, dark ink on something light. Null means the pointer is off the
-    /// captured frame and there is nothing to judge against.
+    /// Whether dark ink is the readable one here, given what it is now.
+    ///
+    /// Two thresholds rather than one, and a wide gap between them. A single
+    /// threshold makes the cursor swap ink every few pixels of travel across
+    /// anything near mid-grey, and a cursor changing colour that often does not
+    /// read as one cursor adapting - it reads as two cursors flickering.
     /// </summary>
-    public static Cursor For(CursorStyle style, SKColor? under)
+    public static bool PrefersDark(double? luminance, bool current) => luminance switch
+    {
+        null => false,
+        > 0.62 => true,
+        < 0.42 => false,
+        _ => current,
+    };
+
+    /// <summary>
+    /// The cursor for this shape: dark ink over a light picture, light ink over
+    /// a dark one.
+    /// </summary>
+    public static Cursor For(CursorStyle style, bool dark)
     {
         // The ordinary pointer is the system's, not ours: whatever the user has
         // set their cursor to is what they expect to see.
@@ -82,7 +97,6 @@ public static class Crosshair
             return SystemArrow;
         }
 
-        var dark = under is { } colour && Luminance(colour) > 0.55;
         var cache = dark ? DarkCursors : LightCursors;
 
         if (!cache.TryGetValue(style, out var cursor))
@@ -96,13 +110,6 @@ public static class Crosshair
 
         return cursor;
     }
-
-    /// <summary>
-    /// The threshold is the same luminance used for the tick on a colour
-    /// swatch, so a palette colour and the screen behind it are judged alike.
-    /// </summary>
-    private static double Luminance(SKColor colour) =>
-        ((0.2126 * colour.Red) + (0.7152 * colour.Green) + (0.0722 * colour.Blue)) / 255.0;
 
     private static Cursor Build(CursorStyle style, SKColor ink, SKColor halo)
     {
