@@ -138,13 +138,16 @@ public partial class OverlayWindow : Window
         Show();
         Position = new PixelPoint(monitor.Bounds.X, monitor.Bounds.Y);
 
+        var handle = TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+
         // The overlay lives and dies inside one capture; it has no place in
         // Alt+Tab, and being topmost it never needs to be switched back to.
-        WindowSwitcher.Hide(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
+        WindowSwitcher.Hide(handle);
 
         // Again: a window moved to a monitor with different scaling only learns
         // its new scale once it is on it.
         Resize(monitor);
+
 
         // Started a beat later, and that beat is the whole point. Setting a
         // transitioned property does two things in this order: the property
@@ -156,12 +159,28 @@ public partial class OverlayWindow : Window
         Dispatcher.UIThread.Post(() => Surface.VeilOpacity = 1, DispatcherPriority.Background);
     }
 
+    /// <summary>
+    /// One pixel short of the monitor, on purpose.
+    ///
+    /// A window that covers a monitor exactly is a game or a video player as
+    /// far as Windows is concerned, and it switches Do Not Disturb on for the
+    /// duration: a bell appears in the notification area, everything there
+    /// shifts along to make room, and shifts back when the overlay closes. That
+    /// is a taskbar twitching on every single screenshot. Asking the shell
+    /// nicely through ITaskbarList2 changed nothing - measured - and one pixel
+    /// changes everything.
+    ///
+    /// What it costs: the bottom row of the screen is not dimmed and cannot be
+    /// clicked. A selection dragged downwards still reaches it, and the
+    /// whole-monitor shot is unaffected - both work from the captured frame
+    /// rather than from this window.
+    /// </summary>
     private void Resize(MonitorInfo monitor)
     {
         var scale = RenderScaling;
 
         Width = monitor.Bounds.Width / scale;
-        Height = monitor.Bounds.Height / scale;
+        Height = (monitor.Bounds.Height - 1) / scale;
     }
 
     public void ShowSelection(CaptureRect selection)
