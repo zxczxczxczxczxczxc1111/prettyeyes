@@ -1,5 +1,6 @@
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Core.Settings;
+using PrettyEyes.Core.Tools;
 using Xunit;
 
 namespace PrettyEyes.Core.Tests.Settings;
@@ -51,8 +52,15 @@ public class JsonSettingsStoreTests
             true);
 
         store.Save(saved);
+        var loaded = store.Load();
 
-        Assert.Equal(saved, store.Load());
+        // Field by field, not record against record: AppSettings holds a
+        // dictionary of tool styles, and a dictionary compares by reference.
+        Assert.Equal(saved.Hotkey, loaded.Hotkey);
+        Assert.Equal(saved.FullScreenHotkey, loaded.FullScreenHotkey);
+        Assert.Equal(saved.Autostart, loaded.Autostart);
+        Assert.Equal(saved.ShowMagnifier, loaded.ShowMagnifier);
+        Assert.Equal(saved.MagnifierGrid, loaded.MagnifierGrid);
     }
 
     [Fact]
@@ -168,5 +176,46 @@ public class JsonSettingsStoreTests
 
         Assert.False(store.Load().MagnifierGrid);
         Assert.True(store.Load().ShowMagnifier);
+    }
+
+    [Fact]
+    public void Tool_styles_survive_a_round_trip()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pe-{Guid.NewGuid()}.json");
+        var store = new JsonSettingsStore(path);
+
+        store.Save(AppSettings.Default with
+        {
+            ToolStyles = new Dictionary<ToolKind, ToolStyle>
+            {
+                [ToolKind.Arrow] = new(Palette.Blue, StrokeSize.Large),
+            },
+        });
+
+        var loaded = new ToolStyles(store.Load().ToolStyles!);
+
+        Assert.Equal(Palette.Blue, loaded.For(ToolKind.Arrow).Color);
+        Assert.Equal(StrokeSize.Large, loaded.For(ToolKind.Arrow).Size);
+        Assert.Equal(ToolStyle.Default, loaded.For(ToolKind.Rectangle));
+    }
+
+    [Fact]
+    public void A_file_without_tool_styles_loads_as_no_styles_rather_than_null()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pe-{Guid.NewGuid()}.json");
+
+        File.WriteAllText(path, """
+            {
+              "Hotkey": { "Modifiers": 1, "VirtualKey": 71 },
+              "FullScreenHotkey": { "Modifiers": 6, "VirtualKey": 51 },
+              "Autostart": false,
+              "SchemaVersion": 3
+            }
+            """);
+
+        var settings = new JsonSettingsStore(path).Load();
+
+        Assert.NotNull(settings.ToolStyles);
+        Assert.Empty(settings.ToolStyles);
     }
 }

@@ -1,0 +1,93 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PrettyEyes.App.Views.ToolStylePopup">
+  <UserControl.Styles>
+    <!-- A swatch is a colour and nothing else, so its selected state cannot be
+         shown with colour: the ring would vanish on the white one. A tick does
+         the job on every swatch in the row. -->
+    <Style Selector="Button.swatch">
+      <Setter Property="Width" Value="24"/>
+      <Setter Property="Height" Value="24"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+    </Style>
+    <Style Selector="Button.swatch /template/ ContentPresenter">
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.12"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.swatch:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource Fill}"/>
+    </Style>
+
+    <Style Selector="Button.step">
+      <Setter Property="Height" Value="28"/>
+      <Setter Property="MinWidth" Value="44"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+      <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    </Style>
+    <Style Selector="Button.step /template/ ContentPresenter">
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.12"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.step:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource Fill}"/>
+    </Style>
+    <Style Selector="Button.step.active /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource FillHover}"/>
+    </Style>
+    <Style Selector="Button.step Rectangle">
+      <Setter Property="Fill" Value="{StaticResource TextStrong}"/>
+      <Setter Property="Width" Value="22"/>
+      <Setter Property="RadiusX" Value="2"/>
+      <Setter Property="RadiusY" Value="2"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Border x:Name="Card"
+          Background="{StaticResource Surface}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="1"
+          CornerRadius="{StaticResource RCard}"
+          Padding="12"
+          BoxShadow="{StaticResource Shadow2}"
+          Opacity="0">
+    <Border.RenderTransform>
+      <TranslateTransform Y="6"/>
+    </Border.RenderTransform>
+    <Border.Transitions>
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.12" Easing="CubicEaseOut"/>
+        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" Easing="CubicEaseOut"/>
+      </Transitions>
+    </Border.Transitions>
+
+    <StackPanel Spacing="12">
+      <StackPanel x:Name="Colors" Orientation="Horizontal" Spacing="4"/>
+
+      <Rectangle Height="1" Fill="{StaticResource Border}"/>
+
+      <StackPanel Orientation="Horizontal" Spacing="4">
+        <Button Classes="step" x:Name="SmallStep" ToolTip.Tip="Тонкая">
+          <Rectangle Height="2"/>
+        </Button>
+        <Button Classes="step" x:Name="MediumStep" ToolTip.Tip="Средняя">
+          <Rectangle Height="3"/>
+        </Button>
+        <Button Classes="step" x:Name="LargeStep" ToolTip.Tip="Толстая">
+          <Rectangle Height="5"/>
+        </Button>
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

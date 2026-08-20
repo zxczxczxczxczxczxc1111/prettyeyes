@@ -14,6 +14,7 @@
     <views:MagnifierLabel x:Name="Loupe" HorizontalAlignment="Left" VerticalAlignment="Top" IsVisible="False"
                           IsHitTestVisible="False"/>
     <views:ToolbarView x:Name="Toolbar" HorizontalAlignment="Left" VerticalAlignment="Top" IsVisible="False"/>
+    <views:ToolStylePopup x:Name="StyleCard" HorizontalAlignment="Left" VerticalAlignment="Top" IsVisible="False"/>
     <Border x:Name="ErrorBanner"
             HorizontalAlignment="Center"
             VerticalAlignment="Top"

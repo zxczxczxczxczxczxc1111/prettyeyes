@@ -75,6 +75,9 @@ public partial class OverlayWindow : Window
     /// <summary>A hex colour that wants to be in the clipboard as text.</summary>
     public event EventHandler<string>? ColourCopyRequested;
 
+    /// <summary>Escape while a tool is held: put the pointer back on the frame.</summary>
+    public event EventHandler? ToolCleared;
+
     /// <summary>
     /// Asks the session for a fresh tool instance, one per gesture. Null means
     /// no tool is active yet, which keeps the window free of tool state.
@@ -265,6 +268,7 @@ public partial class OverlayWindow : Window
         Surface.VeilOpacity = 0;
         Surface.ShowPreview(null);
         HideMagnifier();
+        StyleCard.Close();
 
         // Drops the reference to the frozen desktop: 28 MB per capture that
         // would otherwise be held by a hidden window until the next one.
@@ -297,6 +301,37 @@ public partial class OverlayWindow : Window
     public void HideError() => ErrorBanner.IsVisible = false;
 
     public ToolbarView ToolbarControl => Toolbar;
+
+    public ToolStylePopup StyleCardControl => StyleCard;
+
+    /// <summary>
+    /// Opens the style card under the tool button, or above it when the toolbar
+    /// itself has already flipped above the selection.
+    /// </summary>
+    public void ShowStyleCard(ToolKind kind, ToolStyle style)
+    {
+        if (Toolbar.RenderTransform is not TranslateTransform panel)
+        {
+            return;
+        }
+
+        StyleCard.Open(kind, style);
+        StyleCard.Measure(Size.Infinity);
+
+        var size = StyleCard.DesiredSize;
+        var y = panel.Y + Toolbar.DesiredSize.Height + Gap;
+
+        if (y + size.Height > Height)
+        {
+            y = panel.Y - Gap - size.Height;
+        }
+
+        StyleCard.RenderTransform = new TranslateTransform(
+            Math.Clamp(panel.X, 0, Math.Max(0, Width - size.Width)),
+            Math.Max(0, y));
+    }
+
+    public void HideStyleCard() => StyleCard.Close();
 
     /// <summary>
     /// Puts the toolbar under the selection, above it when there is no room
@@ -402,6 +437,14 @@ public partial class OverlayWindow : Window
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
+
+        // A click anywhere outside the card closes it, and that click does
+        // nothing else: it was aimed at the card, not at the screen.
+        if (StyleCard.IsVisible)
+        {
+            StyleCard.Close();
+            return;
+        }
 
         // Anything but the left button leaves the selection alone. Without this
         // a right click on the screen wipes the frame and everything drawn in
@@ -571,6 +614,16 @@ public partial class OverlayWindow : Window
 
         switch (e.Key)
         {
+            // One step of undo per press: the open card first, then the tool,
+            // and only then the overlay itself.
+            case Key.Escape when StyleCard.IsVisible:
+                StyleCard.Close();
+                break;
+
+            case Key.Escape when _mode == OverlayMode.Drawing:
+                ToolCleared?.Invoke(this, EventArgs.Empty);
+                break;
+
             case Key.Escape:
                 Cancelled?.Invoke(this, EventArgs.Empty);
                 break;

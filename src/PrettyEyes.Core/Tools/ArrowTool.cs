@@ -10,6 +10,11 @@ namespace PrettyEyes.Core.Tools;
 /// </summary>
 public sealed class ArrowTool : ITool
 {
+    private readonly ToolStyle _style;
+
+    /// <summary>Without a style the tool draws what every version drew before.</summary>
+    public ArrowTool(ToolStyle? style = null) => _style = style ?? ToolStyle.Default;
+
     private int _x;
     private int _y;
 
@@ -28,6 +33,6 @@ public sealed class ArrowTool : ITool
         var line = CaptureRect.FromPoints(_x, _y, x, y);
         return line.IsEmpty
             ? null
-            : new ArrowAnnotation(_x, _y, x, y, AnnotationColors.Shape, AnnotationColors.StrokeWidth);
+            : new ArrowAnnotation(_x, _y, x, y, _style.Color, _style.StrokeWidth);
     }
 }

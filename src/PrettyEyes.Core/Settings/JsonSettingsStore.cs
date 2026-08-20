@@ -71,6 +71,10 @@ public sealed class JsonSettingsStore : ISettingsStore
 
         // Schema 3 added the pixel grid, on by default for the same reason.
         MagnifierGrid = stored.SchemaVersion >= 3 ? stored.MagnifierGrid : true,
+
+        // Schema 4 added per-tool styles. Missing means every tool draws the
+        // default, which is exactly what an empty dictionary says.
+        ToolStyles = stored.ToolStyles ?? [],
         SchemaVersion = AppSettings.CurrentSchema,
     };
 

@@ -1,13 +1,10 @@
 namespace PrettyEyes.Core.Tools;
 
 /// <summary>
-/// Annotation colours live here rather than in the XAML token set, because
-/// Core knows nothing about XAML. Carmine, picked from samples on real
-/// screenshots: shapes drawn over arbitrary content have to be findable, and
-/// the pastel red it replaced looked washed out on both dark and light pages.
+/// Kept as the one name the older code used for the default shape colour. The
+/// colours themselves live in Palette now, and the width comes from ToolStyle.
 /// </summary>
 internal static class AnnotationColors
 {
-    internal const uint Shape = 0xFFB01030;
-    internal const float StrokeWidth = 3f;
+    internal const uint Shape = Palette.Carmine;
 }

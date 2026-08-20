@@ -6,6 +6,11 @@ namespace PrettyEyes.Core.Tools;
 
 public sealed class RectangleTool : ITool
 {
+    private readonly ToolStyle _style;
+
+    /// <summary>Without a style the tool draws what every version drew before.</summary>
+    public RectangleTool(ToolStyle? style = null) => _style = style ?? ToolStyle.Default;
+
     private int _x;
     private int _y;
 
@@ -24,6 +29,6 @@ public sealed class RectangleTool : ITool
         var bounds = CaptureRect.FromPoints(_x, _y, x, y);
         return bounds.IsEmpty
             ? null
-            : new RectangleAnnotation(bounds, AnnotationColors.Shape, AnnotationColors.StrokeWidth);
+            : new RectangleAnnotation(bounds, _style.Color, _style.StrokeWidth);
     }
 }

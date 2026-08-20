@@ -1,4 +1,8 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Shapes;
+using Avalonia.Input;
+using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Media.Transformation;
 using PrettyEyes.Core.Tools;
 
@@ -17,6 +21,19 @@ public partial class ToolbarView : UserControl
     public ToolbarView()
     {
         InitializeComponent();
+
+        // Right button on a tool opens its style card. Blur has none on
+        // purpose: its strength is decided by the size of the region, and a
+        // "weaker blur" option is a way to publish data you meant to hide.
+        foreach (var (button, kind) in Buttons())
+        {
+            if (kind == ToolKind.Blur)
+            {
+                continue;
+            }
+
+            button.PointerPressed += (_, e) => OnToolPressed(kind, e);
+        }
 
         BlurButton.Click += (_, _) => Pick(ToolKind.Blur);
         ArrowButton.Click += (_, _) => Pick(ToolKind.Arrow);
@@ -38,6 +55,38 @@ public partial class ToolbarView : UserControl
     public event EventHandler? CopyClicked;
 
     public event EventHandler? SaveClicked;
+
+    /// <summary>Right click on a tool: its style card wants to open.</summary>
+    public event EventHandler<ToolKind>? StyleRequested;
+
+    /// <summary>Paints the dot that says what colour each tool will draw with.</summary>
+    public void ShowStyles(ToolStyles styles)
+    {
+        foreach (var (dot, kind) in Dots())
+        {
+            dot.Fill = new SolidColorBrush(Color.FromUInt32(styles.For(kind).Color));
+        }
+    }
+
+    private void OnToolPressed(ToolKind kind, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsRightButtonPressed)
+        {
+            return;
+        }
+
+        // Handled here, or the overlay underneath treats it as a click on the
+        // screen and starts a new selection.
+        e.Handled = true;
+        StyleRequested?.Invoke(this, kind);
+    }
+
+    private IEnumerable<(Ellipse Dot, ToolKind Kind)> Dots()
+    {
+        yield return (ArrowDot, ToolKind.Arrow);
+        yield return (LineDot, ToolKind.Line);
+        yield return (RectDot, ToolKind.Rectangle);
+    }
 
     /// <summary>Null means no tool is picked and the pointer edits the selection.</summary>
     public void SetActive(ToolKind? kind)

@@ -19,10 +19,15 @@ public sealed class OverlaySession
     private IReadOnlyList<OverlayWindow> _windows = [];
     private DesktopLayout? _layout;
     private ToolKind? _activeTool;
+    private readonly ToolStyles _styles;
     private bool _toolbarShown;
     private bool _closed;
 
-    public OverlaySession(AppServices services) => _services = services;
+    public OverlaySession(AppServices services)
+    {
+        _services = services;
+        _styles = new ToolStyles(services.Settings.ToolStyles ?? []);
+    }
 
     public event EventHandler? Finished;
 
@@ -52,6 +57,10 @@ public sealed class OverlaySession
             window.CopyRequested += OnCopyClicked;
             window.SaveRequested += OnSaveClicked;
             window.ColourCopyRequested += OnColourCopyRequested;
+            window.ToolCleared += OnToolCleared;
+            window.ToolbarControl.StyleRequested += OnStyleRequested;
+            window.StyleCardControl.StyleChanged += OnStyleChanged;
+            window.ToolbarControl.ShowStyles(_styles);
             window.ToolFactory = () => _activeTool is null ? null : CreateTool(_activeTool.Value);
             window.ToolbarControl.ToolPicked += OnToolPicked;
             window.ToolbarControl.UndoClicked += OnUndoRequested;
@@ -80,6 +89,9 @@ public sealed class OverlaySession
         window.CopyRequested -= OnCopyClicked;
         window.SaveRequested -= OnSaveClicked;
         window.ColourCopyRequested -= OnColourCopyRequested;
+        window.ToolCleared -= OnToolCleared;
+        window.ToolbarControl.StyleRequested -= OnStyleRequested;
+        window.StyleCardControl.StyleChanged -= OnStyleChanged;
         window.ToolFactory = null;
         window.ToolbarControl.ToolPicked -= OnToolPicked;
         window.ToolbarControl.UndoClicked -= OnUndoRequested;
@@ -196,6 +208,53 @@ public sealed class OverlaySession
         if (Document?.Undo() == true)
         {
             Redraw();
+        }
+    }
+
+    private void OnToolCleared(object? sender, EventArgs e) => OnToolPicked(sender, null);
+
+    /// <summary>
+    /// Right click on a tool. The card belongs to the window whose toolbar is
+    /// showing, which is the one that raised this.
+    /// </summary>
+    private void OnStyleRequested(object? sender, ToolKind kind)
+    {
+        foreach (var window in _windows)
+        {
+            if (ReferenceEquals(window.ToolbarControl, sender))
+            {
+                window.ShowStyleCard(kind, _styles.For(kind));
+            }
+            else
+            {
+                window.HideStyleCard();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Applies to whatever is drawn next. Shapes already on the screenshot keep
+    /// the style they were drawn with: there is no way to select one yet.
+    /// </summary>
+    private void OnStyleChanged(object? sender, (ToolKind Kind, ToolStyle Style) change)
+    {
+        _styles.Set(change.Kind, change.Style);
+
+        foreach (var window in _windows)
+        {
+            window.ToolbarControl.ShowStyles(_styles);
+        }
+
+        var settings = _services.Settings with
+        {
+            ToolStyles = _styles.Stored.ToDictionary(pair => pair.Key, pair => pair.Value),
+        };
+
+        _services.Settings = settings;
+
+        if (!_services.SettingsStore.Save(settings))
+        {
+            Log.Default.Info("не удалось сохранить стиль инструмента");
         }
     }
 
@@ -325,12 +384,12 @@ public sealed class OverlaySession
         }
     }
 
-    private static ITool CreateTool(ToolKind kind) => kind switch
+    private ITool CreateTool(ToolKind kind) => kind switch
     {
         ToolKind.Blur => new BlurTool(),
-        ToolKind.Arrow => new ArrowTool(),
-        ToolKind.Line => new LineTool(),
-        ToolKind.Rectangle => new RectangleTool(),
+        ToolKind.Arrow => new ArrowTool(_styles.For(kind)),
+        ToolKind.Line => new LineTool(_styles.For(kind)),
+        ToolKind.Rectangle => new RectangleTool(_styles.For(kind)),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown tool."),
     };
 

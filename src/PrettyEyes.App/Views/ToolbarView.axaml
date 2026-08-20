@@ -49,6 +49,7 @@
     </Style>
   </UserControl.Styles>
 
+  <Panel>
   <Border x:Name="Card"
           Background="{StaticResource Surface}"
           BorderBrush="{StaticResource Border}"
@@ -71,14 +72,31 @@
         <Button Classes="tool" x:Name="BlurButton" ToolTip.Tip="Размытие">
           <Path Data="M4,4 H6.5 V6.5 H4 Z M9.5,4 H12 V6.5 H9.5 Z M6.5,6.5 H9 V9 H6.5 Z M4,9.5 H6.5 V12 H4 Z M9.5,9.5 H12 V12 H9.5 Z"/>
         </Button>
-        <Button Classes="tool" x:Name="ArrowButton" ToolTip.Tip="Стрелка">
-          <Path Data="M4,12 L12,4 M12,4 H7.5 M12,4 V8.5"/>
+        <Button Classes="tool" x:Name="ArrowButton" ToolTip.Tip="Стрелка, правая кнопка - цвет и толщина">
+          <Panel>
+            <Path Data="M4,12 L12,4 M12,4 H7.5 M12,4 V8.5"/>
+            <!-- The only colour in the interface, and it is not decoration: it
+                 is the colour this tool will draw with. -->
+            <Ellipse x:Name="ArrowDot" Width="6" Height="6"
+                     HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                     Margin="0,0,-3,-3"/>
+          </Panel>
         </Button>
-        <Button Classes="tool" x:Name="LineButton" ToolTip.Tip="Линия">
-          <Path Data="M4,12 L12,4"/>
+        <Button Classes="tool" x:Name="LineButton" ToolTip.Tip="Линия, правая кнопка - цвет и толщина">
+          <Panel>
+            <Path Data="M4,12 L12,4"/>
+            <Ellipse x:Name="LineDot" Width="6" Height="6"
+                     HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                     Margin="0,0,-3,-3"/>
+          </Panel>
         </Button>
-        <Button Classes="tool" x:Name="RectButton" ToolTip.Tip="Рамка">
-          <Path Data="M3.5,4 H12.5 V12 H3.5 Z"/>
+        <Button Classes="tool" x:Name="RectButton" ToolTip.Tip="Рамка, правая кнопка - цвет и толщина">
+          <Panel>
+            <Path Data="M3.5,4 H12.5 V12 H3.5 Z"/>
+            <Ellipse x:Name="RectDot" Width="6" Height="6"
+                     HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                     Margin="0,0,-3,-3"/>
+          </Panel>
         </Button>
       </StackPanel>
 
@@ -97,4 +115,5 @@
       </StackPanel>
     </StackPanel>
   </Border>
+  </Panel>
 </UserControl>
