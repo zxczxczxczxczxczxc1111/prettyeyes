@@ -54,4 +54,53 @@ public class JsonSettingsStoreTests
 
         Assert.Equal(saved, store.Load());
     }
+
+    [Fact]
+    public void Settings_from_version_1_0_1_load_and_get_the_new_fields_filled_in()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pe-{Guid.NewGuid()}.json");
+
+        // Exactly what 1.0.1 wrote: three fields, no schema version.
+        File.WriteAllText(path, """
+            {
+              "Hotkey": { "Modifiers": 1, "VirtualKey": 71 },
+              "FullScreenHotkey": { "Modifiers": 6, "VirtualKey": 51 },
+              "Autostart": false
+            }
+            """);
+
+        var settings = new JsonSettingsStore(path).Load();
+
+        Assert.Equal(new HotkeyDefinition(HotkeyModifiers.Alt, 0x47), settings.Hotkey);
+        Assert.Equal(AppSettings.CurrentSchema, settings.SchemaVersion);
+    }
+
+    [Fact]
+    public void A_failed_save_leaves_the_previous_file_intact()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pe-{Guid.NewGuid()}.json");
+        var store = new JsonSettingsStore(path);
+
+        store.Save(AppSettings.Default);
+        var before = File.ReadAllText(path);
+
+        // Held open by somebody else: the move cannot replace it.
+        using (File.Open(path, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            var saved = store.Save(AppSettings.Default with { Autostart = true });
+
+            Assert.False(saved);
+        }
+
+        Assert.Equal(before, File.ReadAllText(path));
+    }
+
+    [Fact]
+    public void A_successful_save_leaves_no_temporary_file_behind()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pe-{Guid.NewGuid()}.json");
+
+        Assert.True(new JsonSettingsStore(path).Save(AppSettings.Default));
+        Assert.False(File.Exists(path + ".tmp"));
+    }
 }

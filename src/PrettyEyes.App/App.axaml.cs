@@ -44,14 +44,16 @@ public partial class App : Application
 
             // A capture taken before the monitors moved is worthless: the frame
             // and the coordinates no longer describe the same desktop.
-            Services.Hotkeys.DisplayChanged += (_, _) => Dispatcher.UIThread.Post(() =>
+            Services.WarmCapture();
+            Services.Hotkeys.DisplayChanged += (_, _) => Dispatcher.UIThread.Post(OnDisplayChanged);
+
+            // WM_DISPLAYCHANGE covers a resolution change, but not a monitor
+            // rearranged or a scaling change: a message-only window is not even
+            // eligible for the broadcast that carries those.
+            if (Services.Host.Screens is { } screens)
             {
-                // Arrives on the message-only window's thread. Closing a
-                // session and rebuilding windows from there is asking for it.
-                Log.Default.Info("конфигурация мониторов изменилась");
-                _session?.Close();
-                Services?.OverlayWindows.Rebuild(Services.Monitors.Enumerate().Monitors.Count);
-            });
+                screens.Changed += (_, _) => Dispatcher.UIThread.Post(OnDisplayChanged);
+            }
 
             desktop.ShutdownRequested += (_, _) => Services.Dispose();
         }
@@ -65,6 +67,23 @@ public partial class App : Application
     /// The only place a capture failure is handled: the app lives in the tray
     /// and has to survive until the next hotkey press.
     /// </summary>
+    /// <summary>
+    /// The desktop is not what it was. An overlay sized for a monitor that is
+    /// gone, or placed at coordinates that no longer exist, is worse than no
+    /// overlay at all.
+    /// </summary>
+    private void OnDisplayChanged()
+    {
+        if (Services is null)
+        {
+            return;
+        }
+
+        Log.Default.Info("конфигурация мониторов изменилась");
+        _session?.Close();
+        Services.OverlayWindows.Rebuild(Services.Monitors.Enumerate().Monitors.Count);
+    }
+
     public void StartCapture()
     {
         if (Services is null)

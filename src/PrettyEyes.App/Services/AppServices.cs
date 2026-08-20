@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using PrettyEyes.App.Controls;
+using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Core.Settings;
 using PrettyEyes.Platform.Windows;
@@ -152,6 +153,29 @@ public sealed class AppServices : IDisposable
             FullScreenHotkeyRegistered = fullScreenRegistered,
         };
     }
+
+    /// <summary>
+    /// Takes one capture and throws it away, in the background.
+    ///
+    /// The first capture of a run costs 128 ms against 44 ms for the ones after
+    /// it: the code has to be compiled, the capture item built, the D3D device
+    /// woken. That belongs to start-up, not to the first time the hotkey is
+    /// pressed. Nothing is stored, shown or written anywhere.
+    /// </summary>
+    public void WarmCapture() => Task.Run(() =>
+    {
+        try
+        {
+            using var scope = Log.Default.Scope("capture.warm");
+            Capture.CaptureAll().Image.Dispose();
+        }
+        catch (InvalidOperationException error)
+        {
+            // A failed warm-up changes nothing: the real capture reports for
+            // itself, and this one nobody asked for.
+            Log.Default.Error("прогрев захвата не удался", error);
+        }
+    });
 
     /// <summary>
     /// Called on shutdown. The D3D11 device and the tray entry belong to us and

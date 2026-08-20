@@ -37,13 +37,7 @@ public sealed class JsonSettingsStore : ISettingsStore
                 return AppSettings.Default;
             }
 
-            // A file written before a setting existed leaves that property null,
-            // and a missing hotkey would mean no hotkey at all.
-            return stored with
-            {
-                Hotkey = stored.Hotkey ?? HotkeyDefinition.Default,
-                FullScreenHotkey = stored.FullScreenHotkey ?? HotkeyDefinition.DefaultFullScreen,
-            };
+            return Normalize(stored);
         }
         catch (JsonException)
         {
@@ -59,15 +53,61 @@ public sealed class JsonSettingsStore : ISettingsStore
         }
     }
 
-    public void Save(AppSettings settings)
+    /// <summary>
+    /// The one place where a file from an older version is brought up to date.
+    /// Every field added by a later version needs a line here: JSON leaves an
+    /// unknown property at its default, and for a reference type that default
+    /// is null in a property declared as never null.
+    /// </summary>
+    private static AppSettings Normalize(AppSettings stored) => stored with
+    {
+        Hotkey = stored.Hotkey ?? HotkeyDefinition.Default,
+        FullScreenHotkey = stored.FullScreenHotkey ?? HotkeyDefinition.DefaultFullScreen,
+        SchemaVersion = AppSettings.CurrentSchema,
+    };
+
+    /// <summary>
+    /// Written through a temporary file and moved into place: a half-written
+    /// settings file reads as no settings at all, and losing every hotkey
+    /// because the power went out mid-write is not a trade worth making.
+    /// </summary>
+    public bool Save(AppSettings settings)
     {
         var directory = Path.GetDirectoryName(_path);
+        var temporary = _path + ".tmp";
 
-        if (!string.IsNullOrEmpty(directory))
+        try
         {
-            Directory.CreateDirectory(directory);
-        }
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
 
-        File.WriteAllText(_path, JsonSerializer.Serialize(settings, Options));
+            File.WriteAllText(temporary, JsonSerializer.Serialize(settings, Options));
+            File.Move(temporary, _path, overwrite: true);
+
+            return true;
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // Reported by returning false: a storage class in Core has no
+            // business writing into the user's log file, and the tests would
+            // write there too.
+            Discard(temporary);
+
+            return false;
+        }
+    }
+
+    private static void Discard(string path)
+    {
+        try
+        {
+            File.Delete(path);
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+        {
+            // A leftover .tmp is harmless; the next save overwrites it.
+        }
     }
 }

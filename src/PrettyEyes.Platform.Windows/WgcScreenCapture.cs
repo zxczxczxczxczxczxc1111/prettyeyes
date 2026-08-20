@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Platform;
@@ -38,6 +40,7 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
     private readonly ID3D11DeviceContext _context;
     private readonly IDirect3DDevice _winrtDevice;
     private readonly Dictionary<IntPtr, MonitorCapture> _captures = [];
+    private readonly MtaWorker _worker = new();
 
     /// <summary>
     /// Where the per-step timings go. Null in the application: the numbers are
@@ -74,10 +77,23 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
     /// <summary>True when this Windows build has the capture API at all.</summary>
     public static bool IsSupported => GraphicsCaptureSession.IsSupported();
 
+    /// <summary>
+    /// Runs on the worker thread, never on the caller's.
+    ///
+    /// The application's UI thread is a single-threaded apartment, and every
+    /// WinRT call made from there is marshalled. Measured on the same machine:
+    /// 33 ms per capture from a multi-threaded apartment against 105-132 ms
+    /// from the UI thread, for the same code and the same monitors.
+    /// </summary>
     public CaptureResult CaptureAll()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        return _worker.Run(CaptureOnWorker);
+    }
+
+    private CaptureResult CaptureOnWorker()
+    {
         var layout = _monitors.Enumerate();
         var bounds = layout.VirtualBounds;
 
@@ -148,6 +164,8 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
         }
 
         _disposed = true;
+
+        _worker.Dispose();
 
         lock (_captures)
         {
@@ -304,6 +322,76 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
             lock (_context)
             {
                 _context.Unmap(staging, 0);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A single thread in the multi-threaded apartment, kept for the life of
+    /// the capture. Everything WinRT touches happens here.
+    /// </summary>
+    private sealed class MtaWorker : IDisposable
+    {
+        private readonly BlockingCollection<Action> _queue = new();
+        private readonly Thread _thread;
+
+        public MtaWorker()
+        {
+            _thread = new Thread(Pump)
+            {
+                IsBackground = true,
+                Name = "prettyeyes capture",
+            };
+
+            _thread.SetApartmentState(ApartmentState.MTA);
+            _thread.Start();
+        }
+
+        public T Run<T>(Func<T> work)
+        {
+            using var done = new ManualResetEventSlim(false);
+            T result = default!;
+            Exception? failure = null;
+
+            _queue.Add(() =>
+            {
+                try
+                {
+                    result = work();
+                }
+                catch (Exception error)
+                {
+                    failure = error;
+                }
+                finally
+                {
+                    done.Set();
+                }
+            });
+
+            done.Wait();
+
+            if (failure is not null)
+            {
+                // Rethrown on the caller's thread with the original stack kept.
+                ExceptionDispatchInfo.Capture(failure).Throw();
+            }
+
+            return result;
+        }
+
+        public void Dispose()
+        {
+            _queue.CompleteAdding();
+            _thread.Join(TimeSpan.FromSeconds(2));
+            _queue.Dispose();
+        }
+
+        private void Pump()
+        {
+            foreach (var work in _queue.GetConsumingEnumerable())
+            {
+                work();
             }
         }
     }

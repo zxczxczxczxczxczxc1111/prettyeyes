@@ -4,5 +4,6 @@ public interface ISettingsStore
 {
     AppSettings Load();
 
-    void Save(AppSettings settings);
+    /// <summary>False when the settings could not be written down.</summary>
+    bool Save(AppSettings settings);
 }

@@ -4,6 +4,7 @@ using Avalonia.Media;
 using Avalonia.Media.Transformation;
 using Avalonia.Threading;
 using PrettyEyes.App.Controls;
+using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Core.Settings;
 using PrettyEyes.Platform.Windows;
@@ -165,7 +166,14 @@ public partial class SettingsWindow : Window
     private void Store(AppSettings settings)
     {
         _settings = settings;
-        _store?.Save(settings);
+
+        // A setting that looks applied but was never written down comes back
+        // wrong after a restart, and nobody connects that to this moment.
+        if (_store?.Save(settings) == false)
+        {
+            Log.Default.Info("не удалось сохранить настройки");
+            ShowFailure("Настройки применены, но не сохранились.");
+        }
     }
 
     private void ShowWarning(string text) => Show(text, "Warn");
