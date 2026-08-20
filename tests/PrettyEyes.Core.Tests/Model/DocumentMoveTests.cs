@@ -1,6 +1,7 @@
 using PrettyEyes.Core.Annotations;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
+using PrettyEyes.Core.Tools;
 using SkiaSharp;
 using Xunit;
 
@@ -177,5 +178,92 @@ public class DocumentMoveTests
         // Otherwise undo would bring back shapes drawn for a region that no
         // longer exists.
         Assert.False(document.Undo());
+    }
+
+    [Fact]
+    public void A_step_of_the_wheel_grows_the_glyph_around_its_centre()
+    {
+        using var glyph = NewImage();
+        using var document = NewDocument();
+        var emoji = Glyph(glyph, 100, 100);
+
+        document.Add(emoji);
+
+        Assert.True(document.Resize(emoji, 1));
+
+        var grown = Assert.Single(document.Annotations);
+
+        Assert.Equal(40 + EmojiAnnotation.SizeStep, grown.Bounds.Width);
+        Assert.Equal(100 - (EmojiAnnotation.SizeStep / 2), grown.Bounds.X);
+        Assert.Equal(100 - (EmojiAnnotation.SizeStep / 2), grown.Bounds.Y);
+    }
+
+    [Fact]
+    public void The_glyph_does_not_shrink_past_the_smallest_readable_size()
+    {
+        using var glyph = NewImage();
+        using var document = NewDocument();
+        var emoji = Glyph(glyph, 0, 0, EmojiTool.MinSize);
+
+        document.Add(emoji);
+
+        Assert.False(document.Resize(emoji, -1));
+        Assert.Equal(EmojiTool.MinSize, document.Annotations[0].Bounds.Width);
+    }
+
+    [Fact]
+    public void The_glyph_does_not_grow_past_the_largest()
+    {
+        using var glyph = NewImage();
+        using var document = NewDocument();
+        var emoji = Glyph(glyph, 0, 0, EmojiTool.MaxSize);
+
+        document.Add(emoji);
+
+        Assert.False(document.Resize(emoji, 1));
+    }
+
+    [Fact]
+    public void A_run_of_wheel_steps_undoes_in_one()
+    {
+        using var glyph = NewImage();
+        using var document = NewDocument();
+        var emoji = Glyph(glyph, 100, 100);
+
+        document.Add(emoji);
+
+        var current = emoji;
+
+        for (var step = 0; step < 4; step++)
+        {
+            Assert.True(document.Resize(current, 1));
+            current = (EmojiAnnotation)document.Annotations[0];
+        }
+
+        Assert.True(document.Undo());
+
+        // Back to the size it was stamped at, not four notches of undo.
+        Assert.Equal(40, document.Annotations[0].Bounds.Width);
+    }
+
+    [Fact]
+    public void Drawing_between_two_runs_of_steps_splits_them()
+    {
+        using var glyph = NewImage();
+        using var document = NewDocument();
+        var first = Glyph(glyph, 0, 0);
+
+        document.Add(first);
+        document.Resize(first, 1);
+
+        var second = Glyph(glyph, 200, 200);
+        document.Add(second);
+        document.Resize(second, 1);
+
+        Assert.True(document.Undo());
+
+        // The second glyph is back to its stamped size, the first keeps its step.
+        Assert.Equal(40, document.Annotations[1].Bounds.Width);
+        Assert.Equal(40 + EmojiAnnotation.SizeStep, document.Annotations[0].Bounds.Width);
     }
 }

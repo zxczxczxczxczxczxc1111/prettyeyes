@@ -11,4 +11,10 @@ public interface IMovable : IAnnotation
 {
     /// <summary>The same object, that much further along. Never mutates.</summary>
     IMovable MovedBy(int dx, int dy);
+
+    /// <summary>
+    /// A step bigger or smaller, around its own centre. Null when it has
+    /// nowhere left to go in that direction.
+    /// </summary>
+    IMovable? ResizedBy(int steps);
 }

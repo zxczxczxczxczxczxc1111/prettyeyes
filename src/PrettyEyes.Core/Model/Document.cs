@@ -27,6 +27,12 @@ public sealed class Document : IDisposable
 
     private IAnnotation? _detached;
 
+    /// <summary>
+    /// Which annotation the current run of resize steps belongs to, by index,
+    /// or -1 between runs.
+    /// </summary>
+    private int _resizing = -1;
+
     private IReadOnlyList<IAnnotation>? _snapshot;
 
     public Document(SKImage source, CaptureRect sourceBounds)
@@ -90,6 +96,32 @@ public sealed class Document : IDisposable
     }
 
     /// <summary>
+    /// Grows or shrinks one annotation in place. A run of steps on the same one
+    /// counts as a single change, so a wheel spun ten notches is one undo and
+    /// not ten.
+    /// </summary>
+    public bool Resize(IMovable annotation, int steps)
+    {
+        var index = _annotations.IndexOf(annotation);
+
+        if (index < 0 || annotation.ResizedBy(steps) is not { } resized)
+        {
+            return false;
+        }
+
+        if (_resizing != index)
+        {
+            Remember();
+            _resizing = index;
+        }
+
+        _annotations[index] = resized;
+        _snapshot = null;
+
+        return true;
+    }
+
+    /// <summary>
     /// The topmost thing under the point that can be dragged, or null. Topmost
     /// because that is the one the eye picks when two overlap.
     /// </summary>
@@ -116,6 +148,7 @@ public sealed class Document : IDisposable
         _annotations.Clear();
         _annotations.AddRange(_history[^1]);
         _history.RemoveAt(_history.Count - 1);
+        _resizing = -1;
         _snapshot = null;
 
         return true;
@@ -123,6 +156,10 @@ public sealed class Document : IDisposable
 
     private void Remember()
     {
+        // Any other change ends the run: the next wheel step after drawing
+        // something else is a change of its own.
+        _resizing = -1;
+
         _history.Add([.. _annotations]);
 
         if (_history.Count > HistoryDepth)
@@ -140,6 +177,7 @@ public sealed class Document : IDisposable
         _annotations.Clear();
         _history.Clear();
         _detached = null;
+        _resizing = -1;
         _snapshot = null;
     }
 

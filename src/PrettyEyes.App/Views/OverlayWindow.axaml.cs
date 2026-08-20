@@ -29,6 +29,10 @@ public partial class OverlayWindow : Window
 
     // A Cursor owns a native handle. Building one per mouse move burns handles
     // and hands back the same arrow anyway.
+    /// <summary>
+    /// Kept for the moments the pointer is not over the captured frame and
+    /// there is nothing to judge the colour against.
+    /// </summary>
     private static readonly Cursor Cross = new(StandardCursorType.Cross);
     private static readonly Cursor Corner = new(StandardCursorType.TopLeftCorner);
     private static readonly Cursor AntiCorner = new(StandardCursorType.TopRightCorner);
@@ -79,11 +83,14 @@ public partial class OverlayWindow : Window
     /// <summary>A stamped glyph was carried somewhere else and let go.</summary>
     public event EventHandler<(IMovable Annotation, int Dx, int Dy)>? AnnotationMoved;
 
+    /// <summary>A stamped glyph should grow or shrink by one step.</summary>
+    public event EventHandler<(IMovable Annotation, int Steps)>? AnnotationResized;
+
     /// <summary>Ctrl+C or Enter: the same thing the copy button does.</summary>
     public event EventHandler? CopyRequested;
 
-    /// <summary>Ctrl+S saves; with Shift it asks where, like the button.</summary>
-    public event EventHandler<bool>? SaveRequested;
+    /// <summary>Ctrl+S: save to a file, through the dialog, like the button.</summary>
+    public event EventHandler? SaveRequested;
 
     /// <summary>A hex colour that wants to be in the clipboard as text.</summary>
     public event EventHandler<string>? ColourCopyRequested;
@@ -653,6 +660,31 @@ public partial class OverlayWindow : Window
         _lastY = y;
     }
 
+    /// <summary>
+    /// Ctrl and the wheel over a stamped glyph makes it bigger or smaller.
+    /// The same modifier that picks a glyph up, so there is one thing to
+    /// remember rather than two.
+    /// </summary>
+    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    {
+        base.OnPointerWheelChanged(e);
+
+        if (!e.KeyModifiers.HasFlag(KeyModifiers.Control) || _moving is not null)
+        {
+            return;
+        }
+
+        var (x, y) = ToVirtualPixels(e.GetPosition(this));
+
+        if (_document?.MovableAt(x, y) is not { } target)
+        {
+            return;
+        }
+
+        AnnotationResized?.Invoke(this, (target, e.Delta.Y > 0 ? 1 : -1));
+        e.Handled = true;
+    }
+
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
@@ -716,7 +748,7 @@ public partial class OverlayWindow : Window
 
         if (_mode == OverlayMode.Drawing)
         {
-            Cursor = Cross;
+            Cursor = Aim(x, y);
             return;
         }
 
@@ -727,9 +759,17 @@ public partial class OverlayWindow : Window
             SelectionGrip.Left or SelectionGrip.Right => WestEast,
             SelectionGrip.Top or SelectionGrip.Bottom => NorthSouth,
             SelectionGrip.Inside => Move,
-            _ => Cross,
+            _ => Aim(x, y),
         };
     }
+
+    /// <summary>
+    /// The crosshair that reads against what is under it: light on a dark
+    /// screenshot, dark on a light one. The pixel is already being sampled for
+    /// the magnifier, so this costs a comparison.
+    /// </summary>
+    private Cursor Aim(int x, int y) =>
+        Surface.ColorAt(x, y) is { } colour ? Crosshair.For(colour) : Cross;
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
@@ -776,7 +816,7 @@ public partial class OverlayWindow : Window
                 break;
 
             case Key.S when control:
-                SaveRequested?.Invoke(this, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+                SaveRequested?.Invoke(this, EventArgs.Empty);
                 break;
 
             // Bare C, so it cannot be reached while Ctrl is held for a copy.

@@ -60,6 +60,7 @@ public sealed class OverlaySession
             window.UndoRequested += OnUndoRequested;
             window.AnnotationDrawn += OnAnnotationDrawn;
             window.AnnotationMoved += OnAnnotationMoved;
+            window.AnnotationResized += OnAnnotationResized;
             window.CopyRequested += OnCopyClicked;
             window.SaveRequested += OnSaveRequested;
             window.ColourCopyRequested += OnColourCopyRequested;
@@ -104,6 +105,7 @@ public sealed class OverlaySession
         window.UndoRequested -= OnUndoRequested;
         window.AnnotationDrawn -= OnAnnotationDrawn;
         window.AnnotationMoved -= OnAnnotationMoved;
+        window.AnnotationResized -= OnAnnotationResized;
         window.CopyRequested -= OnCopyClicked;
         window.SaveRequested -= OnSaveRequested;
         window.ColourCopyRequested -= OnColourCopyRequested;
@@ -415,6 +417,14 @@ public sealed class OverlaySession
         Redraw();
     }
 
+    private void OnAnnotationResized(object? sender, (IMovable Annotation, int Steps) change)
+    {
+        if (Document?.Resize(change.Annotation, change.Steps) == true)
+        {
+            Redraw();
+        }
+    }
+
     /// <summary>
     /// Copy always fills the clipboard, and with autosave on it also drops a
     /// file in the folder. The file is a bonus, so the clipboard goes first:
@@ -438,12 +448,14 @@ public sealed class OverlaySession
     /// With autosave on this writes silently; holding Shift asks for a place
     /// anyway, because "somewhere else, just this once" has to stay possible.
     /// </summary>
-    private async void OnSaveRequested(object? sender, bool askWhere)
-    {
-        var dialog = askWhere || _services.Settings.Save?.Ready != true;
-
-        await SendSafelyAsync(dialog ? _services.File : _services.Folder);
-    }
+    /// <summary>
+    /// Saving on purpose always asks where. Quick save is a different feature
+    /// with its own switch, and it has already put a copy in the folder by the
+    /// time this button is pressed; a save button that silently drops the file
+    /// somewhere leaves no way to put one screenshot anywhere else.
+    /// </summary>
+    private async void OnSaveRequested(object? sender, EventArgs e) =>
+        await SendSafelyAsync(_services.File);
 
     /// <summary>
     /// An async event handler is the one place where an exception has nowhere
