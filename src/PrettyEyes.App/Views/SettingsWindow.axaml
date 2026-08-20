@@ -4,7 +4,7 @@
         x:Class="PrettyEyes.App.Views.SettingsWindow"
         Title="prettyeyes"
         Icon="/Assets/prettyeyes.ico"
-        Width="440" Height="366"
+        Width="880" Height="640"
         CanResize="False"
         SystemDecorations="None"
         Background="{StaticResource Bg}"
@@ -32,30 +32,40 @@
                 Margin="0,0,10,0" Content="✕"/>
       </Grid>
 
-      <StackPanel Margin="24,8,24,24" Spacing="20">
-        <StackPanel Spacing="12">
-          <TextBlock Text="Снимок" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+        <!-- Two columns, nothing folded away. The window is opened to set
+             things up and closed again, so it can afford the room; a setting
+             that has to be hunted for is worse than a wide window. -->
+        <Grid Margin="32,8,32,32" ColumnDefinitions="400,32,400" RowDefinitions="Auto,Auto">
+          <StackPanel Grid.Column="0" Grid.Row="0" Spacing="20">
+            <StackPanel Spacing="12">
+              <TextBlock Text="Снимок" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
 
-          <StackPanel Spacing="8">
-            <TextBlock Text="Выделить область" Foreground="{StaticResource Text}"/>
-            <controls:HotkeyBox x:Name="RegionHotkey" Classes="field" HorizontalAlignment="Stretch"/>
+              <StackPanel Spacing="8">
+                <TextBlock Text="Выделить область" Foreground="{StaticResource Text}"/>
+                <controls:HotkeyBox x:Name="RegionHotkey" Classes="field" HorizontalAlignment="Stretch"/>
+              </StackPanel>
+
+              <StackPanel Spacing="8">
+                <TextBlock Text="Весь монитор в буфер" Foreground="{StaticResource Text}"/>
+                <controls:HotkeyBox x:Name="FullScreenHotkey" Classes="field" HorizontalAlignment="Stretch"/>
+              </StackPanel>
+
+              <CheckBox x:Name="ShowMagnifier" Content="Показывать лупу при выделении"/>
+            </StackPanel>
           </StackPanel>
 
-          <StackPanel Spacing="8">
-            <TextBlock Text="Весь монитор в буфер" Foreground="{StaticResource Text}"/>
-            <controls:HotkeyBox x:Name="FullScreenHotkey" Classes="field" HorizontalAlignment="Stretch"/>
+          <StackPanel Grid.Column="2" Grid.Row="0" Spacing="20">
+            <StackPanel Spacing="12">
+              <TextBlock Text="Система" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
+              <CheckBox x:Name="Autostart" Content="Запускать вместе с Windows"/>
+            </StackPanel>
           </StackPanel>
-        </StackPanel>
 
-        <Rectangle Height="1" Fill="{StaticResource Border}"/>
-
-        <StackPanel Spacing="12">
-          <TextBlock Text="Система" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
-          <CheckBox x:Name="Autostart" Content="Запускать вместе с Windows"/>
-        </StackPanel>
-
-        <TextBlock x:Name="Message" FontSize="12" TextWrapping="Wrap" IsVisible="False"/>
-      </StackPanel>
+          <TextBlock x:Name="Message" Grid.Row="1" Grid.ColumnSpan="3" Margin="0,20,0,0"
+                     FontSize="12" TextWrapping="Wrap" IsVisible="False"/>
+        </Grid>
+      </ScrollViewer>
     </DockPanel>
   </Border>
 </Window>

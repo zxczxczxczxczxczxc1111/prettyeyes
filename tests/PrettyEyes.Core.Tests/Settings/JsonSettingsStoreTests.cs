@@ -103,4 +103,36 @@ public class JsonSettingsStoreTests
         Assert.True(new JsonSettingsStore(path).Save(AppSettings.Default));
         Assert.False(File.Exists(path + ".tmp"));
     }
+
+    [Fact]
+    public void A_file_older_than_the_magnifier_gets_it_switched_on()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pe-{Guid.NewGuid()}.json");
+
+        // Schema 1: no ShowMagnifier property at all.
+        File.WriteAllText(path, """
+            {
+              "Hotkey": { "Modifiers": 1, "VirtualKey": 71 },
+              "FullScreenHotkey": { "Modifiers": 6, "VirtualKey": 51 },
+              "Autostart": false,
+              "SchemaVersion": 1
+            }
+            """);
+
+        var settings = new JsonSettingsStore(path).Load();
+
+        Assert.True(settings.ShowMagnifier);
+        Assert.Equal(AppSettings.CurrentSchema, settings.SchemaVersion);
+    }
+
+    [Fact]
+    public void A_magnifier_switched_off_on_purpose_stays_off()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pe-{Guid.NewGuid()}.json");
+        var store = new JsonSettingsStore(path);
+
+        store.Save(AppSettings.Default with { ShowMagnifier = false });
+
+        Assert.False(store.Load().ShowMagnifier);
+    }
 }

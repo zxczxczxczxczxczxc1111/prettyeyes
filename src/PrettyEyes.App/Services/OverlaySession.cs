@@ -51,12 +51,14 @@ public sealed class OverlaySession
             window.AnnotationDrawn += OnAnnotationDrawn;
             window.CopyRequested += OnCopyClicked;
             window.SaveRequested += OnSaveClicked;
+            window.ColourCopyRequested += OnColourCopyRequested;
             window.ToolFactory = () => _activeTool is null ? null : CreateTool(_activeTool.Value);
             window.ToolbarControl.ToolPicked += OnToolPicked;
             window.ToolbarControl.UndoClicked += OnUndoRequested;
             window.ToolbarControl.CopyClicked += OnCopyClicked;
             window.ToolbarControl.SaveClicked += OnSaveClicked;
 
+            window.SetMagnifierEnabled(_services.Settings.ShowMagnifier);
             window.PlaceOn(capture.Layout.Monitors[i], Document);
         }
 
@@ -76,6 +78,7 @@ public sealed class OverlaySession
         window.AnnotationDrawn -= OnAnnotationDrawn;
         window.CopyRequested -= OnCopyClicked;
         window.SaveRequested -= OnSaveClicked;
+        window.ColourCopyRequested -= OnColourCopyRequested;
         window.ToolFactory = null;
         window.ToolbarControl.ToolPicked -= OnToolPicked;
         window.ToolbarControl.UndoClicked -= OnUndoRequested;
@@ -84,6 +87,22 @@ public sealed class OverlaySession
     }
 
     private void OnCancelled(object? sender, EventArgs e) => Close();
+
+    /// <summary>
+    /// The colour goes in as text and the overlay stays open: reading a colour
+    /// off the screen is something people do several times in a row.
+    /// </summary>
+    private async void OnColourCopyRequested(object? sender, string hex)
+    {
+        try
+        {
+            await _services.Host.Clipboard!.SetTextAsync(hex);
+        }
+        catch (Exception error)
+        {
+            Log.Default.Error("не удалось скопировать цвет", error);
+        }
+    }
 
     /// <summary>
     /// Every monitor window feeds the same selection, so dragging across a

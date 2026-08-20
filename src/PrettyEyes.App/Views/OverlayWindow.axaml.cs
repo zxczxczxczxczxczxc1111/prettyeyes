@@ -17,6 +17,15 @@ public partial class OverlayWindow : Window
     /// <summary>How far from an edge a pointer still counts as grabbing it.</summary>
     private const int GripReach = 8;
 
+    // Mirrors the numbers the canvas draws with: the label has to line up with
+    // a magnifier it does not draw itself.
+    private const int MagnifierSize = 132;
+    private const int MagnifierGap = 24;
+
+    /// <summary>Arrow keys nudge by one pixel, with Shift by ten.</summary>
+    private const int NudgeStep = 1;
+    private const int NudgeStepFast = 10;
+
     // A Cursor owns a native handle. Building one per mouse move burns handles
     // and hands back the same arrow anyway.
     private static readonly Cursor Cross = new(StandardCursorType.Cross);
@@ -37,6 +46,7 @@ public partial class OverlayWindow : Window
     private SelectionGrip _grip = SelectionGrip.None;
     private OverlayMode _mode = OverlayMode.Selecting;
     private Size? _toolbarSize;
+    private bool _magnifierWanted = true;
     private ITool? _tool;
 
     public OverlayWindow() => InitializeComponent();
@@ -61,6 +71,9 @@ public partial class OverlayWindow : Window
 
     /// <summary>Ctrl+S: the same thing the save button does.</summary>
     public event EventHandler? SaveRequested;
+
+    /// <summary>A hex colour that wants to be in the clipboard as text.</summary>
+    public event EventHandler<string>? ColourCopyRequested;
 
     /// <summary>
     /// Asks the session for a fresh tool instance, one per gesture. Null means
@@ -115,6 +128,11 @@ public partial class OverlayWindow : Window
         }
 
         _mode = active ? OverlayMode.Drawing : OverlayMode.Adjusting;
+
+        if (active)
+        {
+            HideMagnifier();
+        }
     }
 
     /// <summary>
@@ -130,6 +148,101 @@ public partial class OverlayWindow : Window
         Show();
         Position = new PixelPoint(-32000, -32000);
         Hide();
+    }
+
+    /// <summary>Off means the magnifier never shows, whatever the pointer does.</summary>
+    public void SetMagnifierEnabled(bool enabled)
+    {
+        _magnifierWanted = enabled;
+
+        if (!enabled)
+        {
+            HideMagnifier();
+        }
+    }
+
+    /// <summary>
+    /// Aims the magnifier, or takes it away. It has no business being up while
+    /// a tool is drawing, while the pointer is over the toolbar, or when the
+    /// user switched it off.
+    /// </summary>
+    private void UpdateMagnifier(int x, int y)
+    {
+        if (!_magnifierWanted || _mode == OverlayMode.Drawing || OverToolbar(x, y))
+        {
+            HideMagnifier();
+            return;
+        }
+
+        Surface.MagnifierAt = new PixelPoint(x, y);
+
+        var box = MagnifierPlacement.Choose(x, y, _monitorBounds, MagnifierSize, MagnifierGap);
+        var scale = RenderScaling;
+
+        Loupe.IsVisible = true;
+        Loupe.Measure(Size.Infinity);
+
+        // Centred under the magnifier, and never off the monitor.
+        var width = Loupe.DesiredSize.Width;
+        var left = (((box.X + (box.Width / 2.0)) - _monitorBounds.X) / scale) - (width / 2);
+        var top = ((box.Bottom - _monitorBounds.Y) / scale) + 6;
+
+        if (top + Loupe.DesiredSize.Height > Height)
+        {
+            top = ((box.Y - _monitorBounds.Y) / scale) - 6 - Loupe.DesiredSize.Height;
+        }
+
+        Loupe.RenderTransform = new TranslateTransform(
+            Math.Clamp(left, 0, Math.Max(0, Width - width)),
+            Math.Max(0, top));
+
+        if (_dragging && _mode != OverlayMode.Drawing && !_selection.IsEmpty)
+        {
+            Loupe.ShowSize(_selection);
+        }
+        else
+        {
+            Loupe.ShowPixel(x, y, Surface.ColorAt(x, y));
+        }
+
+        Loupe.Show();
+    }
+
+    private void HideMagnifier()
+    {
+        Surface.MagnifierAt = null;
+        Loupe.Hide();
+    }
+
+    /// <summary>
+    /// Whether the pointer is over the toolbar or the chip. The magnifier drops
+    /// out below and to the right of the cursor, which is exactly where the
+    /// toolbar sits after a right-handed drag.
+    /// </summary>
+    private bool OverToolbar(int x, int y)
+    {
+        var scale = RenderScaling;
+        var localX = (x - _monitorBounds.X) / scale;
+        var localY = (y - _monitorBounds.Y) / scale;
+
+        return Covers(Toolbar, localX, localY) || Covers(Chip, localX, localY);
+    }
+
+    private static bool Covers(Control control, double x, double y)
+    {
+        if (!control.IsVisible || control.RenderTransform is not TranslateTransform at)
+        {
+            return false;
+        }
+
+        var size = control.DesiredSize;
+
+        // A little slack: the magnifier appearing right at the panel's edge
+        // reads as a glitch either way.
+        return x >= at.X - MagnifierGap
+            && y >= at.Y - MagnifierGap
+            && x <= at.X + size.Width + MagnifierGap
+            && y <= at.Y + size.Height + MagnifierGap;
     }
 
     /// <summary>
@@ -148,6 +261,7 @@ public partial class OverlayWindow : Window
         Surface.FrameOpacity = 0;
         Surface.VeilOpacity = 0;
         Surface.ShowPreview(null);
+        HideMagnifier();
 
         // Drops the reference to the frozen desktop: 28 MB per capture that
         // would otherwise be held by a hidden window until the next one.
@@ -357,8 +471,11 @@ public partial class OverlayWindow : Window
         if (!_dragging)
         {
             UpdateCursor(x, y);
+            UpdateMagnifier(x, y);
             return;
         }
+
+        UpdateMagnifier(x, y);
 
         switch (_mode)
         {
@@ -469,6 +586,54 @@ public partial class OverlayWindow : Window
             case Key.S when control:
                 SaveRequested?.Invoke(this, EventArgs.Empty);
                 break;
+
+            // Bare C, so it cannot be reached while Ctrl is held for a copy.
+            case Key.C:
+                CopyColour();
+                break;
+
+            case Key.Left or Key.Right or Key.Up or Key.Down:
+                Nudge(e.Key, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
+                break;
         }
+    }
+
+    /// <summary>
+    /// Moves the whole selection by a pixel. There is no notion of an active
+    /// edge in the model, and inventing one for the arrow keys would be a
+    /// bigger change than the keys are worth.
+    /// </summary>
+    private void Nudge(Key key, bool fast)
+    {
+        if (_selection.IsEmpty || _mode == OverlayMode.Drawing)
+        {
+            return;
+        }
+
+        var step = fast ? NudgeStepFast : NudgeStep;
+
+        var (dx, dy) = key switch
+        {
+            Key.Left => (-step, 0),
+            Key.Right => (step, 0),
+            Key.Up => (0, -step),
+            _ => (0, step),
+        };
+
+        var moved = SelectionGrips.Apply(_selection, SelectionGrip.Inside, dx, dy, _frameBounds);
+        SelectionChanged?.Invoke(this, moved);
+        SelectionSettled?.Invoke(this, moved);
+    }
+
+    /// <summary>The colour under the crosshair, as text, in the clipboard.</summary>
+    private void CopyColour()
+    {
+        if (Surface.MagnifierAt is not { } at || Surface.ColorAt(at.X, at.Y) is not { } colour)
+        {
+            return;
+        }
+
+        ColourCopyRequested?.Invoke(this, $"#{colour.Red:X2}{colour.Green:X2}{colour.Blue:X2}");
+        Loupe.ShowCopied(colour);
     }
 }

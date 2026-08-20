@@ -11,6 +11,8 @@
   <Panel x:Name="Root">
     <controls:CaptureCanvas x:Name="Surface"/>
     <views:SizeChip x:Name="Chip" HorizontalAlignment="Left" VerticalAlignment="Top" IsVisible="False"/>
+    <views:MagnifierLabel x:Name="Loupe" HorizontalAlignment="Left" VerticalAlignment="Top" IsVisible="False"
+                          IsHitTestVisible="False"/>
     <views:ToolbarView x:Name="Toolbar" HorizontalAlignment="Left" VerticalAlignment="Top" IsVisible="False"/>
     <Border x:Name="ErrorBanner"
             HorizontalAlignment="Center"

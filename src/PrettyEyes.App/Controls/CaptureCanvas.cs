@@ -7,6 +7,7 @@ using Avalonia.Platform;
 using Avalonia.Rendering.SceneGraph;
 using Avalonia.Skia;
 using PrettyEyes.Core.Diagnostics;
+using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using SkiaSharp;
 using CaptureRect = PrettyEyes.Core.Geometry.CaptureRect;
@@ -49,7 +50,7 @@ public sealed class CaptureCanvas : Control
 
     static CaptureCanvas()
     {
-        AffectsRender<CaptureCanvas>(VeilOpacityProperty, FrameOpacityProperty);
+        AffectsRender<CaptureCanvas>(VeilOpacityProperty, FrameOpacityProperty, MagnifierAtProperty);
     }
 
     /// <summary>
@@ -76,6 +77,43 @@ public sealed class CaptureCanvas : Control
     {
         get => GetValue(FrameOpacityProperty);
         set => SetValue(FrameOpacityProperty, value);
+    }
+
+    /// <summary>
+    /// Where the magnifier is aimed, in virtual-desktop pixels, or null when it
+    /// is not wanted: no capture yet, a tool is active, or the cursor is over
+    /// the toolbar.
+    /// </summary>
+    public static readonly StyledProperty<PixelPoint?> MagnifierAtProperty =
+        AvaloniaProperty.Register<CaptureCanvas, PixelPoint?>(nameof(MagnifierAt));
+
+    public PixelPoint? MagnifierAt
+    {
+        get => GetValue(MagnifierAtProperty);
+        set => SetValue(MagnifierAtProperty, value);
+    }
+
+    /// <summary>
+    /// The colour under the crosshair, sampled once per position rather than
+    /// per frame. Null when the cursor is off the captured frame.
+    /// </summary>
+    public SKColor? ColorAt(int x, int y)
+    {
+        if (_source is null)
+        {
+            return null;
+        }
+
+        var local = new CaptureRect(x - _frameBounds.X, y - _frameBounds.Y, 1, 1);
+
+        if (local.X < 0 || local.Y < 0 || local.X >= _source.Width || local.Y >= _source.Height)
+        {
+            return null;
+        }
+
+        using var pixels = _source.PeekPixels();
+
+        return pixels?.GetPixelColor(local.X, local.Y);
     }
 
     public void Attach(Document document, CaptureRect monitorBounds)
@@ -144,7 +182,8 @@ public sealed class CaptureCanvas : Control
             _preview,
             (float)(VisualRoot?.RenderScaling ?? 1.0),
             (float)VeilOpacity,
-            (float)FrameOpacity));
+            (float)FrameOpacity,
+            MagnifierAt));
     }
 
     private sealed class CaptureDrawOperation : ICustomDrawOperation
@@ -167,6 +206,18 @@ public sealed class CaptureCanvas : Control
         /// </summary>
         private const byte GlassAlpha = 26;
 
+        /// <summary>
+        /// 132 physical pixels showing 16 source pixels at eight times life
+        /// size: enough to see a pixel, small enough not to be in the way.
+        /// </summary>
+        private const int MagnifierSize = 132;
+        private const int MagnifierZoom = 8;
+        private const int MagnifierGap = 24;
+        private const float MagnifierRadius = 14;
+
+        /// <summary>Matches the Border token: a hairline, not a lattice.</summary>
+        private const byte GridAlpha = 15;
+
         private readonly SKImage _source;
         private readonly CaptureRect _frame;
         private readonly CaptureRect _monitor;
@@ -176,12 +227,15 @@ public sealed class CaptureCanvas : Control
         private readonly float _scaling;
         private readonly float _veilOpacity;
         private readonly float _frameOpacity;
+        private readonly PixelPoint? _magnifierAt;
 
         public CaptureDrawOperation(
             Rect bounds, SKImage source, CaptureRect frame, CaptureRect monitor,
             CaptureRect selection, IReadOnlyList<IAnnotation> annotations,
-            IAnnotation? preview, float scaling, float veilOpacity, float frameOpacity)
+            IAnnotation? preview, float scaling, float veilOpacity, float frameOpacity,
+            PixelPoint? magnifierAt)
         {
+            _magnifierAt = magnifierAt;
             Bounds = bounds;
             _source = source;
             _frame = frame;
@@ -289,7 +343,92 @@ public sealed class CaptureCanvas : Control
                 DrawSelectionFrame(canvas, hole);
             }
 
+            DrawMagnifier(canvas);
+
             canvas.Restore();
+        }
+
+        /// <summary>
+        /// The pixel grid, at eight times life size. Sampling is nearest
+        /// neighbour on purpose: this exists so an edge can be put on the right
+        /// pixel, and a smoothed pixel has no edge to aim at.
+        /// </summary>
+        private void DrawMagnifier(SKCanvas canvas)
+        {
+            if (_magnifierAt is not { } at)
+            {
+                return;
+            }
+
+            var box = MagnifierPlacement.Choose(at.X, at.Y, _monitor, MagnifierSize, MagnifierGap);
+            var destination = SKRect.Create(box.X, box.Y, box.Width, box.Height);
+
+            var span = MagnifierSize / MagnifierZoom;
+            var source = SKRect.Create(
+                at.X - _frame.X - (span / 2f),
+                at.Y - _frame.Y - (span / 2f),
+                span,
+                span);
+
+            canvas.Save();
+
+            using var round = new SKRoundRect(destination, MagnifierRadius);
+            canvas.ClipRoundRect(round, antialias: true);
+
+            // Anything outside the captured frame has no pixels to show: black
+            // is honest, a stretched edge pixel is not.
+            using var backdrop = new SKPaint { Color = SKColors.Black };
+            canvas.DrawRect(destination, backdrop);
+
+            var sampling = new SKSamplingOptions(SKFilterMode.Nearest, SKMipmapMode.None);
+            canvas.DrawImage(_source, source, destination, sampling, null);
+
+            DrawPixelGrid(canvas, destination);
+            DrawCrosshair(canvas, destination);
+
+            canvas.Restore();
+
+            // The rim goes on outside the clip, so it is not cut in half.
+            using var rim = Stroke(new SKColor(255, 255, 255, FrameLightAlpha));
+            using var rimRound = new SKRoundRect(destination, MagnifierRadius);
+            canvas.DrawRoundRect(rimRound, rim);
+        }
+
+        private static void DrawPixelGrid(SKCanvas canvas, SKRect box)
+        {
+            using var line = new SKPaint
+            {
+                Color = new SKColor(255, 255, 255, GridAlpha),
+                Style = SKPaintStyle.Stroke,
+                StrokeWidth = 1,
+            };
+
+            for (var offset = MagnifierZoom; offset < MagnifierSize; offset += MagnifierZoom)
+            {
+                canvas.DrawLine(box.Left + offset, box.Top, box.Left + offset, box.Bottom, line);
+                canvas.DrawLine(box.Left, box.Top + offset, box.Right, box.Top + offset, line);
+            }
+        }
+
+        /// <summary>
+        /// The centre cell, outlined with the same double hairline as the
+        /// selection frame so it reads on any wallpaper.
+        /// </summary>
+        private static void DrawCrosshair(SKCanvas canvas, SKRect box)
+        {
+            var centre = SKRect.Create(
+                box.Left + ((MagnifierSize - MagnifierZoom) / 2f),
+                box.Top + ((MagnifierSize - MagnifierZoom) / 2f),
+                MagnifierZoom,
+                MagnifierZoom);
+
+            using var dark = Stroke(new SKColor(0, 0, 0, FrameDarkAlpha));
+            using var light = Stroke(new SKColor(255, 255, 255, FrameLightAlpha));
+
+            var outer = centre;
+            outer.Inflate(0.5f, 0.5f);
+            canvas.DrawRect(outer, dark);
+            canvas.DrawRect(centre, light);
         }
 
         private void DrawSelectionFrame(SKCanvas canvas, SKRect hole)

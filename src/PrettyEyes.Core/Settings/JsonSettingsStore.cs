@@ -63,6 +63,11 @@ public sealed class JsonSettingsStore : ISettingsStore
     {
         Hotkey = stored.Hotkey ?? HotkeyDefinition.Default,
         FullScreenHotkey = stored.FullScreenHotkey ?? HotkeyDefinition.DefaultFullScreen,
+
+        // Schema 2 added the magnifier. A file older than that has the property
+        // missing, and JSON leaves a missing bool false - which would silently
+        // switch off a feature that ships switched on, for everyone updating.
+        ShowMagnifier = stored.SchemaVersion >= 2 ? stored.ShowMagnifier : true,
         SchemaVersion = AppSettings.CurrentSchema,
     };
 

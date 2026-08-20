@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PrettyEyes.App.Views.MagnifierLabel">
+  <Border x:Name="Card"
+          Background="{StaticResource SurfaceRaised}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="1"
+          CornerRadius="{StaticResource RChip}"
+          Padding="6,2"
+          Opacity="0">
+    <Border.Transitions>
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.12" Easing="CubicEaseOut"/>
+      </Transitions>
+    </Border.Transitions>
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <TextBlock x:Name="Position"
+                 Foreground="{StaticResource TextDim}"
+                 FontSize="11"
+                 Text="0, 0"/>
+      <!-- The one place colour is allowed in the interface: it is not
+           decoration, it is the value being read off the screen. -->
+      <Border x:Name="Swatch"
+              Width="10" Height="10"
+              CornerRadius="2"
+              VerticalAlignment="Center"
+              BorderBrush="{StaticResource Border}"
+              BorderThickness="1"
+              IsVisible="False"/>
+      <TextBlock x:Name="Value"
+                 Foreground="{StaticResource Text}"
+                 FontSize="11"
+                 Text=""/>
+    </StackPanel>
+  </Border>
+</UserControl>
