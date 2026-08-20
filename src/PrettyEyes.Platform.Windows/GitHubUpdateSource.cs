@@ -16,6 +16,13 @@ public sealed class GitHubUpdateSource : IUpdateSource, IDisposable
     private const string Latest =
         "https://api.github.com/repos/zxczxczxczxczxczxc1111/prettyeyes/releases/latest";
 
+    /// <summary>
+    /// The same releases, for a human to read before they install anything.
+    /// Newest first, so it needs no version in it and cannot go stale.
+    /// </summary>
+    public const string ReleasesPage =
+        "https://github.com/zxczxczxczxczxczxc1111/prettyeyes/releases";
+
     /// <summary>GitHub refuses anonymous calls without one.</summary>
     private const string Agent = "prettyeyes-updater";
 

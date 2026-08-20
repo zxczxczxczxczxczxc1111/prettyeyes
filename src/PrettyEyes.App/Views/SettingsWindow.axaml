@@ -142,8 +142,13 @@
                            Foreground="{StaticResource TextDim}"/>
               </Grid>
 
-              <Button x:Name="InstallUpdate" Classes="ghost" IsVisible="False"
-                      HorizontalAlignment="Left"/>
+              <!-- What to install, and what is in it. The second one is there
+                   whether or not an update is: reading the notes is also how
+                   somebody decides they do not want it. -->
+              <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Left">
+                <Button x:Name="InstallUpdate" Classes="ghost" IsVisible="False"/>
+                <Button x:Name="OpenReleases" Classes="ghost" Content="Что нового"/>
+              </StackPanel>
 
               <TextBlock x:Name="CurrentVersion" Foreground="{StaticResource TextFaint}" FontSize="11"/>
             </StackPanel>

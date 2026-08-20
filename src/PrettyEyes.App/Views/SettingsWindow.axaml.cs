@@ -128,6 +128,7 @@ public partial class SettingsWindow : Window
         PickFolder.Click += OnPickFolder;
         CheckUpdates.IsCheckedChanged += OnCheckUpdatesChanged;
         CheckNow.Click += (_, _) => _ = updates.CheckAsync(manual: true);
+        OpenReleases.Click += (_, _) => OpenPage(GitHubUpdateSource.ReleasesPage);
         InstallUpdate.Click += (_, _) => _ = _install?.Invoke();
 
         // Unsubscribed on close: the service outlives this window, and a
@@ -309,6 +310,25 @@ public partial class SettingsWindow : Window
         Store(_settings with { CheckUpdates = CheckUpdates.IsChecked == true });
         _updates?.Reschedule();
         ShowUpdateState(_updates?.State ?? new UpdateState(UpdateStage.Idle));
+    }
+
+    /// <summary>
+    /// The release notes in a browser. Whether the shell has one, and whether
+    /// it feels like opening it, is not something we can do anything about -
+    /// but it is not worth taking the settings window down over.
+    /// </summary>
+    private void OpenPage(string url)
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception error)
+        {
+            Log.Default.Error("не удалось открыть страницу релизов", error);
+            ShowWarning("Не удалось открыть браузер.");
+        }
     }
 
     private void OnUpdateState(object? sender, UpdateState state) =>
