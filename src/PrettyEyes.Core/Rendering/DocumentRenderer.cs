@@ -10,10 +10,22 @@ namespace PrettyEyes.Core.Rendering;
 /// </summary>
 public static class DocumentRenderer
 {
-    /// <summary>How soft the drop shadow is, relative to the padding.</summary>
-    private const float ShadowBlur = 0.5f;
-
-    private const float ShadowOffset = 0.25f;
+    /// <summary>
+    /// Three shadows, not one: contact, middle and far.
+    ///
+    /// One blur can be soft or it can be tight, and depth needs both at once -
+    /// a dark line where the card meets the surface, a body under it, and a
+    /// wide haze that says how high above the surface it is. Every number is a
+    /// share of the padding, and the far layer is kept inside it: a shadow that
+    /// reaches past the canvas is cut off by a straight edge and reads as a
+    /// dark border around the picture.
+    /// </summary>
+    private static readonly (float Offset, float Sigma, byte Alpha)[] Shadows =
+    [
+        (0.04f, 0.08f, 90),
+        (0.14f, 0.22f, 70),
+        (0.30f, 0.35f, 60),
+    ];
 
     /// <summary>Short side of the copy the aura is built from.</summary>
     private const int AuraThumbnail = 64;
@@ -105,33 +117,27 @@ public static class DocumentRenderer
         DrawBackground(canvas, style, shot, width, height);
 
         var destination = SKRect.Create(style.Padding, style.Padding, shot.Width, shot.Height);
-        using var paint = new SKPaint { IsAntialias = true };
+        using var rounded = new SKRoundRect(destination, style.CornerRadius);
 
         if (style.Shadow)
         {
-            paint.ImageFilter = SKImageFilter.CreateDropShadow(
-                0,
-                style.Padding * ShadowOffset,
-                style.Padding * ShadowBlur,
-                style.Padding * ShadowBlur,
-                new SKColor(0, 0, 0, 140));
+            DrawShadow(canvas, rounded, style.Padding);
         }
+
+        // The shadow goes down first and the screenshot lands on top of it,
+        // opaque. Drawing the screenshot through the shadow filter instead -
+        // which is what CreateDropShadow does - would put a second and a third
+        // copy of it on the canvas: edges thicken and anything half transparent
+        // that was drawn on the screenshot turns solid.
+        canvas.Save();
 
         if (style.CornerRadius > 0)
         {
-            // Rounded through a layer so the shadow follows the rounded shape
-            // instead of the square one underneath it.
-            using var rounded = new SKRoundRect(destination, style.CornerRadius);
-
-            canvas.SaveLayer(paint);
             canvas.ClipRoundRect(rounded, antialias: true);
-            canvas.DrawImage(shot, destination);
-            canvas.Restore();
         }
-        else
-        {
-            canvas.DrawImage(shot, destination, new SKSamplingOptions(SKFilterMode.Linear), paint);
-        }
+
+        canvas.DrawImage(shot, destination, new SKSamplingOptions(SKFilterMode.Linear));
+        canvas.Restore();
 
         return surface.Snapshot();
     }
@@ -181,6 +187,42 @@ public static class DocumentRenderer
             default:
                 canvas.Clear(SKColors.Black);
                 return;
+        }
+    }
+
+    private static void DrawShadow(SKCanvas canvas, SKRoundRect shape, int padding)
+    {
+        var filters = new SKImageFilter[Shadows.Length];
+
+        try
+        {
+            for (var i = 0; i < Shadows.Length; i++)
+            {
+                var (offset, sigma, alpha) = Shadows[i];
+
+                filters[i] = SKImageFilter.CreateDropShadowOnly(
+                    0,
+                    padding * offset,
+                    padding * sigma,
+                    padding * sigma,
+                    new SKColor(0, 0, 0, alpha));
+            }
+
+            using var merged = SKImageFilter.CreateMerge(filters);
+            using var paint = new SKPaint { ImageFilter = merged, IsAntialias = true };
+
+            // The silhouette, not the screenshot: blurring a rounded rectangle
+            // three times costs nothing next to blurring three and a half
+            // million pixels three times.
+            canvas.DrawRoundRect(shape, paint);
+        }
+        finally
+        {
+            // Native objects, and there are three of them on every export.
+            foreach (var filter in filters)
+            {
+                filter?.Dispose();
+            }
         }
     }
 
