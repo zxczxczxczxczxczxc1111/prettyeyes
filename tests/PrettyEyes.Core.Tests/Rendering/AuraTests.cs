@@ -77,6 +77,21 @@ public class AuraTests
     }
 
     [Fact]
+    public void The_backdrop_is_opaque_all_the_way_to_the_corner()
+    {
+        using var document = Shot(new SKColor(0x14, 0x14, 0x18));
+
+        using var image = DocumentRenderer.Render(document, Style);
+        using var pixels = image.PeekPixels();
+
+        // The blur bleeds alpha out of the edges of the thumbnail it works on,
+        // so the haze alone leaves the corners see-through. Nobody asked for a
+        // transparent export here.
+        Assert.Equal(255, pixels.GetPixelColor(1, 1).Alpha);
+        Assert.Equal(255, pixels.GetPixelColor(image.Width - 2, image.Height - 2).Alpha);
+    }
+
+    [Fact]
     public void A_tiny_selection_is_not_blown_up_before_being_blurred()
     {
         // Forty pixels is smaller than the thumbnail the aura is built from,

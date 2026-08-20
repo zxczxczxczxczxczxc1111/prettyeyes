@@ -36,11 +36,14 @@ public sealed record ExportStyle(
     public static ExportStyle None => new(false, 0, ExportBackground.Black, 0, false);
 
     /// <summary>
-    /// Grain is backdrop work: over transparency it would replace the empty
-    /// space with an even haze of noise, which is the opposite of what a
-    /// transparent export is for.
+    /// Grain belongs to the backdrops that are meant to be atmosphere, and to
+    /// no others. Over transparency it would fill the empty space with an even
+    /// haze of noise, which is the opposite of what a transparent export is
+    /// for; over flat black or flat white it is dirt on a surface somebody
+    /// chose precisely because it is clean.
     /// </summary>
-    public bool GrainAllowed => Grain && Background != ExportBackground.Transparent;
+    public bool GrainAllowed =>
+        Grain && Background is ExportBackground.Gradient or ExportBackground.Aura;
 
     /// <summary>
     /// A shadow needs somewhere to fall. With no padding it lands outside the

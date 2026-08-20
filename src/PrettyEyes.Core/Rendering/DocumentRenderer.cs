@@ -31,6 +31,12 @@ public static class DocumentRenderer
 
     private const byte AuraShade = 60;
 
+    /// <summary>Side of the noise tile the grain is repeated from.</summary>
+    private const int GrainTile = 128;
+
+    /// <summary>Strongest a single speck is allowed to be, out of 255.</summary>
+    private const byte GrainAlpha = 14;
+
     public static SKImage Render(Document document) => Render(document, ExportStyle.None);
 
     public static SKImage Render(Document document, ExportStyle style)
@@ -132,6 +138,16 @@ public static class DocumentRenderer
 
     private static void DrawBackground(SKCanvas canvas, ExportStyle style, SKImage shot, int width, int height)
     {
+        DrawBackdrop(canvas, style, shot, width, height);
+
+        if (style.GrainAllowed)
+        {
+            DrawGrain(canvas, width, height);
+        }
+    }
+
+    private static void DrawBackdrop(SKCanvas canvas, ExportStyle style, SKImage shot, int width, int height)
+    {
         var area = SKRect.Create(0, 0, width, height);
 
         switch (style.Background)
@@ -169,6 +185,62 @@ public static class DocumentRenderer
     }
 
     /// <summary>
+    /// Film grain over the backdrop.
+    ///
+    /// Two jobs. It breaks up the banding a big soft gradient always has on an
+    /// eight bit screen, and it makes the backdrop read as a material instead
+    /// of a fill. Never over the screenshot itself: the screenshot is evidence,
+    /// and evidence does not get texture applied to it.
+    /// </summary>
+    private static void DrawGrain(SKCanvas canvas, int width, int height)
+    {
+        using var shader = Grain.ToShader(SKShaderTileMode.Repeat, SKShaderTileMode.Repeat);
+        using var paint = new SKPaint { Shader = shader };
+
+        canvas.DrawRect(SKRect.Create(0, 0, width, height), paint);
+    }
+
+    /// <summary>
+    /// One tile, built once, the same on every machine and every run.
+    ///
+    /// Deliberately not Random and not Skia's Perlin noise: the first makes two
+    /// exports of one screenshot differ, and the second gives no promise that
+    /// its seed means the same thing in the next version of Skia.
+    /// </summary>
+    private static readonly SKImage Grain = BuildGrain();
+
+    private static SKImage BuildGrain()
+    {
+        var info = new SKImageInfo(GrainTile, GrainTile, SKColorType.Bgra8888, SKAlphaType.Unpremul);
+        var bitmap = new SKBitmap(info);
+
+        for (var y = 0; y < GrainTile; y++)
+        {
+            for (var x = 0; x < GrainTile; x++)
+            {
+                // A hash of the coordinates, not a sequence: the tile is then
+                // the same however it is walked.
+                var hash = (uint)((x * 73856093) ^ (y * 19349663));
+                hash ^= hash >> 13;
+                hash *= 2654435761;
+                hash ^= hash >> 16;
+
+                // Half the specks lighten, half darken, so the backdrop keeps
+                // the lightness it was given.
+                var light = (hash & 1) == 0;
+                var alpha = (byte)(hash % (GrainAlpha + 1));
+                var tone = light ? (byte)255 : (byte)0;
+
+                bitmap.SetPixel(x, y, new SKColor(tone, tone, tone, alpha));
+            }
+        }
+
+        bitmap.SetImmutable();
+
+        return SKImage.FromBitmap(bitmap);
+    }
+
+    /// <summary>
     /// The screenshot's own blurred copy, blown up past the edges.
     ///
     /// A gradient is a decision somebody made once for every screenshot there
@@ -179,6 +251,17 @@ public static class DocumentRenderer
     {
         using var thumbnail = Thumbnail(shot);
         using var haze = Blur(thumbnail);
+
+        var (average, lightness) = Measure(thumbnail);
+
+        // The flat average goes down first. A blur of sixty-four pixels with
+        // this much sigma bleeds alpha out of its own edges, and without an
+        // opaque base underneath, a backdrop nobody asked to be transparent
+        // comes out see-through at the corners. Measured, not feared.
+        using (var base_ = new SKPaint { Color = average })
+        {
+            canvas.DrawRect(SKRect.Create(0, 0, width, height), base_);
+        }
 
         // Bigger than the canvas so the blurred edges stay off screen: a blur
         // clamped at the border leaves a visible seam along it.
@@ -196,7 +279,7 @@ public static class DocumentRenderer
         // Away from the screenshot's own lightness, never towards it. A dark
         // shot on a dark haze is the illness this whole thing is curing, and a
         // white page on a white haze is the same illness from the other side.
-        var veil = Luminance(thumbnail) < AuraThreshold
+        var veil = lightness < AuraThreshold
             ? new SKColor(255, 255, 255, AuraLift)
             : new SKColor(0, 0, 0, AuraShade);
 
@@ -242,20 +325,21 @@ public static class DocumentRenderer
     }
 
     /// <summary>
-    /// How light the screenshot is, from the thumbnail that already exists.
-    /// Reading the full picture would be three and a half million pixels for a
-    /// number that a sixty-four pixel copy answers just as well.
+    /// The screenshot's average colour and how light it is, both from the
+    /// thumbnail that already exists. Reading the full picture would be three
+    /// and a half million pixels for two numbers a sixty-four pixel copy
+    /// answers just as well.
     /// </summary>
-    private static double Luminance(SKImage thumbnail)
+    private static (SKColor Average, double Lightness) Measure(SKImage thumbnail)
     {
         using var pixels = thumbnail.PeekPixels();
 
         if (pixels is null)
         {
-            return 0;
+            return (SKColors.Black, 0);
         }
 
-        var total = 0.0;
+        double red = 0, green = 0, blue = 0;
         var counted = 0;
 
         for (var y = 0; y < pixels.Height; y++)
@@ -264,12 +348,25 @@ public static class DocumentRenderer
             {
                 var colour = pixels.GetPixelColor(x, y);
 
-                // Rec. 601, the same weights the crosshair and the highlighter use.
-                total += ((colour.Red * 0.299) + (colour.Green * 0.587) + (colour.Blue * 0.114)) / 255.0;
+                red += colour.Red;
+                green += colour.Green;
+                blue += colour.Blue;
                 counted++;
             }
         }
 
-        return counted == 0 ? 0 : total / counted;
+        if (counted == 0)
+        {
+            return (SKColors.Black, 0);
+        }
+
+        red /= counted;
+        green /= counted;
+        blue /= counted;
+
+        // Rec. 601, the same weights the crosshair and the highlighter use.
+        var lightness = ((red * 0.299) + (green * 0.587) + (blue * 0.114)) / 255.0;
+
+        return (new SKColor((byte)red, (byte)green, (byte)blue), lightness);
     }
 }
