@@ -223,11 +223,8 @@ begin
   PaintPage(WizardForm.ReadyPage);
   PaintPage(WizardForm.PreparingPage);
 
-  // By name as well as by class: this page is the one the updater walks through
-  // unattended, and a choice nobody can read is worse here than anywhere else.
   WizardForm.PreparingLabel.Font.Color := TextStrong;
-  WizardForm.PreparingYesRadio.Color := Bg;
-  WizardForm.PreparingNoRadio.Color := Bg;
+
   PaintPage(WizardForm.InstallingPage);
   PaintPage(WizardForm.FinishedPage);
 end;
