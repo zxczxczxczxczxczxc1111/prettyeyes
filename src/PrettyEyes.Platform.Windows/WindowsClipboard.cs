@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using PrettyEyes.Core.Platform;
+using PrettyEyes.Core.Rendering;
 using SkiaSharp;
 
 namespace PrettyEyes.Platform.Windows;
@@ -33,7 +34,14 @@ public sealed class WindowsClipboard : IImageSink
 
         try
         {
-            dib = BuildDib(image);
+            // Two formats, two answers to transparency. PNG carries the alpha
+            // exactly as it was drawn, so an application that understands PNG
+            // gets the transparent export it was promised. The DIB cannot carry
+            // it at all, so the picture is laid on white first: without that,
+            // the soft shadow around a transparent export pastes as a black
+            // smear, which is the same bug we already fixed once for Photoshop.
+            using var flattened = DocumentRenderer.Composite(image, SKColors.White);
+            dib = BuildDib(flattened);
 
             using var encoded = image.Encode(SKEncodedImageFormat.Png, 100);
             png = encoded.ToArray();

@@ -494,16 +494,12 @@ public sealed class OverlaySession
 
         try
         {
-            // The clipboard gets the shot on a solid background even when the
-            // export is transparent: the DIB format on the clipboard carries no
-            // alpha, and half the applications paste the DIB.
+            // Transparency reaches the sink as it was drawn. The clipboard
+            // writes PNG next to the DIB and decides for itself what to do with
+            // an alpha channel the DIB cannot carry.
             var style = _services.Settings.Export ?? ExportStyle.None;
-            var forClipboard = ReferenceEquals(sink, _services.Clipboard)
-                && style is { Enabled: true, Background: ExportBackground.Transparent };
 
-            using var image = DocumentRenderer.Render(
-                Document,
-                forClipboard ? style with { Background = ExportBackground.Black } : style);
+            using var image = DocumentRenderer.Render(Document, style);
 
             var result = await sink.SendAsync(image, CancellationToken.None);
 

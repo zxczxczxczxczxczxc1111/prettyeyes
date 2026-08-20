@@ -173,22 +173,21 @@ public partial class App : Application
         document.Selection = monitor.Bounds;
 
         var style = Services.Settings.Export ?? ExportStyle.None;
-        var transparent = style is { Enabled: true, Background: ExportBackground.Transparent };
 
-        // The clipboard gets a solid background even when the export is
-        // transparent: the DIB on the clipboard carries no alpha.
-        using var image = DocumentRenderer.Render(
-            document,
-            transparent ? style with { Background = ExportBackground.Black } : style);
+        // Transparency is no longer flattened here. The clipboard writes PNG as
+        // well as a DIB, and it is the clipboard that knows which of the two
+        // can carry an alpha channel.
+        using var image = DocumentRenderer.Render(document, style);
 
         var result = await Services.Clipboard.SendAsync(image, CancellationToken.None);
 
         // Autosave applies here too: the point of the setting is that a
-        // screenshot ends up in the folder, whichever way it was taken.
+        // screenshot ends up in the folder, whichever way it was taken. The
+        // same image, not a second render of it: with the aura that would be a
+        // second blur for a picture we already have.
         if (Services.Settings.Save?.Ready == true)
         {
-            using var forFile = DocumentRenderer.Render(document, style);
-            await Services.Folder.SendAsync(forFile, CancellationToken.None);
+            await Services.Folder.SendAsync(image, CancellationToken.None);
         }
 
         Services.Notifier.Notify(

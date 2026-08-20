@@ -86,6 +86,29 @@ public static class DocumentRenderer
         }
     }
 
+    /// <summary>
+    /// The same picture laid on a solid colour.
+    ///
+    /// For the clipboard, and only for it. The DIB format on the clipboard has
+    /// no alpha channel: whatever is half transparent in a picture handed to it
+    /// arrives at the other end as its own colour at full strength, so a soft
+    /// shadow becomes a black smear. Laying the picture on a colour first is
+    /// the only honest answer, and white is the colour a pasted screenshot
+    /// usually lands next to.
+    /// </summary>
+    public static SKImage Composite(SKImage image, SKColor colour)
+    {
+        var info = new SKImageInfo(image.Width, image.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
+
+        using var surface = SKSurface.Create(info)
+            ?? throw new InvalidOperationException($"Could not allocate a {image.Width}x{image.Height} surface.");
+
+        surface.Canvas.Clear(colour);
+        surface.Canvas.DrawImage(image, 0, 0);
+
+        return surface.Snapshot();
+    }
+
     /// <summary>The screenshot itself: the captured pixels plus what was drawn on them.</summary>
     private static SKImage Flatten(Document document, CaptureRect frame, CaptureRect selection)
     {
