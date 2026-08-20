@@ -1,3 +1,4 @@
+using Avalonia.Threading;
 using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Animation.Easings;
@@ -129,6 +130,23 @@ public sealed class CaptureCanvas : Control
         using var pixels = _source.PeekPixels();
 
         return pixels?.GetPixelColor(local.X, local.Y);
+    }
+
+    /// <summary>
+    /// Puts the veil and the frame at a value without animating there.
+    ///
+    /// Used when the overlay closes, where the fade out has nobody watching it
+    /// and its only effect would be to leave the emptied window mid-way through
+    /// a dimming when it is stored away.
+    /// </summary>
+    public void SnapOpacities(double veil, double frame)
+    {
+        var transitions = Transitions;
+
+        Transitions = null;
+        VeilOpacity = veil;
+        FrameOpacity = frame;
+        Transitions = transitions;
     }
 
     public void Attach(Document document, CaptureRect monitorBounds)
@@ -293,6 +311,7 @@ public sealed class CaptureCanvas : Control
                     Log.Default.Info($"медленный кадр: {watch.Elapsed.TotalMilliseconds:F1} мс, "
                         + $"объектов {_annotations.Count}");
                 }
+
             }
         }
 

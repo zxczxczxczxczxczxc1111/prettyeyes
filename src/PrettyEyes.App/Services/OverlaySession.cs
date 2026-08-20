@@ -577,6 +577,12 @@ public sealed class OverlaySession
         }
     }
 
+    /// <summary>
+    /// How long the overlay takes to disappear. Long enough to be a movement
+    /// rather than a cut, short enough that nobody waits for it.
+    /// </summary>
+    private static readonly TimeSpan FadeOut = TimeSpan.FromMilliseconds(120);
+
     public void Close()
     {
         if (_closed)
@@ -591,17 +597,35 @@ public sealed class OverlaySession
             Unsubscribe(window);
         }
 
-        _services.OverlayWindows.Release();
+        // Faded, not cut. The screenshot is already in the clipboard by now, so
+        // the tenth of a second this takes is spent after the work is done and
+        // before the screen comes back - which is the moment that reads as
+        // abrupt when it is not there.
+        foreach (var window in _windows)
+        {
+            window.FadeOut();
+        }
+
+        // The frame stays alive until the windows have let go of it: they are
+        // still drawing it for as long as the fade lasts, and 29 MB of pixels
+        // pulled out from under a render in progress is a crash, not a leak.
+        var frame = Document;
+
+        _services.OverlayWindows.Release(
+            FadeOut,
+            () =>
+            {
+                // Blurred slices belong to the capture that is going away.
+                BlurCache.Shared.Clear();
+
+                // Roughly 29 MB on two 2K monitors: one leak per hotkey press
+                // adds up fast.
+                frame?.Dispose();
+            });
+
         _windows = [];
         _layout = null;
         _toolbarShown = false;
-
-        // Blurred slices belong to the capture that is going away.
-        BlurCache.Shared.Clear();
-
-        // The frame is roughly 29 MB on two 2K monitors - one leak per hotkey
-        // press adds up fast.
-        Document?.Dispose();
         Document = null;
 
         Finished?.Invoke(this, EventArgs.Empty);

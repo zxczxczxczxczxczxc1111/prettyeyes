@@ -23,9 +23,14 @@ public static class Crosshair
     private const int Centre = 16;
 
     /// <summary>The bare pixel at the centre stays visible: it is the one being aimed at.</summary>
-    private const float Gap = 4;
+    private const float Gap = 3;
 
-    private const float Reach = 15;
+    /// <summary>
+    /// How far each arm goes. Short on purpose: a crosshair that spans the whole
+    /// cursor box reads as a graphic in its own right, and the job here is to
+    /// point at one pixel.
+    /// </summary>
+    private const float Reach = 8;
 
     public static Cursor Light { get; } = Build(SKColors.White, SKColors.Black);
 

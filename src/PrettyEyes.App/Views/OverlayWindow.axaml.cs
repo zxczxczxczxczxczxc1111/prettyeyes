@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Threading;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Rendering;
@@ -118,11 +119,11 @@ public partial class OverlayWindow : Window
 
         Position = new PixelPoint(monitor.Bounds.X, monitor.Bounds.Y);
 
-        // Everything the first frame needs goes in before the window is shown.
-        // Hiding a window does not throw away what was last composited into it,
-        // so a window shown before its new content is filled comes back with the
-        // previous capture and the previous selection frame on it for a frame or
-        // two - which is exactly the flicker, and the ghost rectangle with it.
+        // Filled before it is shown. Between becoming visible and drawing its
+        // first frame - measured at 44 ms for a canvas this size - a window
+        // shows nothing but its own background, and the window is transparent
+        // exactly so that "nothing" is the real desktop rather than a black
+        // flash or the frame left over from the previous capture.
         Surface.Attach(document, monitor.Bounds);
         Resize(monitor);
 
@@ -137,8 +138,14 @@ public partial class OverlayWindow : Window
         // its new scale once it is on it.
         Resize(monitor);
 
-        // Fades the veil in; the value itself is animated by the canvas.
-        Surface.VeilOpacity = 1;
+        // Started a beat later, and that beat is the whole point. Setting a
+        // transitioned property does two things in this order: the property
+        // takes the new value, and the transition then walks it there from the
+        // old one. A frame drawn in between - and the first frame after Show
+        // lands exactly there - is drawn fully dimmed, after which the
+        // transition puts it back to nothing and fades it in properly. That is
+        // the flash: dark, undimmed, then dark again.
+        Dispatcher.UIThread.Post(() => Surface.VeilOpacity = 1, DispatcherPriority.Background);
     }
 
     private void Resize(MonitorInfo monitor)
@@ -198,6 +205,22 @@ public partial class OverlayWindow : Window
 
     /// <summary>Takes the magnifier away because another overlay has it now.</summary>
     public void DropMagnifier() => HideMagnifier();
+
+    /// <summary>
+    /// Starts the overlay disappearing. The veil and the frame walk down through
+    /// their own transitions; the window is hidden by the pool once they have.
+    /// </summary>
+    public void FadeOut()
+    {
+        Surface.VeilOpacity = 0;
+        Surface.FrameOpacity = 0;
+        Surface.ShowPreview(null);
+        HideMagnifier();
+        HideToolbar();
+        StyleCard.Close();
+        EmojiCard.Close();
+        Chip.IsVisible = false;
+    }
 
     /// <summary>Off means the magnifier never shows, whatever the pointer does.</summary>
     public void SetMagnifierEnabled(bool enabled)
@@ -336,8 +359,8 @@ public partial class OverlayWindow : Window
         _tool = null;
         _toolbarSize = null;
 
-        Surface.FrameOpacity = 0;
-        Surface.VeilOpacity = 0;
+        // Snapped rather than animated: see SnapOpacities.
+        Surface.SnapOpacities(veil: 0, frame: 0);
         Surface.ShowPreview(null);
         HideMagnifier();
         StyleCard.Close();

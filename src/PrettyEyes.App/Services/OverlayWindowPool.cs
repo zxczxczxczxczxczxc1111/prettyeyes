@@ -19,13 +19,15 @@ public sealed class OverlayWindowPool
 {
     /// <summary>
     /// How long an emptied window stays on screen before it is hidden. Three
-    /// frames at 60 Hz, spent by a window that draws nothing at all, against a
-    /// visible flash of the previous capture at the start of the next one.
+    /// frames at 60 Hz, spent by a window that draws nothing at all.
     /// </summary>
     private static readonly TimeSpan BlankDelay = TimeSpan.FromMilliseconds(50);
 
     private readonly List<OverlayWindow> _windows = [];
     private readonly DispatcherTimer _blank;
+    private readonly DispatcherTimer _hide;
+
+    private Action? _cleared;
 
     private bool _warm;
 
@@ -33,6 +35,9 @@ public sealed class OverlayWindowPool
     {
         _blank = new DispatcherTimer { Interval = BlankDelay };
         _blank.Tick += HideBlanked;
+
+        _hide = new DispatcherTimer { Interval = BlankDelay };
+        _hide.Tick += HideEmptied;
     }
 
     /// <summary>
@@ -56,10 +61,13 @@ public sealed class OverlayWindowPool
     /// <summary>The windows for this capture, one per monitor, hidden.</summary>
     public IReadOnlyList<OverlayWindow> Take(DesktopLayout layout)
     {
-        // A capture that comes in before the windows were hidden finds them
-        // already empty and simply fills them again; what it must not do is
-        // leave a hide pending over the overlay it is about to open.
+        // A capture that arrives while the previous overlay is still fading out
+        // takes the windows as they are and fills them again; what it must not
+        // do is leave a hide pending over the overlay it is about to open.
         _blank.Stop();
+        _hide.Stop();
+        Clear();
+
 
         if (!_warm)
         {
@@ -79,25 +87,52 @@ public sealed class OverlayWindowPool
     ///
     /// A hidden window keeps whatever was last composited into it, and nothing
     /// can repaint it while it is hidden. Clearing and hiding in the same breath
-    /// therefore stores the frame that still has the old capture and the old
-    /// selection frame on it, and that is what flashes at the start of the next
-    /// capture. Cleared while still on screen, the stored frame is the empty
-    /// one, and an empty overlay is invisible.
+    /// therefore stores the frame that still has the previous capture on it,
+    /// dimmed and with its selection frame, and the next capture shows that for
+    /// as long as it takes to draw its own - which is the flash. Cleared while
+    /// still on screen, what gets stored is the empty frame, and the window is
+    /// transparent, so the empty frame is nothing at all.
     /// </summary>
-    public void Release()
+    public void Release(TimeSpan after, Action cleared)
     {
-        foreach (var window in _windows)
-        {
-            window.Reset();
-        }
-
+        _cleared = cleared;
         _blank.Stop();
+        _blank.Interval = after + BlankDelay;
         _blank.Start();
     }
 
     private void HideBlanked(object? sender, EventArgs e)
     {
         _blank.Stop();
+
+        Clear();
+
+        // Hidden one beat after being emptied, so the frame stored in a hidden
+        // window is the empty one rather than the last capture; see Release.
+        _hide.Stop();
+        _hide.Start();
+    }
+
+    /// <summary>
+    /// Lets go of the capture, and tells whoever was holding it that they can
+    /// too. Until this runs the windows are still drawing that image, so the
+    /// frame it came from has to stay alive.
+    /// </summary>
+    private void Clear()
+    {
+        foreach (var window in _windows)
+        {
+            window.Reset();
+        }
+
+        var cleared = _cleared;
+        _cleared = null;
+        cleared?.Invoke();
+    }
+
+    private void HideEmptied(object? sender, EventArgs e)
+    {
+        _hide.Stop();
 
         foreach (var window in _windows)
         {
@@ -111,6 +146,13 @@ public sealed class OverlayWindowPool
     /// </summary>
     public void Rebuild(int monitors)
     {
+        // A monitor change in the middle of a fade: the windows are about to be
+        // destroyed, so whatever is waiting on them has to be told now or the
+        // capture it is holding is never released.
+        _blank.Stop();
+        _hide.Stop();
+        Clear();
+
         foreach (var window in _windows)
         {
             window.Close();

@@ -6,7 +6,8 @@
         SystemDecorations="None"
         Topmost="True"
         ShowInTaskbar="False"
-        Background="Black"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
         CanResize="False">
   <Panel x:Name="Root">
     <controls:CaptureCanvas x:Name="Surface"/>
