@@ -40,7 +40,7 @@
         <Grid Margin="32,8,32,32" ColumnDefinitions="400,32,400" RowDefinitions="Auto,Auto">
           <StackPanel Grid.Column="0" Grid.Row="0" Spacing="20">
             <StackPanel Spacing="12">
-              <TextBlock Text="Снимок" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
+              <TextBlock Text="Скриншот" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
 
               <StackPanel Spacing="8">
                 <TextBlock Text="Выделить область" Foreground="{StaticResource Text}"/>
@@ -64,7 +64,7 @@
 
             <StackPanel Spacing="12">
               <TextBlock Text="Сохранение" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
-              <CheckBox x:Name="Autosave" Content="Сохранять снимки в папку"/>
+              <CheckBox x:Name="Autosave" Content="Сохранять скриншоты в папку"/>
 
               <StackPanel x:Name="AutosaveOptions" Spacing="12" Opacity="0.4" IsEnabled="False">
                 <StackPanel Spacing="8">
@@ -111,7 +111,7 @@
 
             <StackPanel Spacing="12">
             <TextBlock Text="Оформление" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
-            <CheckBox x:Name="ExportEnabled" Content="Оформлять снимок при выводе"/>
+            <CheckBox x:Name="ExportEnabled" Content="Оформлять скриншот при выводе"/>
 
             <StackPanel x:Name="ExportOptions" Spacing="12" Opacity="0.4" IsEnabled="False">
               <StackPanel Spacing="8">

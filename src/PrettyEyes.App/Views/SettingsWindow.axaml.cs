@@ -302,7 +302,7 @@ public partial class SettingsWindow : Window
         {
             var picked = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
             {
-                Title = "Куда сохранять снимки",
+                Title = "Куда сохранять скриншоты",
                 AllowMultiple = false,
             });
 

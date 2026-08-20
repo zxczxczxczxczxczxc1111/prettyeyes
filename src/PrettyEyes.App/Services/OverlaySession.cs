@@ -376,7 +376,7 @@ public sealed class OverlaySession
         {
             await SendSafelyAsync(
                 _services.Folder,
-                failure: "Снимок в буфере, но в папку не сохранился. Проверь папку в настройках.");
+                failure: "Скриншот в буфере, но в папку не сохранился. Проверь папку в настройках.");
         }
     }
 
@@ -406,11 +406,11 @@ public sealed class OverlaySession
             // An async void handler is the one place where an exception has
             // nowhere to go: it would take the whole process with it. Even a
             // COMException from the clipboard has to end up on screen instead.
-            Log.Default.Error("вывод снимка не удался", ex);
+            Log.Default.Error("вывод скриншота не удался", ex);
             SetTopmost(true);
             ShowError(ex is IOException or UnauthorizedAccessException
                 ? ex.Message
-                : "Не удалось отдать снимок. Подробности в журнале.");
+                : "Не удалось отдать скриншот. Подробности в журнале.");
         }
     }
 
@@ -456,7 +456,7 @@ public sealed class OverlaySession
                     SetTopmost(true);
 
                     // Work in progress must survive a failed save.
-                    ShowError(failure ?? "Не удалось сохранить снимок. Попробуй ещё раз.");
+                    ShowError(failure ?? "Не удалось сохранить скриншот. Попробуй ещё раз.");
                     break;
             }
         }

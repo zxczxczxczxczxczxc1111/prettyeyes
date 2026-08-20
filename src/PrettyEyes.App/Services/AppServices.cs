@@ -115,7 +115,7 @@ public sealed class AppServices : IDisposable
     {
         if (milliseconds >= 15)
         {
-            Log.Default.Info($"снимок, шаг {step}: {milliseconds:F1} мс");
+            Log.Default.Info($"скриншот, шаг {step}: {milliseconds:F1} мс");
         }
     }
 

@@ -26,10 +26,10 @@
     </Border.Transitions>
 
     <StackPanel Spacing="2">
-      <Button x:Name="CaptureItem" Classes="menu" Content="Снимок"/>
+      <Button x:Name="CaptureItem" Classes="menu" Content="Скриншот"/>
       <!-- Only there when there is a folder to open: autosave writes silently,
            and "somewhere on the disk" is not an answer. -->
-      <Button x:Name="OpenFolderItem" Classes="menu" Content="Папка снимков" IsVisible="False"/>
+      <Button x:Name="OpenFolderItem" Classes="menu" Content="Папка скриншотов" IsVisible="False"/>
       <!-- Only there once a newer release has actually been found: an entry
            that is grey nine days out of ten teaches people to ignore it. -->
       <Button x:Name="UpdateItem" Classes="menu" IsVisible="False"/>

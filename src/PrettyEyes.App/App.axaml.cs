@@ -188,8 +188,8 @@ public partial class App : Application
         Services.Notifier.Notify(
             "prettyeyes",
             result == SinkResult.Sent
-                ? "Снимок монитора скопирован в буфер."
-                : "Не удалось скопировать снимок в буфер.");
+                ? "Скриншот монитора скопирован в буфер."
+                : "Не удалось скопировать скриншот в буфер.");
     }
 
     /// <summary>
@@ -215,7 +215,7 @@ public partial class App : Application
         }
         catch (Exception error) when (error is Win32Exception or FileNotFoundException)
         {
-            Log.Default.Error("не удалось открыть папку снимков", error);
+            Log.Default.Error("не удалось открыть папку скриншотов", error);
         }
     }
 
