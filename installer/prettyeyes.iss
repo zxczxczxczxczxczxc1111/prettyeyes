@@ -1,7 +1,7 @@
 ﻿; prettyeyes installer. Per-user install: a tray utility has no business
 ; asking for administrator rights.
 #define AppName "prettyeyes"
-#define AppVersion "1.1.1"
+#define AppVersion "1.1.2"
 #define AppExe "PrettyEyes.App.exe"
 #define AppId "{{8E5C1F42-4E2B-4E4A-9E4B-4B6E4B0A7D31}"
 #define PublishDir "..\src\PrettyEyes.App\bin\Release\net10.0-windows10.0.22621.0\win-x64\publish"
@@ -70,7 +70,13 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
     ValueName: "prettyeyes"; ValueData: """{app}\{#AppExe}"""; Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
-Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent
+; No skipifsilent on purpose. The built-in updater runs Setup with /SILENT, and
+; a skipped entry there means the program never comes back after updating
+; itself. RestartApplications cannot cover for it either: the Restart Manager
+; only puts back applications that called RegisterApplicationRestart, and this
+; one does not. Started twice - here and by the Restart Manager - is harmless:
+; the second copy sees the single-instance mutex and exits.
+Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall
 
 [Code]
 // Inno has no dark theme, so the wizard is repainted by hand. Colours are
