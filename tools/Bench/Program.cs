@@ -5,6 +5,7 @@ using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Core.Rendering;
 using PrettyEyes.Platform.Windows;
+using SkiaSharp;
 
 namespace PrettyEyes.Bench;
 
@@ -49,6 +50,7 @@ internal static class Program
         Cold("WGC, первый вызов (с созданием D3D)", () => wgc.CaptureAll().Image.Dispose());
         Measure("WGC CaptureAll", () => wgc.CaptureAll().Image.Dispose());
 
+        Sample(wgc);
         RenderPath(wgc);
         Allocations(wgc);
         Breakdown(monitors);
@@ -108,8 +110,33 @@ internal static class Program
             .Sum(pair => pair.Value.Sum() / Runs);
 
         Console.WriteLine($"  {"размечено",-14} {total,6:F1} мс");
-        Console.WriteLine($"  {"не размечено",-14} {envelope - inner,6:F1} мс   "
-            + "(освобождение пула и сессии, маршалинг WinRT)");
+
+        // Only meaningful while an envelope step exists, and only when the
+        // steps ran one after another: parallel work sums past the wall clock.
+        if (envelope > inner)
+        {
+            Console.WriteLine($"  {"не размечено",-14} {envelope - inner,6:F1} мс");
+        }
+    }
+
+    /// <summary>
+    /// Writes one capture to disk. A capture that is fast and black is not a
+    /// capture, and only a picture proves otherwise.
+    /// </summary>
+    private static void Sample(IScreenCapture capture)
+    {
+        var shot = capture.CaptureAll();
+
+        using (shot.Image)
+        {
+            using var data = shot.Image.Encode(SKEncodedImageFormat.Png, 90);
+            var path = Path.Combine(Path.GetTempPath(), "prettyeyes-bench-sample.png");
+            using var file = File.Create(path);
+            data.SaveTo(file);
+
+            Console.WriteLine();
+            Console.WriteLine($"снимок сохранён: {path} ({shot.Image.Width}x{shot.Image.Height})");
+        }
     }
 
     /// <summary>
@@ -125,6 +152,18 @@ internal static class Program
         document.Selection = new CaptureRect(monitor.X + 100, monitor.Y + 100, 1200, 800);
 
         Console.WriteLine();
+
+        // The render path is what the copy button uses; a fast render of a
+        // black rectangle is not a render.
+        using (var rendered = DocumentRenderer.Render(document))
+        {
+            using var data = rendered.Encode(SKEncodedImageFormat.Png, 90);
+            var path = Path.Combine(Path.GetTempPath(), "prettyeyes-bench-render.png");
+            using var file = File.Create(path);
+            data.SaveTo(file);
+            Console.WriteLine($"результат рендера сохранён: {path} ({rendered.Width}x{rendered.Height})");
+        }
+
         Measure("Render 1200x800, без пометок", () => DocumentRenderer.Render(document).Dispose());
 
         foreach (var count in (int[])[1, 3, 5])

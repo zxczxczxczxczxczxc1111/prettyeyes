@@ -127,6 +127,7 @@ public partial class App : Application
         document.Selection = monitor.Bounds;
 
         using var image = DocumentRenderer.Render(document);
+
         var result = await Services.Clipboard.SendAsync(image, CancellationToken.None);
 
         Services.Notifier.Notify(

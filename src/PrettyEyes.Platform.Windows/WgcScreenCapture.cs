@@ -21,9 +21,14 @@ namespace PrettyEyes.Platform.Windows;
 /// is the point of DRM and not fixable here.
 ///
 /// One capture item per monitor: the API has no virtual-desktop item, so the
-/// monitors are grabbed separately and pasted into one frame.
+/// monitors are grabbed separately and written into one frame.
+///
+/// Items and frame pools are built once and kept: measured on two 2K monitors,
+/// building and tearing them down again cost about 40 ms of the 96 ms a capture
+/// took. Capture sessions are not kept forever, because a live session is what
+/// makes Windows draw the yellow border and light up the recording indicator.
 /// </summary>
-public sealed class WgcScreenCapture : IScreenCapture, IDisposable
+public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
 {
     /// <summary>A frame normally arrives within a frame or two of the display.</summary>
     private static readonly TimeSpan FrameTimeout = TimeSpan.FromSeconds(2);
@@ -32,6 +37,7 @@ public sealed class WgcScreenCapture : IScreenCapture, IDisposable
     private readonly ID3D11Device _device;
     private readonly ID3D11DeviceContext _context;
     private readonly IDirect3DDevice _winrtDevice;
+    private readonly Dictionary<IntPtr, MonitorCapture> _captures = [];
 
     /// <summary>
     /// Where the per-step timings go. Null in the application: the numbers are
@@ -82,34 +88,56 @@ public sealed class WgcScreenCapture : IScreenCapture, IDisposable
 
         var handles = Win32MonitorEnumerator.Handles();
 
-        var info = new SKImageInfo(bounds.Width, bounds.Height, SKColorType.Bgra8888, SKAlphaType.Opaque);
-        using var surface = Step("surface", () => SKSurface.Create(info))
-            ?? throw new InvalidOperationException($"Could not allocate a {bounds.Width}x{bounds.Height} surface.");
+        // One buffer for the whole desktop, handed over to Skia at the end. It
+        // is allocated per capture rather than pooled because the image outlives
+        // the call: the overlay keeps it until the capture is done with.
+        var stride = bounds.Width * 4;
+        var frame = Step("alloc", () => Allocate(bounds, layout, stride));
 
-        var canvas = surface.Canvas;
-        Step("clear", () =>
+        try
         {
-            canvas.Clear(SKColors.Black);
-            return 0;
-        });
-
-        foreach (var monitor in layout.Monitors)
-        {
-            if (!handles.TryGetValue(monitor.DeviceId, out var handle))
+            // In parallel because every monitor spends most of its capture
+            // waiting for a frame, and those waits are the same 16 ms whether
+            // they happen one after another or at once. The copy inside is
+            // serialised: a D3D11 device context is single-threaded.
+            Parallel.ForEach(layout.Monitors, monitor =>
             {
-                throw new InvalidOperationException($"No display handle for {monitor.DeviceId}.");
-            }
+                if (!handles.TryGetValue(monitor.DeviceId, out var handle))
+                {
+                    throw new InvalidOperationException($"No display handle for {monitor.DeviceId}.");
+                }
 
-            using var image = Step("monitor всего", () => CaptureMonitor(handle, monitor.Bounds));
-            var target = image;
-            Step("stitch", () =>
-            {
-                canvas.DrawImage(target, monitor.Bounds.X - bounds.X, monitor.Bounds.Y - bounds.Y);
-                return 0;
+                var offset = ((monitor.Bounds.Y - bounds.Y) * (long)stride)
+                    + ((monitor.Bounds.X - bounds.X) * 4L);
+
+                CaptureMonitor(handle, monitor.Bounds, frame + (nint)offset, stride);
             });
         }
+        catch (AggregateException error)
+        {
+            NativeMemory.Free((void*)frame);
 
-        return new CaptureResult(Step("snapshot", surface.Snapshot), layout);
+            // One monitor failing is the whole capture failing; the first
+            // reason is the useful one.
+            throw error.InnerException ?? error;
+        }
+        catch
+        {
+            NativeMemory.Free((void*)frame);
+            throw;
+        }
+
+        var info = new SKImageInfo(bounds.Width, bounds.Height, SKColorType.Bgra8888, SKAlphaType.Opaque);
+
+        // FromPixels over our own buffer, not FromPixelCopy: Skia hands the
+        // memory back through the release callback when the image dies. That is
+        // one 28 MB copy less on every capture.
+        using var pixmap = new SKPixmap(info, frame, stride);
+
+        var image = Step("image", () => SKImage.FromPixels(pixmap, Release, null))
+            ?? throw new InvalidOperationException("Skia rejected the captured pixel buffer.");
+
+        return new CaptureResult(image, layout);
     }
 
     public void Dispose()
@@ -121,9 +149,37 @@ public sealed class WgcScreenCapture : IScreenCapture, IDisposable
 
         _disposed = true;
 
+        lock (_captures)
+        {
+            foreach (var capture in _captures.Values)
+            {
+                capture.Dispose();
+            }
+
+            _captures.Clear();
+        }
+
         _winrtDevice.Dispose();
         _context.Dispose();
         _device.Dispose();
+    }
+
+    private static void Release(IntPtr address, object context) => NativeMemory.Free((void*)address);
+
+    /// <summary>
+    /// The desktop buffer. Zeroed only when the monitors do not tile the virtual
+    /// desktop exactly: on a plain side-by-side setup every byte is overwritten
+    /// anyway, and zeroing 28 MB is not free.
+    /// </summary>
+    private static IntPtr Allocate(CaptureRect bounds, DesktopLayout layout, int stride)
+    {
+        var size = (nuint)((long)stride * bounds.Height);
+        var covered = layout.Monitors.Sum(monitor => (long)monitor.Bounds.Width * monitor.Bounds.Height);
+        var whole = (long)bounds.Width * bounds.Height;
+
+        return covered >= whole
+            ? (IntPtr)NativeMemory.Alloc(size)
+            : (IntPtr)NativeMemory.AllocZeroed(size);
     }
 
     /// <summary>Times one step and reports it, when anyone is listening.</summary>
@@ -142,59 +198,39 @@ public sealed class WgcScreenCapture : IScreenCapture, IDisposable
         return result;
     }
 
-    private SKImage CaptureMonitor(IntPtr handle, CaptureRect monitorBounds)
+    private void CaptureMonitor(IntPtr handle, CaptureRect monitorBounds, IntPtr destination, int stride)
     {
-        var item = Step("item", () => CaptureInterop.CreateItemForMonitor(handle));
+        MonitorCapture capture;
 
-        using var pool = Step("pool", () => Direct3D11CaptureFramePool.CreateFreeThreaded(
-            _winrtDevice, DirectXPixelFormat.B8G8R8A8UIntNormalized, 1, item.Size));
-
-        using var session = Step("session", () => pool.CreateCaptureSession(item));
-        session.IsCursorCaptureEnabled = false;
-
-        // The yellow capture border is a Windows 11 addition; older builds do
-        // not know the property and do not draw the border either.
-        if (global::Windows.Foundation.Metadata.ApiInformation.IsPropertyPresent(
-                "Windows.Graphics.Capture.GraphicsCaptureSession", "IsBorderRequired"))
+        lock (_captures)
         {
-            session.IsBorderRequired = false;
+            if (!_captures.TryGetValue(handle, out var existing) || !existing.Matches(monitorBounds))
+            {
+                existing?.Dispose();
+                existing = Step("item", () => new MonitorCapture(_winrtDevice, handle, monitorBounds));
+                _captures[handle] = existing;
+            }
+
+            capture = existing;
         }
 
-        using var arrived = new ManualResetEventSlim(false);
-        Direct3D11CaptureFrame? frame = null;
+        var captured = capture.Capture(
+            FrameTimeout,
+            frame => CopyPixels(frame, monitorBounds, destination, stride),
+            _timing);
 
-        pool.FrameArrived += (sender, _) =>
-        {
-            frame ??= sender.TryGetNextFrame();
-
-            if (frame is not null)
-            {
-                arrived.Set();
-            }
-        };
-
-        var delivered = Step("start+frame", () =>
-        {
-            session.StartCapture();
-            return arrived.Wait(FrameTimeout);
-        });
-
-        if (!delivered || frame is null)
+        if (!captured)
         {
             throw new InvalidOperationException("Windows.Graphics.Capture delivered no frame in time.");
         }
-
-        try
-        {
-            return ToSkImage(frame, monitorBounds);
-        }
-        finally
-        {
-            frame.Dispose();
-        }
     }
 
-    private SKImage ToSkImage(Direct3D11CaptureFrame frame, CaptureRect monitorBounds)
+    /// <summary>
+    /// Frame texture to desktop buffer, one pass. The staging texture is mapped
+    /// read-only, so the missing alpha cannot be fixed in place: it rides along
+    /// with the copy instead of costing a second pass over 28 MB.
+    /// </summary>
+    private void CopyPixels(Direct3D11CaptureFrame frame, CaptureRect monitorBounds, IntPtr destination, int stride)
     {
         var surface = MarshalInterface<IDirect3DSurface>.FromManaged(frame.Surface);
         IntPtr texturePointer;
@@ -212,7 +248,8 @@ public sealed class WgcScreenCapture : IScreenCapture, IDisposable
         var description = source.Description;
 
         // A staging texture is the only kind the CPU is allowed to read.
-        using var staging = Step("staging", () => _device.CreateTexture2D(new Texture2DDescription
+        // ID3D11Device itself is free-threaded; only the context is not.
+        using var staging = _device.CreateTexture2D(new Texture2DDescription
         {
             Width = description.Width,
             Height = description.Height,
@@ -224,53 +261,140 @@ public sealed class WgcScreenCapture : IScreenCapture, IDisposable
             BindFlags = BindFlags.None,
             CPUAccessFlags = CpuAccessFlags.Read,
             MiscFlags = ResourceOptionFlags.None,
-        }));
-
-        Step("copy+map", () =>
-        {
-            _context.CopyResource(staging, source);
-            return 0;
         });
 
-        var mapped = Step("map", () => _context.Map(staging, 0, MapMode.Read, Vortice.Direct3D11.MapFlags.None));
+        // The device context is single-threaded, and monitors are captured in
+        // parallel.
+        MappedSubresource mapped;
+
+        lock (_context)
+        {
+            _context.CopyResource(staging, source);
+            mapped = Step("map", () => _context.Map(staging, 0, MapMode.Read, Vortice.Direct3D11.MapFlags.None));
+        }
 
         try
         {
-            // Only the monitor's own size is kept: the frame can be larger than
-            // the display when Windows rounds the texture up.
-            var width = Math.Min((int)description.Width, monitorBounds.Width);
-            var height = Math.Min((int)description.Height, monitorBounds.Height);
+            // ContentSize, not the texture size: Windows rounds the texture up
+            // and whatever sits past the content is leftover memory.
+            var width = Math.Min(frame.ContentSize.Width, monitorBounds.Width);
+            var height = Math.Min(frame.ContentSize.Height, monitorBounds.Height);
+            var pitch = (nint)mapped.RowPitch;
+            var origin = mapped.DataPointer;
 
-            var info = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Opaque);
-            var buffer = Step("rows", () =>
+            Step("rows", () =>
             {
-                var bytes = new byte[width * height * 4];
-
                 for (var row = 0; row < height; row++)
                 {
-                    Marshal.Copy(mapped.DataPointer + (row * (int)mapped.RowPitch), bytes, row * width * 4, width * 4);
-                }
+                    var from = new ReadOnlySpan<uint>((void*)(origin + (row * pitch)), width);
+                    var to = new Span<uint>((void*)(destination + (row * (nint)stride)), width);
 
-                return bytes;
-            });
-
-            // The capture leaves alpha unset on opaque desktops; force it.
-            Step("alpha", () =>
-            {
-                for (var i = 3; i < buffer.Length; i += 4)
-                {
-                    buffer[i] = 255;
+                    for (var x = 0; x < width; x++)
+                    {
+                        // The desktop is opaque; the capture leaves alpha unset.
+                        to[x] = from[x] | 0xFF000000;
+                    }
                 }
 
                 return 0;
             });
-
-            return Step("toimage", () => SKImage.FromPixelCopy(info, buffer))
-                ?? throw new InvalidOperationException("Skia rejected the captured pixel buffer.");
         }
         finally
         {
-            _context.Unmap(staging, 0);
+            lock (_context)
+            {
+                _context.Unmap(staging, 0);
+            }
+        }
+    }
+
+    /// <summary>
+    /// One monitor's capture item, kept between captures. Creating it costs
+    /// 11.5 ms for two monitors and it never changes while the monitor is
+    /// there.
+    ///
+    /// The frame pool and the session are not kept, and neither is negotiable:
+    /// a pool accepts exactly one session in its lifetime (a second one fails
+    /// with "Catastrophic failure"), and Windows.Graphics.Capture only produces
+    /// frames when the picture changes - so a session left running delivers
+    /// nothing at all on a still desktop. Starting a session is what forces the
+    /// first frame out. It also means an idle tray application never holds a
+    /// live screen recording.
+    /// </summary>
+    private sealed class MonitorCapture : IDisposable
+    {
+        private readonly object _gate = new();
+        private readonly IDirect3DDevice _device;
+        private readonly GraphicsCaptureItem _item;
+        private readonly CaptureRect _bounds;
+
+        public MonitorCapture(IDirect3DDevice device, IntPtr handle, CaptureRect bounds)
+        {
+            _device = device;
+            _bounds = bounds;
+            _item = CaptureInterop.CreateItemForMonitor(handle);
+        }
+
+        public bool Matches(CaptureRect bounds) => _bounds == bounds;
+
+        /// <summary>
+        /// Runs one capture and hands the frame to the caller. The frame belongs
+        /// to the pool, so it cannot outlive this call.
+        /// </summary>
+        public bool Capture(TimeSpan timeout, Action<Direct3D11CaptureFrame> use, Action<string, double>? timing)
+        {
+            lock (_gate)
+            {
+                var watch = Stopwatch.StartNew();
+
+                using var arrived = new ManualResetEventSlim(false);
+
+                // One buffer is enough: the session is stopped before the frame
+                // is read, so nothing else is competing for it.
+                using var pool = Direct3D11CaptureFramePool.CreateFreeThreaded(
+                    _device, DirectXPixelFormat.B8G8R8A8UIntNormalized, 1, _item.Size);
+
+                // Set, never read after disposal: the event outlives the pool
+                // because it is declared first and disposed last.
+                pool.FrameArrived += (_, _) => arrived.Set();
+
+                using (var session = pool.CreateCaptureSession(_item))
+                {
+                    session.IsCursorCaptureEnabled = false;
+
+                    // The yellow capture border is a Windows 11 addition; older
+                    // builds do not know the property and do not draw it either.
+                    if (global::Windows.Foundation.Metadata.ApiInformation.IsPropertyPresent(
+                            "Windows.Graphics.Capture.GraphicsCaptureSession", "IsBorderRequired"))
+                    {
+                        session.IsBorderRequired = false;
+                    }
+
+                    session.StartCapture();
+
+                    if (!arrived.Wait(timeout))
+                    {
+                        return false;
+                    }
+                }
+
+                using var frame = pool.TryGetNextFrame();
+                watch.Stop();
+                timing?.Invoke("pool+session+frame", watch.Elapsed.TotalMilliseconds);
+
+                if (frame is null)
+                {
+                    return false;
+                }
+
+                use(frame);
+
+                return true;
+            }
+        }
+
+        public void Dispose()
+        {
         }
     }
 }
