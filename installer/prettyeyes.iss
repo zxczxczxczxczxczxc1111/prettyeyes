@@ -256,11 +256,15 @@ function NewLabel(Radio: TNewRadioButton; Text: String; Handler: TNotifyEvent): 
 begin
   Result := TNewStaticText.Create(WizardForm);
   Result.Parent := Radio.Parent;
+
+  // Caption first, then let it size itself: a label given a width but never a
+  // height is a label nobody can see.
+  Result.AutoSize := True;
+  Result.Caption := Text;
+  Result.Font.Color := TextStrong;
+  Result.Color := Bg;
   Result.Left := Radio.Left + ScaleX(20);
   Result.Top := Radio.Top + ScaleY(1);
-  Result.Width := Radio.Width - ScaleX(20);
-  Result.Font.Color := TextStrong;
-  Result.Caption := Text;
   Result.OnClick := Handler;
 end;
 

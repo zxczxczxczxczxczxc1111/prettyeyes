@@ -22,15 +22,12 @@ public static class Crosshair
     private const int Size = 32;
     private const int Centre = 16;
 
-    /// <summary>The bare pixel at the centre stays visible: it is the one being aimed at.</summary>
-    private const float Gap = 3;
-
     /// <summary>
     /// How far each arm goes. Short on purpose: a crosshair that spans the whole
     /// cursor box reads as a graphic in its own right, and the job here is to
     /// point at one pixel.
     /// </summary>
-    private const float Reach = 8;
+    private const float Reach = 9;
 
     public static Cursor Light { get; } = Build(SKColors.White, SKColors.Black);
 
@@ -79,9 +76,10 @@ public static class Crosshair
 
         var half = Centre + 0.5f;
 
-        canvas.DrawLine(half - Reach, half, half - Gap, half, paint);
-        canvas.DrawLine(half + Gap, half, half + Reach, half, paint);
-        canvas.DrawLine(half, half - Reach, half, half - Gap, paint);
-        canvas.DrawLine(half, half + Gap, half, half + Reach, paint);
+        // Two unbroken lines. A cross with a hole punched in the middle shows
+        // the pixel being aimed at, but it reads as four marks rather than one
+        // shape, and the pixel is already named in the magnifier.
+        canvas.DrawLine(half - Reach, half, half + Reach, half, paint);
+        canvas.DrawLine(half, half - Reach, half, half + Reach, paint);
     }
 }
