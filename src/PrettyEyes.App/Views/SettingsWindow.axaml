@@ -4,7 +4,7 @@
         x:Class="PrettyEyes.App.Views.SettingsWindow"
         Title="prettyeyes"
         Icon="/Assets/prettyeyes.ico"
-        Width="880" Height="720"
+        Width="880" Height="780"
         CanResize="False"
         SystemDecorations="None"
         Background="{StaticResource Bg}"
@@ -129,8 +129,15 @@
           </StackPanel>
           </StackPanel>
 
-          <TextBlock x:Name="Message" Grid.Row="1" Grid.ColumnSpan="3" Margin="0,20,0,0"
-                     FontSize="12" TextWrapping="Wrap" IsVisible="False"/>
+          <Grid Grid.Row="1" Grid.ColumnSpan="3" Margin="0,20,0,0" ColumnDefinitions="*,Auto">
+            <TextBlock x:Name="Message" Grid.Column="0" VerticalAlignment="Center"
+                       FontSize="12" TextWrapping="Wrap" IsVisible="False"/>
+
+            <!-- The mark, in the corner where a signature goes. Dimmed: it is
+                 the last thing on this window that should catch the eye. -->
+            <Image Grid.Column="1" Source="/Assets/logo.png" Height="96" Opacity="0.85"
+                   HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+          </Grid>
         </Grid>
       </ScrollViewer>
     </DockPanel>

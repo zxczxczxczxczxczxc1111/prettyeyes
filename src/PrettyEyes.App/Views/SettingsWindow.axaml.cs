@@ -98,6 +98,7 @@ public partial class SettingsWindow : Window
         ExportShadow.IsChecked = _export.Shadow;
         BuildExportRows();
         ShowExportState(_export.Enabled);
+        ShowPreview();
         _loading = false;
 
         RegionHotkey.HotkeyChanged += (_, hotkey) => Apply(HotkeyAction.Region, hotkey);
@@ -338,10 +339,10 @@ public partial class SettingsWindow : Window
         ExportOptions.IsEnabled = enabled;
         ExportOptions.Opacity = enabled ? 1 : 0.4;
 
-        if (enabled)
-        {
-            ShowPreview();
-        }
+        // Drawn either way: switched off the preview shows the bare screenshot,
+        // which is exactly what the export will be. An empty frame would just
+        // look broken.
+        ShowPreview();
     }
 
     /// <summary>
