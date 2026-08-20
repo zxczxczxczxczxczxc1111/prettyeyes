@@ -30,6 +30,9 @@
       <!-- Only there when there is a folder to open: autosave writes silently,
            and "somewhere on the disk" is not an answer. -->
       <Button x:Name="OpenFolderItem" Classes="menu" Content="Папка снимков" IsVisible="False"/>
+      <!-- Only there once a newer release has actually been found: an entry
+           that is grey nine days out of ten teaches people to ignore it. -->
+      <Button x:Name="UpdateItem" Classes="menu" IsVisible="False"/>
       <Button x:Name="SettingsItem" Classes="menu" Content="Настройки"/>
       <Rectangle Height="1" Margin="8,4" Fill="{StaticResource Border}"/>
       <Button x:Name="ExitItem" Classes="menu" Content="Выход"/>

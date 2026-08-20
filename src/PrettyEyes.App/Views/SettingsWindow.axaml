@@ -90,6 +90,21 @@
             <StackPanel Spacing="12">
               <TextBlock Text="Система" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
               <CheckBox x:Name="Autostart" Content="Запускать вместе с Windows"/>
+              <CheckBox x:Name="CheckUpdates" Content="Проверять обновления"/>
+
+              <!-- The button and what it found, side by side: a status line
+                   somewhere else on the window belongs to no control. -->
+              <Grid ColumnDefinitions="Auto,12,*">
+                <Button x:Name="CheckNow" Grid.Column="0" Classes="ghost" Content="Проверить сейчас"/>
+                <TextBlock x:Name="UpdateStatus" Grid.Column="2" VerticalAlignment="Center"
+                           FontSize="12" TextWrapping="Wrap"
+                           Foreground="{StaticResource TextDim}"/>
+              </Grid>
+
+              <Button x:Name="InstallUpdate" Classes="ghost" IsVisible="False"
+                      HorizontalAlignment="Left"/>
+
+              <TextBlock x:Name="CurrentVersion" Foreground="{StaticResource TextFaint}" FontSize="11"/>
             </StackPanel>
 
             <Rectangle Height="1" Fill="{StaticResource Border}"/>

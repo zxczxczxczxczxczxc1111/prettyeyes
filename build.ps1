@@ -23,3 +23,15 @@ if (-not (Test-Path "$publish\PrettyEyes.App.exe")) {
 
 & $iscc "installer\prettyeyes.iss"
 Write-Host "Установщик собран в dist\"
+
+# The hash goes into the release notes as "sha256: <хэш>". The updater refuses
+# a release without one, so printing it here is not a nicety: forget the line
+# and nobody updates.
+$setup = Get-ChildItem "dist\prettyeyes-setup-*.exe" | Sort-Object LastWriteTime | Select-Object -Last 1
+
+if ($setup) {
+    $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLower()
+    Write-Host ""
+    Write-Host "В описание релиза строкой:"
+    Write-Host "sha256: $hash"
+}

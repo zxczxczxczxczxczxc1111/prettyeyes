@@ -15,6 +15,7 @@ public sealed record AppSettings(
     List<string>? RecentEmoji = null,
     SaveOptions? Save = null,
     ExportStyle? Export = null,
+    bool CheckUpdates = true,
     int SchemaVersion = AppSettings.CurrentSchema)
 {
     /// <summary>
@@ -22,7 +23,7 @@ public sealed record AppSettings(
     /// older build is missing everything added since, and the reader has to
     /// know what to fill in rather than hand out nulls.
     /// </summary>
-    public const int CurrentSchema = 7;
+    public const int CurrentSchema = 8;
 
     public static AppSettings Default =>
         new(HotkeyDefinition.Default, HotkeyDefinition.DefaultFullScreen, false);

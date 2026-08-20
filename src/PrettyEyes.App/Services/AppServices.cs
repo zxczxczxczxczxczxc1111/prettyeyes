@@ -30,6 +30,7 @@ public sealed class AppServices : IDisposable
         Win32TrayIcon tray,
         OverlayWindowPool overlayWindows,
         EmojiAtlas emoji,
+        UpdateService updates,
         AppSettings settings)
     {
         Host = host;
@@ -46,6 +47,7 @@ public sealed class AppServices : IDisposable
         Tray = tray;
         OverlayWindows = overlayWindows;
         Emoji = emoji;
+        Updates = updates;
         Settings = settings;
     }
 
@@ -79,6 +81,15 @@ public sealed class AppServices : IDisposable
 
     /// <summary>The bundled emoji, decoded once at start-up.</summary>
     public EmojiAtlas Emoji { get; }
+
+    /// <summary>Release checks and the installer handover.</summary>
+    public UpdateService Updates { get; }
+
+    /// <summary>
+    /// Whether an overlay is up. Set by the application, which is the only
+    /// thing that knows: an update must not close the app mid-selection.
+    /// </summary>
+    public Func<bool>? IsCapturing { get; set; }
 
     /// <summary>False when a combination was taken at startup.</summary>
     public bool RegionHotkeyRegistered { get; set; }
@@ -150,6 +161,13 @@ public sealed class AppServices : IDisposable
             () => built?.Settings.Save ?? SaveOptions.Default,
             () => DateTimeOffset.Now);
 
+        // Late-bound the same way the folder sink is: the settings record is
+        // replaced whole on every change, so a captured copy goes stale.
+        var updates = new UpdateService(
+            new GitHubUpdateSource(),
+            () => built?.Settings.CheckUpdates ?? true,
+            () => built?.IsCapturing?.Invoke() ?? false);
+
         // Built here and not lazily: the message-only window belongs to the
         // thread that creates it, and this runs on the UI thread.
         var hotkeys = new WindowsHotkeys();
@@ -185,6 +203,7 @@ public sealed class AppServices : IDisposable
             tray,
             overlayWindows,
             emoji,
+            updates,
             settings)
         {
             RegionHotkeyRegistered = regionRegistered,
@@ -226,6 +245,7 @@ public sealed class AppServices : IDisposable
         Hotkeys.Dispose();
         Tray.Dispose();
         Emoji.Dispose();
+        Updates.Dispose();
         (Capture as IDisposable)?.Dispose();
     }
 }

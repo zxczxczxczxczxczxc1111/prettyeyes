@@ -12,7 +12,9 @@ using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using SkiaSharp;
 using PrettyEyes.Core.Rendering;
+using PrettyEyes.App.Services;
 using PrettyEyes.Core.Settings;
+using PrettyEyes.Core.Updates;
 using PrettyEyes.Platform.Windows;
 
 namespace PrettyEyes.App.Views;
@@ -25,6 +27,8 @@ namespace PrettyEyes.App.Views;
 public partial class SettingsWindow : Window
 {
     private ISettingsStore? _store;
+    private UpdateService? _updates;
+    private Func<Task>? _install;
     private IHotkeys? _hotkeys;
     private IAutostart? _autostart;
 
@@ -71,9 +75,13 @@ public partial class SettingsWindow : Window
         IAutostart autostart,
         AppSettings settings,
         bool regionRegistered,
-        bool fullScreenRegistered)
+        bool fullScreenRegistered,
+        UpdateService updates,
+        Func<Task> install)
     {
         _store = store;
+        _updates = updates;
+        _install = install;
         _hotkeys = hotkeys;
         _autostart = autostart;
         _settings = settings;
@@ -93,6 +101,10 @@ public partial class SettingsWindow : Window
         ShowAutosaveState(save.Enabled);
         ShowExample();
 
+        CheckUpdates.IsChecked = settings.CheckUpdates;
+        CurrentVersion.Text = $"установлена {UpdateService.Current}";
+        ShowUpdateState(updates.State);
+
         _export = settings.Export ?? ExportStyle.None;
         ExportEnabled.IsChecked = _export.Enabled;
         ExportShadow.IsChecked = _export.Shadow;
@@ -109,6 +121,15 @@ public partial class SettingsWindow : Window
         Autosave.IsCheckedChanged += OnAutosaveChanged;
         SaveTemplate.TextChanged += OnTemplateChanged;
         PickFolder.Click += OnPickFolder;
+        CheckUpdates.IsCheckedChanged += OnCheckUpdatesChanged;
+        CheckNow.Click += (_, _) => _ = updates.CheckAsync(manual: true);
+        InstallUpdate.Click += (_, _) => _ = _install?.Invoke();
+
+        // Unsubscribed on close: the service outlives this window, and a
+        // handler pointing at a closed one would write into nothing.
+        updates.StateChanged += OnUpdateState;
+        Closed += (_, _) => updates.StateChanged -= OnUpdateState;
+
         ExportEnabled.IsCheckedChanged += (_, _) => ApplyExport(_export with { Enabled = ExportEnabled.IsChecked == true });
         ExportShadow.IsCheckedChanged += (_, _) => ApplyExport(_export with { Shadow = ExportShadow.IsChecked == true });
 
@@ -116,6 +137,53 @@ public partial class SettingsWindow : Window
         {
             ShowWarning("Комбинация занята другой программой. Выбери другую.");
         }
+    }
+
+    private void OnCheckUpdatesChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        Store(_settings with { CheckUpdates = CheckUpdates.IsChecked == true });
+        _updates?.Reschedule();
+        ShowUpdateState(_updates?.State ?? new UpdateState(UpdateStage.Idle));
+    }
+
+    private void OnUpdateState(object? sender, UpdateState state) =>
+        Dispatcher.UIThread.Post(() => ShowUpdateState(state));
+
+    /// <summary>
+    /// The one line that says where the update got to, plus the button that is
+    /// only there when there is something to install.
+    /// </summary>
+    private void ShowUpdateState(UpdateState state)
+    {
+        var busy = state.Stage is UpdateStage.Checking or UpdateStage.Downloading or UpdateStage.Installing;
+
+        CheckNow.IsEnabled = !busy;
+
+        // Also after a failure, as long as a version is known: a download that
+        // broke halfway is the case where retrying is most likely to work, and
+        // hiding the button would make it a trip through the check first.
+        InstallUpdate.IsVisible = state.Version is not null
+            && state.Stage is UpdateStage.Available or UpdateStage.Failed;
+        InstallUpdate.Content = $"Обновить до {state.Version}";
+
+        UpdateStatus.Text = state.Stage switch
+        {
+            UpdateStage.Checking => "Проверяю...",
+            UpdateStage.UpToDate => "Установлена последняя версия",
+            UpdateStage.Available => $"Доступна {state.Version}",
+            UpdateStage.Downloading => $"Скачиваю {state.Progress:P0}",
+            UpdateStage.Installing => "Запускаю установщик...",
+            // A failure with a version behind it is a download that went
+            // wrong, not a check: telling somebody the check failed while the
+            // installer is what broke sends them looking in the wrong place.
+            UpdateStage.Failed => state.Version is null ? "Не удалось проверить" : "Не удалось обновиться",
+            _ => string.Empty,
+        };
     }
 
     private void Apply(HotkeyAction action, HotkeyDefinition hotkey)

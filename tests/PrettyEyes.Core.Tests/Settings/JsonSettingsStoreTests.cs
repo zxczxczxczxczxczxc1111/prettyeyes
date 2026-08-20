@@ -218,4 +218,36 @@ public class JsonSettingsStoreTests
         Assert.NotNull(settings.ToolStyles);
         Assert.Empty(settings.ToolStyles);
     }
+
+    [Fact]
+    public void A_file_older_than_the_update_check_gets_it_switched_on()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pe-{Guid.NewGuid()}.json");
+
+        // Schema 7: everything up to the export frame, no update check.
+        File.WriteAllText(path, """
+            {
+              "Hotkey": { "Modifiers": 1, "VirtualKey": 71 },
+              "FullScreenHotkey": { "Modifiers": 6, "VirtualKey": 51 },
+              "Autostart": false,
+              "SchemaVersion": 7
+            }
+            """);
+
+        var settings = new JsonSettingsStore(path).Load();
+
+        Assert.True(settings.CheckUpdates);
+        Assert.Equal(AppSettings.CurrentSchema, settings.SchemaVersion);
+    }
+
+    [Fact]
+    public void An_update_check_switched_off_on_purpose_stays_off()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pe-{Guid.NewGuid()}.json");
+        var store = new JsonSettingsStore(path);
+
+        store.Save(AppSettings.Default with { CheckUpdates = false });
+
+        Assert.False(store.Load().CheckUpdates);
+    }
 }

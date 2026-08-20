@@ -24,6 +24,7 @@ public partial class TrayMenuWindow : Window
 
         CaptureItem.Click += (_, _) => Pick(TrayMenuChoice.Capture);
         OpenFolderItem.Click += (_, _) => Pick(TrayMenuChoice.OpenFolder);
+        UpdateItem.Click += (_, _) => Pick(TrayMenuChoice.Update);
         SettingsItem.Click += (_, _) => Pick(TrayMenuChoice.Settings);
         ExitItem.Click += (_, _) => Pick(TrayMenuChoice.Exit);
 
@@ -50,6 +51,16 @@ public partial class TrayMenuWindow : Window
 
     /// <summary>Shows the folder entry when autosave has one to show.</summary>
     public void ShowFolderEntry(bool visible) => OpenFolderItem.IsVisible = visible;
+
+    /// <summary>
+    /// Names the waiting release, or hides the entry. The version is in the
+    /// label because "Обновить" alone says nothing about what arrives.
+    /// </summary>
+    public void ShowUpdateEntry(string? version)
+    {
+        UpdateItem.IsVisible = version is not null;
+        UpdateItem.Content = version is null ? string.Empty : $"Обновить до {version}";
+    }
 
     /// <summary>
     /// Opens above and to the left of the cursor, the way a tray menu does,

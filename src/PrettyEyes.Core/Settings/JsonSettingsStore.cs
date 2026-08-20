@@ -88,6 +88,11 @@ public sealed class JsonSettingsStore : ISettingsStore
         // Schema 7 added the export frame, off by default: a screenshot that
         // silently grows a border is not the screenshot that was taken.
         Export = stored.Export ?? ExportStyle.None,
+
+        // Schema 8 added the update check, on by default. A file older than
+        // that has the property missing, and a missing bool reads as false -
+        // which would leave every existing install checking for nothing.
+        CheckUpdates = stored.SchemaVersion >= 8 ? stored.CheckUpdates : true,
         SchemaVersion = AppSettings.CurrentSchema,
     };
 

@@ -48,6 +48,17 @@ public partial class App : Application
             // and the coordinates no longer describe the same desktop.
             Services.WarmCapture();
 
+            Services.IsCapturing = () => _session is not null;
+
+            // Shown once, and only in the tray balloon: somebody who never
+            // opens the settings would otherwise never learn there is a newer
+            // version at all.
+            Services.Updates.Announced += (_, version) => Services.Notifier.Notify(
+                "prettyeyes",
+                $"Доступна версия {version}. Обновить можно из меню в трее.");
+
+            Services.Updates.Start();
+
             // Started with --settings the window opens right away. Useful for a
             // shortcut, and the only way to reach the settings without hunting
             // for the tray icon.
@@ -221,6 +232,7 @@ public partial class App : Application
 
         _menu = new TrayMenuWindow();
         _menu.ShowFolderEntry(Services.Settings.Save?.Ready == true);
+        _menu.ShowUpdateEntry(Services.Updates.Found?.Version.ToString());
         _menu.Picked += (_, choice) =>
         {
             switch (choice)
@@ -230,6 +242,9 @@ public partial class App : Application
                     break;
                 case TrayMenuChoice.OpenFolder:
                     OpenSnapshotFolder();
+                    break;
+                case TrayMenuChoice.Update:
+                    _ = InstallUpdateAsync();
                     break;
                 case TrayMenuChoice.Settings:
                     OpenSettings();
@@ -242,6 +257,30 @@ public partial class App : Application
         _menu.Closed += (_, _) => _menu = null;
 
         _menu.ShowAt(x, y, monitor.Bounds, monitor.Scale);
+    }
+
+    /// <summary>
+    /// Downloads the release and hands over to the installer.
+    ///
+    /// The app then quits, and it has to: the single-instance mutex is held for
+    /// the life of the process, and Inno Setup checks for exactly that mutex
+    /// before it replaces the executable.
+    /// </summary>
+    private async Task InstallUpdateAsync()
+    {
+        if (Services is null)
+        {
+            return;
+        }
+
+        if (await Services.Updates.InstallAsync())
+        {
+            Exit();
+        }
+        else
+        {
+            Services.Notifier.Notify("prettyeyes", "Не удалось обновиться. Попробуй позже.");
+        }
     }
 
     private void Exit()
@@ -274,7 +313,9 @@ public partial class App : Application
             Services.Autostart,
             Services.Settings,
             Services.RegionHotkeyRegistered,
-            Services.FullScreenHotkeyRegistered);
+            Services.FullScreenHotkeyRegistered,
+            Services.Updates,
+            InstallUpdateAsync);
 
         _settings.Closed += (_, _) =>
         {
