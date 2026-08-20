@@ -13,6 +13,9 @@ public sealed class HotkeyBox : Button
 {
     private HotkeyDefinition _value = HotkeyDefinition.Default;
 
+    /// <summary>The key a key-down already bound, so its release is ignored.</summary>
+    private Key _bound = Key.None;
+
     public HotkeyBox()
     {
         Focusable = true;
@@ -30,6 +33,22 @@ public sealed class HotkeyBox : Button
             Content = Describe(value);
         }
     }
+
+    /// <summary>
+    /// Why the system refused a combination, in the words that lead somewhere.
+    /// PrtScn gets its own line because it is almost never another program:
+    /// Windows 11 hands the key to the Snipping Tool by default, and nobody
+    /// finds that switch by guessing.
+    /// </summary>
+    public static string Busy(HotkeyDefinition hotkey) =>
+        hotkey.VirtualKey == VkSnapshot
+            ? "PrtScn уже кем-то занят. Чаще всего это «Ножницы»: Параметры, "
+              + "Специальные возможности, Клавиатура, выключи кнопку Print screen. "
+              + "Иначе клавишу держит другой скриншотер."
+            : $"Комбинация {Describe(hotkey)} занята другой программой.";
+
+    /// <summary>VK_SNAPSHOT, the one key with its own folklore.</summary>
+    private const uint VkSnapshot = 0x2C;
 
     public static string Describe(HotkeyDefinition hotkey)
     {
@@ -84,10 +103,42 @@ public sealed class HotkeyBox : Button
             return;
         }
 
+        if (Capture(e))
+        {
+            _bound = e.Key;
+        }
+    }
+
+    /// <summary>
+    /// PrtScn is the one key Windows never sends a key-down for: the driver
+    /// delivers the release and nothing else, which is why holding it does not
+    /// repeat. A field that only listens on key-down therefore cannot be given
+    /// that key at all - it looks like the field is broken, and it was.
+    ///
+    /// Only that key, and only when the key-down never came: everything else is
+    /// already bound by the time it is released, and binding it twice would
+    /// catch the second half of the gesture with the modifiers already gone.
+    /// </summary>
+    protected override void OnKeyUp(KeyEventArgs e)
+    {
+        if (e.Key is Key.PrintScreen && _bound != Key.PrintScreen)
+        {
+            Capture(e);
+            _bound = Key.None;
+            return;
+        }
+
+        _bound = Key.None;
+        base.OnKeyUp(e);
+    }
+
+    /// <summary>True when the combination was taken; false when it was refused.</summary>
+    private bool Capture(KeyEventArgs e)
+    {
         if (IsModifier(e.Key))
         {
             e.Handled = true;
-            return;
+            return false;
         }
 
         var modifiers = HotkeyModifiers.None;
@@ -119,7 +170,7 @@ public sealed class HotkeyBox : Button
             // Avalonia has no public Key-to-VK mapping, so the table below is
             // ours; anything outside it has no Win32 key to register.
             e.Handled = true;
-            return;
+            return false;
         }
 
         // A bare letter or digit would eat that key everywhere in the system,
@@ -128,12 +179,14 @@ public sealed class HotkeyBox : Button
         if (modifiers == HotkeyModifiers.None && !StandsAlone(e.Key))
         {
             e.Handled = true;
-            return;
+            return false;
         }
 
         Value = new HotkeyDefinition(modifiers, virtualKey.Value);
         HotkeyChanged?.Invoke(this, Value);
         e.Handled = true;
+
+        return true;
     }
 
     /// <summary>

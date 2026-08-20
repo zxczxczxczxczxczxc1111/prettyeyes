@@ -392,7 +392,7 @@ public partial class SettingsWindow : Window
         // Put the working combination back so the user is never left without one.
         _hotkeys.TryRegister(action, Existing(action));
         Restore(action);
-        ShowWarning("Эта комбинация занята другой программой. Оставил прежнюю.");
+        ShowWarning($"{HotkeyBox.Busy(hotkey)} Оставил прежнюю.");
     }
 
     /// <summary>Our own two hotkeys must not fight over one combination.</summary>

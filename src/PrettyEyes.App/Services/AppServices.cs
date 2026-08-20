@@ -182,7 +182,7 @@ public sealed class AppServices : IDisposable
             {
                 notifier.Notify(
                     "prettyeyes",
-                    $"Комбинация {HotkeyBox.Describe(hotkey)} занята другой программой. Смени её в настройках.");
+                    $"{HotkeyBox.Busy(hotkey)} Смени её в настройках.");
             }
         }
 
