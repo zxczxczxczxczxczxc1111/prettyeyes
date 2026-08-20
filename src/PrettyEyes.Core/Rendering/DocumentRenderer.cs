@@ -43,6 +43,12 @@ public static class DocumentRenderer
 
     private const byte AuraShade = 60;
 
+    /// <summary>Strongest the light at the top of the card is, out of 255.</summary>
+    private const byte SheenAlpha = 12;
+
+    /// <summary>The bright pixel around the card.</summary>
+    private const byte RimAlpha = 28;
+
     /// <summary>Side of the noise tile the grain is repeated from.</summary>
     private const int GrainTile = 128;
 
@@ -137,6 +143,12 @@ public static class DocumentRenderer
         }
 
         canvas.DrawImage(shot, destination, new SKSamplingOptions(SKFilterMode.Linear));
+
+        if (style.Sheen)
+        {
+            DrawSheen(canvas, rounded, destination);
+        }
+
         canvas.Restore();
 
         return surface.Snapshot();
@@ -188,6 +200,44 @@ public static class DocumentRenderer
                 canvas.Clear(SKColors.Black);
                 return;
         }
+    }
+
+    /// <summary>
+    /// Light from above, and an edge to catch it.
+    ///
+    /// A flat rectangle on a backdrop is a rectangle; the same rectangle a
+    /// shade lighter at the top and outlined by one bright pixel is an object
+    /// lying on something. Both parts are deliberately at the edge of visible:
+    /// the moment either is noticeable on its own, the screenshot has been
+    /// tampered with rather than presented.
+    /// </summary>
+    private static void DrawSheen(SKCanvas canvas, SKRoundRect shape, SKRect card)
+    {
+        using (var shader = SKShader.CreateLinearGradient(
+            new SKPoint(card.Left, card.Top),
+            new SKPoint(card.Left, card.Top + (card.Height / 2f)),
+            [new SKColor(255, 255, 255, SheenAlpha), new SKColor(255, 255, 255, 0)],
+            SKShaderTileMode.Clamp))
+        {
+            using var paint = new SKPaint { Shader = shader };
+            canvas.DrawRect(card, paint);
+        }
+
+        using var rim = new SKPaint
+        {
+            Color = new SKColor(255, 255, 255, RimAlpha),
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = 1,
+            IsAntialias = true,
+        };
+
+        // Inset by half a pixel: the clip cuts the outer half of a stroke laid
+        // exactly on the edge, and a rim half as bright as asked for is a rim
+        // nobody can tune.
+        using var inner = new SKRoundRect(shape);
+        inner.Deflate(0.5f, 0.5f);
+
+        canvas.DrawRoundRect(inner, rim);
     }
 
     private static void DrawShadow(SKCanvas canvas, SKRoundRect shape, int padding)
