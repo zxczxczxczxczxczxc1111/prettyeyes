@@ -110,8 +110,9 @@ public partial class SettingsWindow : Window
         ShowUpdateState(updates.State);
 
         _export = settings.Export ?? ExportStyle.None;
-        ExportEnabled.IsChecked = _export.Enabled;
         ExportShadow.IsChecked = _export.Shadow;
+        ExportGrain.IsChecked = _export.Grain;
+        ExportSheen.IsChecked = _export.Sheen;
         BuildExportRows();
         ShowExportState(_export.Enabled);
         ShowPreview();
@@ -136,8 +137,10 @@ public partial class SettingsWindow : Window
         updates.StateChanged += OnUpdateState;
         Closed += (_, _) => updates.StateChanged -= OnUpdateState;
 
-        ExportEnabled.IsCheckedChanged += (_, _) => ApplyExport(_export with { Enabled = ExportEnabled.IsChecked == true });
         ExportShadow.IsCheckedChanged += (_, _) => ApplyExport(_export with { Shadow = ExportShadow.IsChecked == true });
+        ExportGrain.IsCheckedChanged += (_, _) => ApplyExport(_export with { Grain = ExportGrain.IsChecked == true });
+        ExportSheen.IsCheckedChanged += (_, _) => ApplyExport(_export with { Sheen = ExportSheen.IsChecked == true });
+        ExportAdvanced.Click += (_, _) => ShowAdvanced(!ExportOptions.IsVisible);
 
         if (!regionRegistered || !fullScreenRegistered)
         {
@@ -534,12 +537,67 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>
+    /// The three ways a screenshot can leave the application.
+    ///
+    /// Nothing is stored about which one is picked: a preset is highlighted
+    /// when the current style equals it, and `ExportStyle` is a record, so that
+    /// comparison is free and cannot drift from the truth. Change a parameter
+    /// by hand and no preset lights up, which is exactly what happened.
+    /// </summary>
+    private static readonly (string Label, ExportStyle Style)[] Presets =
+    [
+        ("нет", ExportStyle.None),
+        ("карточка", ExportStyle.Card),
+        ("прозрачный", ExportStyle.Cutout),
+    ];
+
+    /// <summary>
+    /// Rendered once, when the window opens. A preset does not change, so
+    /// redrawing its picture on every click would be work for an identical
+    /// result - and with the aura that work includes a blur.
+    /// </summary>
+    private readonly Dictionary<string, Bitmap> _presetPreviews = [];
+
+    private void BuildPresetRow()
+    {
+        PresetRow.Children.Clear();
+
+        foreach (var (label, style) in Presets)
+        {
+            var chosen = style.Enabled
+                ? _export == style
+                : !_export.Enabled;
+
+            if (!_presetPreviews.TryGetValue(label, out var preview))
+            {
+                preview = RenderSample(style);
+                _presetPreviews[label] = preview;
+            }
+
+            PresetRow.Children.Add(NewPreset(label, preview, chosen, () => ApplyExport(style)));
+        }
+
+        // The one thing about the transparent export that cannot be seen in a
+        // preview, and the one thing people will otherwise report as a bug.
+        PresetHint.IsVisible = _export is { Enabled: true, Background: ExportBackground.Transparent };
+        PresetHint.Text = "Прозрачность сохраняется в файле. В буфере обмена фона нет, "
+            + "поэтому при вставке он будет белым.";
+    }
+
+    private void ShowAdvanced(bool shown)
+    {
+        ExportOptions.IsVisible = shown;
+        ExportAdvanced.Content = shown ? "Свернуть" : "Настроить";
+    }
+
+    /// <summary>
     /// Padding, backdrop and rounding as rows of small buttons. Built in code
     /// because they are three of the same thing, and three copies of the same
     /// markup would drift apart.
     /// </summary>
     private void BuildExportRows()
     {
+        BuildPresetRow();
         PaddingRow.Children.Clear();
         BackgroundRow.Children.Clear();
         RadiusRow.Children.Clear();
@@ -554,6 +612,7 @@ public partial class SettingsWindow : Window
         {
             ("чёрный", ExportBackground.Black),
             ("градиент", ExportBackground.Gradient),
+            ("дымка", ExportBackground.Aura),
             ("белый", ExportBackground.White),
             ("прозрачный", ExportBackground.Transparent),
         })
@@ -572,6 +631,48 @@ public partial class SettingsWindow : Window
         // says so instead of doing nothing.
         ExportShadow.IsEnabled = _export.ShadowAllowed;
         ExportShadow.IsChecked = _export.Shadow && _export.ShadowAllowed;
+
+        // Grain is backdrop work, and two of the backdrops have nothing for it
+        // to work on. The switch says so instead of doing nothing.
+        ExportGrain.IsEnabled = _export.GrainApplies;
+        ExportGrain.IsChecked = _export.GrainAllowed;
+        ExportSheen.IsChecked = _export.Sheen;
+    }
+
+    /// <summary>
+    /// A preset button: the picture it produces, with its name under it.
+    /// Choosing between three results, rather than between three words.
+    /// </summary>
+    private Button NewPreset(string label, Bitmap preview, bool active, Action pick)
+    {
+        var stack = new StackPanel { Spacing = 6 };
+
+        stack.Children.Add(new Border
+        {
+            CornerRadius = new Avalonia.CornerRadius(4),
+            ClipToBounds = true,
+            Child = new Image { Source = preview, Width = 96, Height = 68, Stretch = Stretch.UniformToFill },
+        });
+
+        stack.Children.Add(new TextBlock
+        {
+            Text = label,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Center,
+            FontSize = 11,
+        });
+
+        var button = new Button { Content = stack, Padding = new Avalonia.Thickness(6) };
+
+        button.Classes.Add("choice");
+
+        if (active)
+        {
+            button.Classes.Add("active");
+        }
+
+        button.Click += (_, _) => pick();
+
+        return button;
     }
 
     private Button NewChoice(string label, bool active, Action pick)
@@ -605,36 +706,31 @@ public partial class SettingsWindow : Window
         Store(_settings with { Export = _export });
     }
 
+    /// <summary>
+    /// Deliberately does not redraw the preview. It used to, and since the
+    /// caller draws it a line later, every change of a parameter rendered the
+    /// sample twice - which with the aura means blurring it twice.
+    /// </summary>
     private void ShowExportState(bool enabled)
     {
         ExportOptions.IsEnabled = enabled;
         ExportOptions.Opacity = enabled ? 1 : 0.4;
-
-        // Drawn either way: switched off the preview shows the bare screenshot,
-        // which is exactly what the export will be. An empty frame would just
-        // look broken.
-        ShowPreview();
     }
 
     /// <summary>
     /// A sample screenshot run through the real renderer. Anything else would
     /// be a drawing of what the export might look like.
     /// </summary>
-    private void ShowPreview()
-    {
-        using var sample = SampleShot();
-        using var document = new Document(sample, new CaptureRect(0, 0, 320, 200))
-        {
-            Selection = new CaptureRect(0, 0, 320, 200),
-        };
+    private void ShowPreview() => ExportPreview.Source = RenderSample(_export);
 
-        using var rendered = DocumentRenderer.Render(document, _export);
-        using var data = rendered.Encode(SKEncodedImageFormat.Png, 90);
-        using var stream = new MemoryStream(data.ToArray());
-
-        ExportPreview.Source = new Bitmap(stream);
-    }
-
+    /// <summary>
+    /// The stand-in screenshot every preview is built from.
+    ///
+    /// It carries colour on purpose. The old sample was grey lines on grey, and
+    /// on a backdrop drawn from the picture's own colours that showed nothing
+    /// at all: a preview of the aura has to have something to be an aura of.
+    /// The colour lives inside the sample, not in the interface around it.
+    /// </summary>
     private static SKImage SampleShot()
     {
         using var surface = SKSurface.Create(new SKImageInfo(320, 200));
@@ -652,7 +748,36 @@ public partial class SettingsWindow : Window
         using var accent = new SKPaint { Color = new SKColor(0xB0, 0x10, 0x30), StrokeWidth = 8 };
         canvas.DrawLine(24, 24, 120, 24, accent);
 
+        var dots = new[]
+        {
+            new SKColor(0x8E, 0x4E, 0xC6),
+            new SKColor(0x00, 0x91, 0xFF),
+            new SKColor(0x30, 0xA4, 0x6C),
+        };
+
+        for (var i = 0; i < dots.Length; i++)
+        {
+            using var dot = new SKPaint { Color = dots[i], IsAntialias = true };
+            canvas.DrawCircle(240 + (i * 26), 150, 9, dot);
+        }
+
         return surface.Snapshot();
+    }
+
+    /// <summary>The sample under one style, as a bitmap the interface can show.</summary>
+    private static Bitmap RenderSample(ExportStyle style)
+    {
+        using var sample = SampleShot();
+        using var document = new Document(sample, new CaptureRect(0, 0, 320, 200))
+        {
+            Selection = new CaptureRect(0, 0, 320, 200),
+        };
+
+        using var rendered = DocumentRenderer.Render(document, style);
+        using var data = rendered.Encode(SKEncodedImageFormat.Png, 90);
+        using var stream = new MemoryStream(data.ToArray());
+
+        return new Bitmap(stream);
     }
 
     private void StoreSave(Func<SaveOptions, SaveOptions> change) =>

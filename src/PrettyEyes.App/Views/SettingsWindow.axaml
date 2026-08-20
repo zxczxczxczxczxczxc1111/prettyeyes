@@ -157,9 +157,18 @@
 
             <StackPanel Spacing="12">
             <TextBlock Text="Оформление" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
-            <CheckBox x:Name="ExportEnabled" Content="Оформлять скриншот при выводе"/>
 
-            <StackPanel x:Name="ExportOptions" Spacing="12" Opacity="0.4" IsEnabled="False">
+            <!-- Three results to choose from, not five parameters to tune. The
+                 parameters are still here, one click down. -->
+            <StackPanel x:Name="PresetRow" Orientation="Horizontal" Spacing="6"/>
+
+            <TextBlock x:Name="PresetHint" Foreground="{StaticResource TextFaint}" FontSize="11"
+                       TextWrapping="Wrap" IsVisible="False"/>
+
+            <Button x:Name="ExportAdvanced" Classes="ghost" Content="Настроить"
+                    HorizontalAlignment="Left"/>
+
+            <StackPanel x:Name="ExportOptions" Spacing="12" Opacity="0.4" IsEnabled="False" IsVisible="False">
               <StackPanel Spacing="8">
                 <TextBlock Text="Поля" Foreground="{StaticResource Text}"/>
                 <StackPanel x:Name="PaddingRow" Orientation="Horizontal" Spacing="6"/>
@@ -176,6 +185,8 @@
               </StackPanel>
 
               <CheckBox x:Name="ExportShadow" Content="Тень"/>
+              <CheckBox x:Name="ExportGrain" Content="Зерно"/>
+              <CheckBox x:Name="ExportSheen" Content="Свет"/>
 
               <!-- Drawn by the same code that writes the file: a preview that
                    lies is worse than no preview. -->

@@ -36,14 +36,31 @@ public sealed record ExportStyle(
     public static ExportStyle None => new(false, 0, ExportBackground.Black, 0, false);
 
     /// <summary>
+    /// The screenshot as an object lying on its own colour: haze, grain, light
+    /// and a shadow. What most people mean by "make it look good".
+    /// </summary>
+    public static ExportStyle Card => new(true, 48, ExportBackground.Aura, 16, true);
+
+    /// <summary>
+    /// The same object with nothing behind it, for dropping onto a page that
+    /// already has a background of its own. Grain is off because there is
+    /// nothing for it to be grain on.
+    /// </summary>
+    public static ExportStyle Cutout =>
+        new(true, 48, ExportBackground.Transparent, 16, true, Grain: false);
+
+    /// <summary>
     /// Grain belongs to the backdrops that are meant to be atmosphere, and to
     /// no others. Over transparency it would fill the empty space with an even
     /// haze of noise, which is the opposite of what a transparent export is
     /// for; over flat black or flat white it is dirt on a surface somebody
     /// chose precisely because it is clean.
     /// </summary>
-    public bool GrainAllowed =>
-        Grain && Background is ExportBackground.Gradient or ExportBackground.Aura;
+    public bool GrainAllowed => Grain && GrainApplies;
+
+    /// <summary>Whether grain means anything on this backdrop at all.</summary>
+    public bool GrainApplies =>
+        Background is ExportBackground.Gradient or ExportBackground.Aura;
 
     /// <summary>
     /// A shadow needs somewhere to fall. With no padding it lands outside the
