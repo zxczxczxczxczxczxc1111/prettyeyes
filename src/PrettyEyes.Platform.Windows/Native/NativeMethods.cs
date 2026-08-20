@@ -1,4 +1,4 @@
-using System.Runtime.InteropServices;
+﻿using System.Runtime.InteropServices;
 
 namespace PrettyEyes.Platform.Windows.Native;
 
@@ -236,4 +236,18 @@ internal static class NativeMethods
     internal static extern int GetDIBits(
         IntPtr hdc, IntPtr bitmap, uint start, uint lines,
         byte[] bits, ref BitmapInfo info, uint usage);
+
+    internal const int GWL_EXSTYLE = -20;
+
+    /// <summary>A tool window never shows up in Alt+Tab.</summary>
+    internal const long WS_EX_TOOLWINDOW = 0x00000080;
+
+    /// <summary>Forces a window into the switcher; the opposite of the above.</summary>
+    internal const long WS_EX_APPWINDOW = 0x00040000;
+
+    [DllImport("user32.dll", SetLastError = true, EntryPoint = "GetWindowLongPtrW")]
+    internal static extern IntPtr GetWindowLongPtr(IntPtr hWnd, int index);
+
+    [DllImport("user32.dll", SetLastError = true, EntryPoint = "SetWindowLongPtrW")]
+    internal static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int index, IntPtr value);
 }

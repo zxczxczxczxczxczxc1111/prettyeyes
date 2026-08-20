@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
+using PrettyEyes.Platform.Windows;
 
 namespace PrettyEyes.App.Services;
 
@@ -21,6 +22,10 @@ public partial class HostWindow : Window
     public void ShowHidden()
     {
         Show();
+
+        // A blank card called "Window" in Alt+Tab is this one: invisible on
+        // screen is not the same as invisible to the switcher.
+        WindowSwitcher.Hide(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
 
         // Position only sticks once the native window exists, so it is set
         // after Show, not before.

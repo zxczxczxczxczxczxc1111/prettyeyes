@@ -4,6 +4,7 @@ using Avalonia.Input;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Tools;
+using PrettyEyes.Platform.Windows;
 using CaptureRect = PrettyEyes.Core.Geometry.CaptureRect;
 
 namespace PrettyEyes.App.Views;
@@ -64,6 +65,10 @@ public partial class OverlayWindow : Window
         Position = new PixelPoint(monitor.Bounds.X, monitor.Bounds.Y);
         Show();
         Position = new PixelPoint(monitor.Bounds.X, monitor.Bounds.Y);
+
+        // The overlay lives and dies inside one capture; it has no place in
+        // Alt+Tab, and being topmost it never needs to be switched back to.
+        WindowSwitcher.Hide(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
 
         var scale = RenderScaling;
         Width = monitor.Bounds.Width / scale;

@@ -37,7 +37,12 @@ public partial class TrayMenuWindow : Window
                 Close();
             }
         };
-        Opened += (_, _) => WindowCorners.Round(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
+        Opened += (_, _) =>
+        {
+            var handle = TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+            WindowCorners.Round(handle);
+            WindowSwitcher.Hide(handle);
+        };
     }
 
     public event EventHandler<TrayMenuChoice>? Picked;
