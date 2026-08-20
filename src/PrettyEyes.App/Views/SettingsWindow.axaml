@@ -23,6 +23,7 @@
         <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15" Easing="CubicEaseOut"/>
       </Transitions>
     </Border.Transitions>
+    <Panel>
     <DockPanel>
       <Grid DockPanel.Dock="Top" x:Name="TitleBar" Height="44" ColumnDefinitions="Auto,*,Auto">
         <Image Grid.Column="0" Source="/Assets/prettyeyes.ico" Width="16" Height="16" Margin="16,0,0,0"/>
@@ -129,17 +130,23 @@
           </StackPanel>
           </StackPanel>
 
-          <Grid Grid.Row="1" Grid.ColumnSpan="3" Margin="0,20,0,0" ColumnDefinitions="*,Auto">
-            <TextBlock x:Name="Message" Grid.Column="0" VerticalAlignment="Center"
-                       FontSize="12" TextWrapping="Wrap" IsVisible="False"/>
-
-            <!-- The mark, in the corner where a signature goes. Dimmed: it is
-                 the last thing on this window that should catch the eye. -->
-            <Image Grid.Column="1" Source="/Assets/logo.png" Height="96" Opacity="0.85"
-                   HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
-          </Grid>
+          <TextBlock x:Name="Message" Grid.Row="1" Grid.ColumnSpan="3" Margin="0,20,0,0"
+                     FontSize="12" TextWrapping="Wrap" IsVisible="False"/>
         </Grid>
       </ScrollViewer>
     </DockPanel>
+
+      <!-- The mark, in the corner where a signature goes, and dimmed: it is the
+           last thing on this window that should catch the eye.
+
+           It sits over the whole card rather than in the scrolling content, so
+           the 32 px below it is the same 32 px as to its right. Inside the
+           content the bottom gap was whatever the settings happened not to fill,
+           which read as crooked. The file itself is cropped to the ink for the
+           same reason. -->
+      <Image Source="/Assets/logo.png" Height="96" Opacity="0.85"
+             Margin="32" IsHitTestVisible="False"
+             HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+    </Panel>
   </Border>
 </Window>
