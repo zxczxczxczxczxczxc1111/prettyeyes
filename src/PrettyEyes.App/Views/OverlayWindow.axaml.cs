@@ -69,8 +69,8 @@ public partial class OverlayWindow : Window
     /// <summary>Ctrl+C or Enter: the same thing the copy button does.</summary>
     public event EventHandler? CopyRequested;
 
-    /// <summary>Ctrl+S: the same thing the save button does.</summary>
-    public event EventHandler? SaveRequested;
+    /// <summary>Ctrl+S saves; with Shift it asks where, like the button.</summary>
+    public event EventHandler<bool>? SaveRequested;
 
     /// <summary>A hex colour that wants to be in the clipboard as text.</summary>
     public event EventHandler<string>? ColourCopyRequested;
@@ -663,7 +663,7 @@ public partial class OverlayWindow : Window
                 break;
 
             case Key.S when control:
-                SaveRequested?.Invoke(this, EventArgs.Empty);
+                SaveRequested?.Invoke(this, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
                 break;
 
             // Bare C, so it cannot be reached while Ctrl is held for a copy.

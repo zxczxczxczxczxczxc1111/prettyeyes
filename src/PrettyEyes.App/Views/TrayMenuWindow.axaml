@@ -27,6 +27,9 @@
 
     <StackPanel Spacing="2">
       <Button x:Name="CaptureItem" Classes="menu" Content="Снимок"/>
+      <!-- Only there when there is a folder to open: autosave writes silently,
+           and "somewhere on the disk" is not an answer. -->
+      <Button x:Name="OpenFolderItem" Classes="menu" Content="Папка снимков" IsVisible="False"/>
       <Button x:Name="SettingsItem" Classes="menu" Content="Настройки"/>
       <Rectangle Height="1" Margin="8,4" Fill="{StaticResource Border}"/>
       <Button x:Name="ExitItem" Classes="menu" Content="Выход"/>

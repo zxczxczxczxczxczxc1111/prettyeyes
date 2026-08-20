@@ -79,6 +79,10 @@ public sealed class JsonSettingsStore : ISettingsStore
         // Schema 5 added emoji. No glyph chosen yet is a valid state: the grid
         // opens on the first click instead of stamping something arbitrary.
         RecentEmoji = stored.RecentEmoji ?? [],
+
+        // Schema 6 added the folder autosave, off by default: a screenshot tool
+        // writing files into a folder nobody chose is a surprise.
+        Save = stored.Save ?? SaveOptions.Default,
         SchemaVersion = AppSettings.CurrentSchema,
     };
 

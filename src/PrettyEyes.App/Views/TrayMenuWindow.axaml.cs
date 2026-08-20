@@ -23,6 +23,7 @@ public partial class TrayMenuWindow : Window
         InitializeComponent();
 
         CaptureItem.Click += (_, _) => Pick(TrayMenuChoice.Capture);
+        OpenFolderItem.Click += (_, _) => Pick(TrayMenuChoice.OpenFolder);
         SettingsItem.Click += (_, _) => Pick(TrayMenuChoice.Settings);
         ExitItem.Click += (_, _) => Pick(TrayMenuChoice.Exit);
 
@@ -46,6 +47,9 @@ public partial class TrayMenuWindow : Window
     }
 
     public event EventHandler<TrayMenuChoice>? Picked;
+
+    /// <summary>Shows the folder entry when autosave has one to show.</summary>
+    public void ShowFolderEntry(bool visible) => OpenFolderItem.IsVisible = visible;
 
     /// <summary>
     /// Opens above and to the left of the cursor, the way a tray menu does,

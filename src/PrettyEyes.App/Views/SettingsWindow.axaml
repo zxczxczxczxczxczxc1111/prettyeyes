@@ -65,6 +65,30 @@
               <TextBlock Text="Система" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
               <CheckBox x:Name="Autostart" Content="Запускать вместе с Windows"/>
             </StackPanel>
+
+            <Rectangle Height="1" Fill="{StaticResource Border}"/>
+
+            <StackPanel Spacing="12">
+              <TextBlock Text="Сохранение" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
+              <CheckBox x:Name="Autosave" Content="Сохранять снимки в папку"/>
+
+              <StackPanel x:Name="AutosaveOptions" Spacing="12" Opacity="0.4" IsEnabled="False">
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Папка" Foreground="{StaticResource Text}"/>
+                  <Grid ColumnDefinitions="*,8,Auto">
+                    <TextBox x:Name="SaveFolder" Grid.Column="0" Classes="field" IsReadOnly="True"
+                             Watermark="не выбрана"/>
+                    <Button x:Name="PickFolder" Grid.Column="2" Classes="ghost" Content="Выбрать"/>
+                  </Grid>
+                </StackPanel>
+
+                <StackPanel Spacing="8">
+                  <TextBlock Text="Имя файла" Foreground="{StaticResource Text}"/>
+                  <TextBox x:Name="SaveTemplate" Classes="field"/>
+                  <TextBlock x:Name="SaveExample" Foreground="{StaticResource TextFaint}" FontSize="11"/>
+                </StackPanel>
+              </StackPanel>
+            </StackPanel>
           </StackPanel>
 
           <TextBlock x:Name="Message" Grid.Row="1" Grid.ColumnSpan="3" Margin="0,20,0,0"

@@ -114,4 +114,33 @@
     <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
     <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
   </Style>
+
+  <!-- A text field that looks like the hotkey field next to it: same fill,
+       same hairline, same radius. The default Avalonia box brings its own
+       light theme with it. -->
+  <Style Selector="TextBox.field">
+    <Setter Property="Background" Value="{StaticResource Fill}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RField}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+    <Setter Property="CaretBrush" Value="{StaticResource TextStrong}"/>
+    <Setter Property="SelectionBrush" Value="{StaticResource FillHover}"/>
+    <Setter Property="Padding" Value="12,10"/>
+  </Style>
+
+  <Style Selector="TextBox.field /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{StaticResource Fill}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+  </Style>
+
+  <Style Selector="TextBox.field:pointerover /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{StaticResource Fill}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}"/>
+  </Style>
+
+  <Style Selector="TextBox.field:focus /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{StaticResource Fill}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
+  </Style>
 </Styles>

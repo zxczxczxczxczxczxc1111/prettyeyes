@@ -12,6 +12,7 @@ public sealed record AppSettings(
     Dictionary<ToolKind, ToolStyle>? ToolStyles = null,
     string? Emoji = null,
     List<string>? RecentEmoji = null,
+    SaveOptions? Save = null,
     int SchemaVersion = AppSettings.CurrentSchema)
 {
     /// <summary>
@@ -19,7 +20,7 @@ public sealed record AppSettings(
     /// older build is missing everything added since, and the reader has to
     /// know what to fill in rather than hand out nulls.
     /// </summary>
-    public const int CurrentSchema = 5;
+    public const int CurrentSchema = 6;
 
     public static AppSettings Default =>
         new(HotkeyDefinition.Default, HotkeyDefinition.DefaultFullScreen, false);

@@ -57,7 +57,7 @@ public sealed class OverlaySession
             window.UndoRequested += OnUndoRequested;
             window.AnnotationDrawn += OnAnnotationDrawn;
             window.CopyRequested += OnCopyClicked;
-            window.SaveRequested += OnSaveClicked;
+            window.SaveRequested += OnSaveRequested;
             window.ColourCopyRequested += OnColourCopyRequested;
             window.ToolCleared += OnToolCleared;
             window.ToolbarControl.StyleRequested += OnStyleRequested;
@@ -74,7 +74,7 @@ public sealed class OverlaySession
             window.ToolbarControl.ToolPicked += OnToolPicked;
             window.ToolbarControl.UndoClicked += OnUndoRequested;
             window.ToolbarControl.CopyClicked += OnCopyClicked;
-            window.ToolbarControl.SaveClicked += OnSaveClicked;
+            window.ToolbarControl.SaveClicked += OnSaveRequested;
 
             window.SetMagnifierEnabled(_services.Settings.ShowMagnifier);
             window.SetMagnifierGrid(_services.Settings.MagnifierGrid);
@@ -96,7 +96,7 @@ public sealed class OverlaySession
         window.UndoRequested -= OnUndoRequested;
         window.AnnotationDrawn -= OnAnnotationDrawn;
         window.CopyRequested -= OnCopyClicked;
-        window.SaveRequested -= OnSaveClicked;
+        window.SaveRequested -= OnSaveRequested;
         window.ColourCopyRequested -= OnColourCopyRequested;
         window.ToolCleared -= OnToolCleared;
         window.ToolbarControl.StyleRequested -= OnStyleRequested;
@@ -106,7 +106,7 @@ public sealed class OverlaySession
         window.ToolbarControl.ToolPicked -= OnToolPicked;
         window.ToolbarControl.UndoClicked -= OnUndoRequested;
         window.ToolbarControl.CopyClicked -= OnCopyClicked;
-        window.ToolbarControl.SaveClicked -= OnSaveClicked;
+        window.ToolbarControl.SaveClicked -= OnSaveRequested;
     }
 
     private void OnCancelled(object? sender, EventArgs e) => Close();
@@ -360,19 +360,45 @@ public sealed class OverlaySession
         Redraw();
     }
 
-    private async void OnCopyClicked(object? sender, EventArgs e) => await SendSafelyAsync(_services.Clipboard);
+    /// <summary>
+    /// Copy always fills the clipboard, and with autosave on it also drops a
+    /// file in the folder. The file is a bonus, so the clipboard goes first:
+    /// a disk that has gone away must not cost the user their screenshot.
+    /// </summary>
+    private async void OnCopyClicked(object? sender, EventArgs e)
+    {
+        var autosave = _services.Settings.Save?.Ready == true;
 
-    private async void OnSaveClicked(object? sender, EventArgs e) => await SendSafelyAsync(_services.File);
+        await SendSafelyAsync(_services.Clipboard, closeOnSuccess: !autosave);
+
+        if (autosave)
+        {
+            await SendSafelyAsync(
+                _services.Folder,
+                failure: "Снимок в буфере, но в папку не сохранился. Проверь папку в настройках.");
+        }
+    }
+
+    /// <summary>
+    /// With autosave on this writes silently; holding Shift asks for a place
+    /// anyway, because "somewhere else, just this once" has to stay possible.
+    /// </summary>
+    private async void OnSaveRequested(object? sender, bool askWhere)
+    {
+        var dialog = askWhere || _services.Settings.Save?.Ready != true;
+
+        await SendSafelyAsync(dialog ? _services.File : _services.Folder);
+    }
 
     /// <summary>
     /// An async event handler is the one place where an exception has nowhere
     /// to go, so it is caught here and shown instead of killing the process.
     /// </summary>
-    private async Task SendSafelyAsync(IImageSink sink)
+    private async Task SendSafelyAsync(IImageSink sink, bool closeOnSuccess = true, string? failure = null)
     {
         try
         {
-            await SendAsync(sink);
+            await SendAsync(sink, closeOnSuccess, failure);
         }
         catch (Exception ex)
         {
@@ -387,7 +413,7 @@ public sealed class OverlaySession
         }
     }
 
-    private async Task SendAsync(IImageSink sink)
+    private async Task SendAsync(IImageSink sink, bool closeOnSuccess = true, string? failure = null)
     {
         if (Document is null)
         {
@@ -406,7 +432,11 @@ public sealed class OverlaySession
             switch (result)
             {
                 case SinkResult.Sent:
-                    Close();
+                    if (closeOnSuccess)
+                    {
+                        Close();
+                    }
+
                     break;
                 case SinkResult.Cancelled:
                     SetTopmost(true);
@@ -415,7 +445,7 @@ public sealed class OverlaySession
                     SetTopmost(true);
 
                     // Work in progress must survive a failed save.
-                    ShowError("Не удалось сохранить снимок. Попробуй ещё раз.");
+                    ShowError(failure ?? "Не удалось сохранить снимок. Попробуй ещё раз.");
                     break;
             }
         }

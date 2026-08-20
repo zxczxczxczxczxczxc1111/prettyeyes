@@ -21,6 +21,7 @@ public sealed class AppServices : IDisposable
         IScreenCapture capture,
         IImageSink clipboard,
         IImageSink file,
+        FolderSink folder,
         INotifier notifier,
         IHotkeys hotkeys,
         ISettingsStore settingsStore,
@@ -36,6 +37,7 @@ public sealed class AppServices : IDisposable
         Capture = capture;
         Clipboard = clipboard;
         File = file;
+        Folder = folder;
         Notifier = notifier;
         Hotkeys = hotkeys;
         SettingsStore = settingsStore;
@@ -56,6 +58,9 @@ public sealed class AppServices : IDisposable
     public IImageSink Clipboard { get; }
 
     public IImageSink File { get; }
+
+    /// <summary>Silent writes into the chosen folder, when that is switched on.</summary>
+    public FolderSink Folder { get; }
 
     public INotifier Notifier { get; }
 
@@ -137,6 +142,14 @@ public sealed class AppServices : IDisposable
         var settingsStore = new JsonSettingsStore(JsonSettingsStore.DefaultPath);
         var settings = settingsStore.Load();
 
+        // Asks the finished services for the current options every time rather
+        // than capturing them: the settings window replaces the whole record on
+        // every change, and a captured copy would go stale on the first edit.
+        AppServices? built = null;
+        var folder = new FolderSink(
+            () => built?.Settings.Save ?? SaveOptions.Default,
+            () => DateTimeOffset.Now);
+
         // Built here and not lazily: the message-only window belongs to the
         // thread that creates it, and this runs on the UI thread.
         var hotkeys = new WindowsHotkeys();
@@ -157,12 +170,13 @@ public sealed class AppServices : IDisposable
             }
         }
 
-        return new AppServices(
+        built = new AppServices(
             host,
             monitors,
             CreateCapture(monitors),
             new ClipboardSink(clipboard),
             new FileSink(host.StorageProvider, () => DateTimeOffset.Now),
+            folder,
             notifier,
             hotkeys,
             settingsStore,
@@ -176,6 +190,8 @@ public sealed class AppServices : IDisposable
             RegionHotkeyRegistered = regionRegistered,
             FullScreenHotkeyRegistered = fullScreenRegistered,
         };
+
+        return built;
     }
 
     /// <summary>

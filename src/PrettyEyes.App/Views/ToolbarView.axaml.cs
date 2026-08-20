@@ -17,6 +17,7 @@ public partial class ToolbarView : UserControl
     private const string ActiveClass = "active";
 
     private ToolKind? _active;
+    private bool _saveWithDialog;
 
     public ToolbarView()
     {
@@ -42,7 +43,14 @@ public partial class ToolbarView : UserControl
         EmojiButton.Click += (_, _) => Pick(ToolKind.Emoji);
         UndoButton.Click += (_, _) => UndoClicked?.Invoke(this, EventArgs.Empty);
         CopyButton.Click += (_, _) => CopyClicked?.Invoke(this, EventArgs.Empty);
-        SaveButton.Click += (_, _) => SaveClicked?.Invoke(this, EventArgs.Empty);
+        // Shift on the save button means "ask me where", even when autosave is
+        // on. The modifier is only available on the pointer event, not on Click.
+        SaveButton.PointerPressed += (_, e) => _saveWithDialog = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        SaveButton.Click += (_, _) =>
+        {
+            SaveClicked?.Invoke(this, _saveWithDialog);
+            _saveWithDialog = false;
+        };
     }
 
     /// <summary>
@@ -55,7 +63,8 @@ public partial class ToolbarView : UserControl
 
     public event EventHandler? CopyClicked;
 
-    public event EventHandler? SaveClicked;
+    /// <summary>True when the user asked for the file dialog on purpose.</summary>
+    public event EventHandler<bool>? SaveClicked;
 
     /// <summary>Right click on a tool: its style card wants to open.</summary>
     public event EventHandler<ToolKind>? StyleRequested;

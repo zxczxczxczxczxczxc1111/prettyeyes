@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
@@ -160,6 +162,29 @@ public partial class App : Application
     /// The tray menu, rebuilt on every right click: it is a short-lived popup,
     /// and keeping one around only invites stale state.
     /// </summary>
+    /// <summary>
+    /// Opens the folder autosave writes into. Explorer, not a dialog: the point
+    /// is to see the files, not to pick one.
+    /// </summary>
+    private void OpenSnapshotFolder()
+    {
+        var folder = Services?.Settings.Save?.Folder;
+
+        if (string.IsNullOrWhiteSpace(folder))
+        {
+            return;
+        }
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(folder) { UseShellExecute = true });
+        }
+        catch (Exception error) when (error is Win32Exception or FileNotFoundException)
+        {
+            Log.Default.Error("не удалось открыть папку снимков", error);
+        }
+    }
+
     private void ShowTrayMenu()
     {
         if (Services is null || _menu is not null)
@@ -172,12 +197,16 @@ public partial class App : Application
         var monitor = layout.MonitorAt(x, y) ?? layout.Monitors[0];
 
         _menu = new TrayMenuWindow();
+        _menu.ShowFolderEntry(Services.Settings.Save?.Ready == true);
         _menu.Picked += (_, choice) =>
         {
             switch (choice)
             {
                 case TrayMenuChoice.Capture:
                     StartCapture();
+                    break;
+                case TrayMenuChoice.OpenFolder:
+                    OpenSnapshotFolder();
                     break;
                 case TrayMenuChoice.Settings:
                     OpenSettings();

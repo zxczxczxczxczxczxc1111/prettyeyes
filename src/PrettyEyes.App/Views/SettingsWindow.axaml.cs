@@ -6,6 +6,8 @@ using Avalonia.Threading;
 using PrettyEyes.App.Controls;
 using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Platform;
+using Avalonia.Platform.Storage;
+using PrettyEyes.Core.Rendering;
 using PrettyEyes.Core.Settings;
 using PrettyEyes.Platform.Windows;
 
@@ -78,6 +80,13 @@ public partial class SettingsWindow : Window
         ShowMagnifier.IsChecked = settings.ShowMagnifier;
         MagnifierGrid.IsChecked = settings.MagnifierGrid;
         MagnifierGrid.IsEnabled = settings.ShowMagnifier;
+
+        var save = settings.Save ?? SaveOptions.Default;
+        Autosave.IsChecked = save.Enabled;
+        SaveFolder.Text = save.Folder;
+        SaveTemplate.Text = save.Template;
+        ShowAutosaveState(save.Enabled);
+        ShowExample();
         _loading = false;
 
         RegionHotkey.HotkeyChanged += (_, hotkey) => Apply(HotkeyAction.Region, hotkey);
@@ -85,6 +94,9 @@ public partial class SettingsWindow : Window
         Autostart.IsCheckedChanged += OnAutostartChanged;
         ShowMagnifier.IsCheckedChanged += OnMagnifierChanged;
         MagnifierGrid.IsCheckedChanged += OnMagnifierGridChanged;
+        Autosave.IsCheckedChanged += OnAutosaveChanged;
+        SaveTemplate.TextChanged += OnTemplateChanged;
+        PickFolder.Click += OnPickFolder;
 
         if (!regionRegistered || !fullScreenRegistered)
         {
@@ -159,6 +171,85 @@ public partial class SettingsWindow : Window
         Store(_settings with { ShowMagnifier = enabled });
         MagnifierChanged?.Invoke(this, enabled);
     }
+
+    /// <summary>
+    /// Switched off, the group stays where it is, greyed out. Hiding it would
+    /// mean looking for a setting that is not on the screen.
+    /// </summary>
+    private void ShowAutosaveState(bool enabled)
+    {
+        AutosaveOptions.IsEnabled = enabled;
+        AutosaveOptions.Opacity = enabled ? 1 : 0.4;
+    }
+
+    private void ShowExample() =>
+        SaveExample.Text = "например: " + FileNameTemplate.Format(SaveTemplate.Text ?? string.Empty, DateTimeOffset.Now);
+
+    private void OnAutosaveChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        var enabled = Autosave.IsChecked == true;
+        ShowAutosaveState(enabled);
+        StoreSave(save => save with { Enabled = enabled });
+    }
+
+    private void OnTemplateChanged(object? sender, Avalonia.Controls.TextChangedEventArgs e)
+    {
+        ShowExample();
+
+        if (_loading)
+        {
+            return;
+        }
+
+        StoreSave(save => save with { Template = SaveTemplate.Text ?? string.Empty });
+    }
+
+    /// <summary>
+    /// The folder is checked the moment it is picked, not when a screenshot is
+    /// waiting on it: a disconnected network drive answers slowly, and that is
+    /// not a delay to discover mid-capture.
+    /// </summary>
+    private async void OnPickFolder(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        try
+        {
+            var picked = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = "Куда сохранять снимки",
+                AllowMultiple = false,
+            });
+
+            var folder = picked.FirstOrDefault()?.TryGetLocalPath();
+
+            if (string.IsNullOrWhiteSpace(folder))
+            {
+                return;
+            }
+
+            if (!FolderSink.CanWrite(folder))
+            {
+                ShowFailure("В эту папку нельзя писать. Выбери другую.");
+                return;
+            }
+
+            SaveFolder.Text = folder;
+            HideMessage();
+            StoreSave(save => save with { Folder = folder });
+        }
+        catch (Exception error)
+        {
+            Log.Default.Error("не удалось выбрать папку", error);
+            ShowFailure("Не удалось открыть выбор папки.");
+        }
+    }
+
+    private void StoreSave(Func<SaveOptions, SaveOptions> change) =>
+        Store(_settings with { Save = change(_settings.Save ?? SaveOptions.Default) });
 
     private void OnMagnifierGridChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
