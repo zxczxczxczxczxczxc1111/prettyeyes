@@ -6,7 +6,11 @@ using Avalonia.Threading;
 using PrettyEyes.App.Controls;
 using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Platform;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform.Storage;
+using PrettyEyes.Core.Geometry;
+using PrettyEyes.Core.Model;
+using SkiaSharp;
 using PrettyEyes.Core.Rendering;
 using PrettyEyes.Core.Settings;
 using PrettyEyes.Platform.Windows;
@@ -25,6 +29,7 @@ public partial class SettingsWindow : Window
     private IAutostart? _autostart;
 
     private AppSettings _settings = AppSettings.Default;
+    private ExportStyle _export = ExportStyle.None;
     private bool _loading;
 
     /// <summary>
@@ -87,6 +92,12 @@ public partial class SettingsWindow : Window
         SaveTemplate.Text = save.Template;
         ShowAutosaveState(save.Enabled);
         ShowExample();
+
+        _export = settings.Export ?? ExportStyle.None;
+        ExportEnabled.IsChecked = _export.Enabled;
+        ExportShadow.IsChecked = _export.Shadow;
+        BuildExportRows();
+        ShowExportState(_export.Enabled);
         _loading = false;
 
         RegionHotkey.HotkeyChanged += (_, hotkey) => Apply(HotkeyAction.Region, hotkey);
@@ -97,6 +108,8 @@ public partial class SettingsWindow : Window
         Autosave.IsCheckedChanged += OnAutosaveChanged;
         SaveTemplate.TextChanged += OnTemplateChanged;
         PickFolder.Click += OnPickFolder;
+        ExportEnabled.IsCheckedChanged += (_, _) => ApplyExport(_export with { Enabled = ExportEnabled.IsChecked == true });
+        ExportShadow.IsCheckedChanged += (_, _) => ApplyExport(_export with { Shadow = ExportShadow.IsChecked == true });
 
         if (!regionRegistered || !fullScreenRegistered)
         {
@@ -246,6 +259,128 @@ public partial class SettingsWindow : Window
             Log.Default.Error("не удалось выбрать папку", error);
             ShowFailure("Не удалось открыть выбор папки.");
         }
+    }
+
+    /// <summary>
+    /// Padding, backdrop and rounding as rows of small buttons. Built in code
+    /// because they are three of the same thing, and three copies of the same
+    /// markup would drift apart.
+    /// </summary>
+    private void BuildExportRows()
+    {
+        PaddingRow.Children.Clear();
+        BackgroundRow.Children.Clear();
+        RadiusRow.Children.Clear();
+
+        foreach (var (label, value) in new (string, int)[] { ("нет", 0), ("24", 24), ("48", 48), ("72", 72) })
+        {
+            PaddingRow.Children.Add(NewChoice(label, _export.Padding == value, () =>
+                ApplyExport(_export with { Padding = value })));
+        }
+
+        foreach (var (label, value) in new (string, ExportBackground)[]
+        {
+            ("чёрный", ExportBackground.Black),
+            ("градиент", ExportBackground.Gradient),
+            ("белый", ExportBackground.White),
+            ("прозрачный", ExportBackground.Transparent),
+        })
+        {
+            BackgroundRow.Children.Add(NewChoice(label, _export.Background == value, () =>
+                ApplyExport(_export with { Background = value })));
+        }
+
+        foreach (var value in new[] { 0, 8, 16 })
+        {
+            RadiusRow.Children.Add(NewChoice(value == 0 ? "нет" : value.ToString(), _export.CornerRadius == value, () =>
+                ApplyExport(_export with { CornerRadius = value })));
+        }
+
+        // A shadow with no padding falls outside the picture, so the switch
+        // says so instead of doing nothing.
+        ExportShadow.IsEnabled = _export.ShadowAllowed;
+        ExportShadow.IsChecked = _export.Shadow && _export.ShadowAllowed;
+    }
+
+    private Button NewChoice(string label, bool active, Action pick)
+    {
+        var button = new Button { Content = label };
+
+        button.Classes.Add("choice");
+
+        if (active)
+        {
+            button.Classes.Add("active");
+        }
+
+        button.Click += (_, _) => pick();
+
+        return button;
+    }
+
+    private void ApplyExport(ExportStyle style)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        _export = style with { Shadow = style.Shadow && style.ShadowAllowed };
+
+        ShowExportState(_export.Enabled);
+        BuildExportRows();
+        ShowPreview();
+        Store(_settings with { Export = _export });
+    }
+
+    private void ShowExportState(bool enabled)
+    {
+        ExportOptions.IsEnabled = enabled;
+        ExportOptions.Opacity = enabled ? 1 : 0.4;
+
+        if (enabled)
+        {
+            ShowPreview();
+        }
+    }
+
+    /// <summary>
+    /// A sample screenshot run through the real renderer. Anything else would
+    /// be a drawing of what the export might look like.
+    /// </summary>
+    private void ShowPreview()
+    {
+        using var sample = SampleShot();
+        using var document = new Document(sample, new CaptureRect(0, 0, 320, 200))
+        {
+            Selection = new CaptureRect(0, 0, 320, 200),
+        };
+
+        using var rendered = DocumentRenderer.Render(document, _export);
+        using var data = rendered.Encode(SKEncodedImageFormat.Png, 90);
+        using var stream = new MemoryStream(data.ToArray());
+
+        ExportPreview.Source = new Bitmap(stream);
+    }
+
+    private static SKImage SampleShot()
+    {
+        using var surface = SKSurface.Create(new SKImageInfo(320, 200));
+        var canvas = surface.Canvas;
+
+        canvas.Clear(new SKColor(0x14, 0x14, 0x18));
+
+        using var line = new SKPaint { Color = new SKColor(0x33, 0x33, 0x3A), StrokeWidth = 8 };
+
+        for (var y = 40; y < 200; y += 32)
+        {
+            canvas.DrawLine(24, y, y < 120 ? 296 : 200, y, line);
+        }
+
+        using var accent = new SKPaint { Color = new SKColor(0xB0, 0x10, 0x30), StrokeWidth = 8 };
+        canvas.DrawLine(24, 24, 120, 24, accent);
+
+        return surface.Snapshot();
     }
 
     private void StoreSave(Func<SaveOptions, SaveOptions> change) =>

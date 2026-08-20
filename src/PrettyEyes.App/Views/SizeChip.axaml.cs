@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Media.Transformation;
 using PrettyEyes.Core.Geometry;
+using PrettyEyes.Core.Rendering;
 
 namespace PrettyEyes.App.Views;
 
@@ -12,8 +13,19 @@ public partial class SizeChip : UserControl
 {
     public SizeChip() => InitializeComponent();
 
-    public void Update(CaptureRect selection) =>
-        Label.Text = $"{selection.Width} x {selection.Height}";
+    /// <summary>
+    /// The selection, and where the export style is on, what the file will
+    /// actually be: promising 1200 x 800 and writing 1296 x 896 is a small lie
+    /// that costs somebody a re-crop.
+    /// </summary>
+    public void Update(CaptureRect selection, ExportStyle? style = null)
+    {
+        var fitted = (style ?? ExportStyle.None).FitTo(selection.Width, selection.Height);
+
+        Label.Text = fitted.Enabled && fitted.Padding > 0
+            ? $"{selection.Width} x {selection.Height} -> {selection.Width + (fitted.Padding * 2)} x {selection.Height + (fitted.Padding * 2)}"
+            : $"{selection.Width} x {selection.Height}";
+    }
 
     public void FadeIn()
     {

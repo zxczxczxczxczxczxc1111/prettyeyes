@@ -115,6 +115,31 @@
     <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
   </Style>
 
+  <!-- One of several: padding, backdrop, rounding. Reads as a row of options
+       where exactly one is on. -->
+  <Style Selector=":is(Button).choice">
+    <Setter Property="Background" Value="{StaticResource Fill}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+    <Setter Property="Padding" Value="10,6"/>
+    <Setter Property="FontSize" Value="12"/>
+  </Style>
+
+  <Style Selector=":is(Button).choice:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource FillHover}"/>
+  </Style>
+
+  <Style Selector=":is(Button).choice.active">
+    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}"/>
+  </Style>
+
+  <Style Selector=":is(Button).choice.active /template/ ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource FillHover}"/>
+  </Style>
+
   <!-- A text field that looks like the hotkey field next to it: same fill,
        same hairline, same radius. The default Avalonia box brings its own
        light theme with it. -->

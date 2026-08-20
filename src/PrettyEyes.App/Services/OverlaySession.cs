@@ -78,6 +78,7 @@ public sealed class OverlaySession
 
             window.SetMagnifierEnabled(_services.Settings.ShowMagnifier);
             window.SetMagnifierGrid(_services.Settings.MagnifierGrid);
+            window.SetExportStyle(_services.Settings.Export ?? ExportStyle.None);
             window.PlaceOn(capture.Layout.Monitors[i], Document);
         }
 
@@ -426,7 +427,17 @@ public sealed class OverlaySession
 
         try
         {
-            using var image = DocumentRenderer.Render(Document);
+            // The clipboard gets the shot on a solid background even when the
+            // export is transparent: the DIB format on the clipboard carries no
+            // alpha, and half the applications paste the DIB.
+            var style = _services.Settings.Export ?? ExportStyle.None;
+            var forClipboard = ReferenceEquals(sink, _services.Clipboard)
+                && style is { Enabled: true, Background: ExportBackground.Transparent };
+
+            using var image = DocumentRenderer.Render(
+                Document,
+                forClipboard ? style with { Background = ExportBackground.Black } : style);
+
             var result = await sink.SendAsync(image, CancellationToken.None);
 
             switch (result)

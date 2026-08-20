@@ -47,6 +47,14 @@ public partial class App : Application
             // A capture taken before the monitors moved is worthless: the frame
             // and the coordinates no longer describe the same desktop.
             Services.WarmCapture();
+
+            // Started with --settings the window opens right away. Useful for a
+            // shortcut, and the only way to reach the settings without hunting
+            // for the tray icon.
+            if (desktop.Args?.Contains("--settings") == true)
+            {
+                Dispatcher.UIThread.Post(OpenSettings, DispatcherPriority.Background);
+            }
             Services.Hotkeys.DisplayChanged += (_, _) => Dispatcher.UIThread.Post(OnDisplayChanged);
 
             // WM_DISPLAYCHANGE covers a resolution change, but not a monitor
@@ -147,9 +155,24 @@ public partial class App : Application
         var monitor = capture.Layout.MonitorAt(x, y) ?? capture.Layout.Monitors[0];
         document.Selection = monitor.Bounds;
 
-        using var image = DocumentRenderer.Render(document);
+        var style = Services.Settings.Export ?? ExportStyle.None;
+        var transparent = style is { Enabled: true, Background: ExportBackground.Transparent };
+
+        // The clipboard gets a solid background even when the export is
+        // transparent: the DIB on the clipboard carries no alpha.
+        using var image = DocumentRenderer.Render(
+            document,
+            transparent ? style with { Background = ExportBackground.Black } : style);
 
         var result = await Services.Clipboard.SendAsync(image, CancellationToken.None);
+
+        // Autosave applies here too: the point of the setting is that a
+        // screenshot ends up in the folder, whichever way it was taken.
+        if (Services.Settings.Save?.Ready == true)
+        {
+            using var forFile = DocumentRenderer.Render(document, style);
+            await Services.Folder.SendAsync(forFile, CancellationToken.None);
+        }
 
         Services.Notifier.Notify(
             "prettyeyes",

@@ -4,6 +4,7 @@ using Avalonia.Input;
 using Avalonia.Media;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
+using PrettyEyes.Core.Rendering;
 using PrettyEyes.Core.Tools;
 using PrettyEyes.Platform.Windows;
 using CaptureRect = PrettyEyes.Core.Geometry.CaptureRect;
@@ -47,6 +48,7 @@ public partial class OverlayWindow : Window
     private OverlayMode _mode = OverlayMode.Selecting;
     private Size? _toolbarSize;
     private bool _magnifierWanted = true;
+    private ExportStyle? _export;
     private ITool? _tool;
 
     public OverlayWindow() => InitializeComponent();
@@ -166,6 +168,9 @@ public partial class OverlayWindow : Window
 
     /// <summary>The pixel grid inside the magnifier, on or off.</summary>
     public void SetMagnifierGrid(bool grid) => Surface.MagnifierGrid = grid;
+
+    /// <summary>The export style, so the size chip can tell the truth.</summary>
+    public void SetExportStyle(ExportStyle style) => _export = style;
 
     /// <summary>
     /// Aims the magnifier, or takes it away. It has no business being up while
@@ -421,7 +426,7 @@ public partial class OverlayWindow : Window
         // The renderer crops the selection to the captured frame, so the chip
         // has to show the cropped size or it promises pixels that never arrive.
         var visible = selection.Intersect(_frameBounds);
-        Chip.Update(visible.IsEmpty ? selection : visible);
+        Chip.Update(visible.IsEmpty ? selection : visible, _export);
         Chip.IsVisible = true;
 
         // The chip does change width with the number it shows, so it is

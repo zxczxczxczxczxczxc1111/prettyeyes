@@ -1,5 +1,6 @@
 using System.Text.Json;
 using PrettyEyes.Core.Platform;
+using PrettyEyes.Core.Rendering;
 
 namespace PrettyEyes.Core.Settings;
 
@@ -83,6 +84,10 @@ public sealed class JsonSettingsStore : ISettingsStore
         // Schema 6 added the folder autosave, off by default: a screenshot tool
         // writing files into a folder nobody chose is a surprise.
         Save = stored.Save ?? SaveOptions.Default,
+
+        // Schema 7 added the export frame, off by default: a screenshot that
+        // silently grows a border is not the screenshot that was taken.
+        Export = stored.Export ?? ExportStyle.None,
         SchemaVersion = AppSettings.CurrentSchema,
     };
 
