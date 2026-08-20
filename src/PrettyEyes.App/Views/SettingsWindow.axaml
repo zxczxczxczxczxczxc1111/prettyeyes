@@ -53,6 +53,15 @@
               </StackPanel>
 
               <StackPanel Spacing="8">
+                <TextBlock Text="Курсор" Foreground="{StaticResource Text}"/>
+                <TextBlock Text="Вид указателя при выделении. Светлеет на тёмном и темнеет на светлом."
+                           Foreground="{StaticResource TextFaint}" FontSize="11" TextWrapping="Wrap"/>
+                <!-- Filled from code: the shapes are the same strings the
+                     cursors themselves are drawn from. -->
+                <StackPanel x:Name="CursorRow" Orientation="Horizontal" Spacing="8"/>
+              </StackPanel>
+
+              <StackPanel Spacing="8">
                 <TextBlock Text="Лупа" Foreground="{StaticResource Text}"/>
                 <TextBlock Text="Увеличение под курсором, пока идёт выделение. Наведи, чтобы прочитать название."
                            Foreground="{StaticResource TextFaint}" FontSize="11" TextWrapping="Wrap"/>

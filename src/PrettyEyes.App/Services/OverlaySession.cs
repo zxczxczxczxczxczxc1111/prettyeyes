@@ -84,6 +84,7 @@ public sealed class OverlaySession
 
             window.PointerSeen += OnPointerSeen;
             window.ColourRequested += OnColourRequested;
+            window.SetCursorStyle(_services.Settings.Cursor);
             window.SetMagnifierEnabled(_services.Settings.ShowMagnifier);
             window.SetMagnifierGrid(_services.Settings.MagnifierGrid);
             window.SetExportStyle(_services.Settings.Export ?? ExportStyle.None);

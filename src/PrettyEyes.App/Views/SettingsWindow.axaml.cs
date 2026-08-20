@@ -103,6 +103,7 @@ public partial class SettingsWindow : Window
 
         _tools = new ToolVisibility(settings.Tools);
         BuildToolRow();
+        BuildCursorRow();
 
         CheckUpdates.IsChecked = settings.CheckUpdates;
         CurrentVersion.Text = $"установлена {UpdateService.Current}";
@@ -142,6 +143,73 @@ public partial class SettingsWindow : Window
             ShowWarning("Комбинация занята другой программой. Выбери другую.");
         }
     }
+
+    /// <summary>
+    /// One button per cursor shape, drawn from the same outline the cursor
+    /// itself is drawn from.
+    /// </summary>
+    private void BuildCursorRow()
+    {
+        CursorRow.Children.Clear();
+
+        foreach (var style in Crosshair.All)
+        {
+            var button = new Button
+            {
+                Tag = style,
+                Content = new Avalonia.Controls.Shapes.Path
+                {
+                    Data = Avalonia.Media.Geometry.Parse(Crosshair.Icon(style)),
+                },
+            };
+
+            button.Classes.Add("toolpick");
+            ToolTip.SetTip(button, CursorName(style));
+            button.Click += OnCursorPicked;
+
+            CursorRow.Children.Add(button);
+        }
+
+        ShowCursorRow();
+    }
+
+    private void ShowCursorRow()
+    {
+        foreach (var child in CursorRow.Children)
+        {
+            if (child is not Button button || button.Tag is not CursorStyle style)
+            {
+                continue;
+            }
+
+            button.Classes.Remove("active");
+
+            if (style == _settings.Cursor)
+            {
+                button.Classes.Add("active");
+            }
+        }
+    }
+
+    private void OnCursorPicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_loading || sender is not Button button || button.Tag is not CursorStyle style)
+        {
+            return;
+        }
+
+        Store(_settings with { Cursor = style });
+        ShowCursorRow();
+    }
+
+    private static string CursorName(CursorStyle style) => style switch
+    {
+        CursorStyle.Cross => "Крест",
+        CursorStyle.Gap => "Крест с просветом",
+        CursorStyle.Dot => "Точка",
+        CursorStyle.Scope => "Прицел",
+        _ => "Обычный указатель",
+    };
 
     /// <summary>
     /// One checkbox per tool, named the way the toolbar tooltip names it.

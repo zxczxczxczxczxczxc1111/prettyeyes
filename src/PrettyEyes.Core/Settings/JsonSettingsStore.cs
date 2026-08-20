@@ -97,6 +97,9 @@ public sealed class JsonSettingsStore : ISettingsStore
         // Schema 9 let the toolbar be cut down. Nothing recorded means nothing
         // was turned off, which is every tool shown.
         Tools = stored.Tools ?? [],
+
+        // Schema 10 added the cursor. A missing enum reads as its first value,
+        // which is the crosshair everyone had until now, so nothing to do.
         SchemaVersion = AppSettings.CurrentSchema,
     };
 

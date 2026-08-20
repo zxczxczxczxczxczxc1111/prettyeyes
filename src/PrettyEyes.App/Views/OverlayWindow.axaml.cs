@@ -6,6 +6,7 @@ using Avalonia.Threading;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Rendering;
+using PrettyEyes.Core.Settings;
 using PrettyEyes.Core.Tools;
 using PrettyEyes.Platform.Windows;
 using CaptureRect = PrettyEyes.Core.Geometry.CaptureRect;
@@ -30,11 +31,7 @@ public partial class OverlayWindow : Window
 
     // A Cursor owns a native handle. Building one per mouse move burns handles
     // and hands back the same arrow anyway.
-    /// <summary>
-    /// Kept for the moments the pointer is not over the captured frame and
-    /// there is nothing to judge the colour against.
-    /// </summary>
-    private static readonly Cursor Cross = new(StandardCursorType.Cross);
+
     private static readonly Cursor Corner = new(StandardCursorType.TopLeftCorner);
     private static readonly Cursor AntiCorner = new(StandardCursorType.TopRightCorner);
     private static readonly Cursor WestEast = new(StandardCursorType.SizeWestEast);
@@ -52,6 +49,8 @@ public partial class OverlayWindow : Window
 
     /// <summary>The document, for finding what is under the pointer.</summary>
     private Document? _document;
+
+    private CursorStyle _cursorStyle = CursorStyle.Cross;
 
     /// <summary>The glyph being carried, and where it was picked up.</summary>
     private IMovable? _moving;
@@ -232,6 +231,9 @@ public partial class OverlayWindow : Window
             HideMagnifier();
         }
     }
+
+    /// <summary>The shape the pointer takes while aiming.</summary>
+    public void SetCursorStyle(CursorStyle style) => _cursorStyle = style;
 
     /// <summary>The pixel grid inside the magnifier, on or off.</summary>
     public void SetMagnifierGrid(bool grid) => Surface.MagnifierGrid = grid;
@@ -791,8 +793,7 @@ public partial class OverlayWindow : Window
     /// screenshot, dark on a light one. The pixel is already being sampled for
     /// the magnifier, so this costs a comparison.
     /// </summary>
-    private Cursor Aim(int x, int y) =>
-        Surface.ColorAt(x, y) is { } colour ? Crosshair.For(colour) : Cross;
+    private Cursor Aim(int x, int y) => Crosshair.For(_cursorStyle, Surface.ColorAt(x, y));
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
