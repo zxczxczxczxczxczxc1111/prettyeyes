@@ -345,7 +345,6 @@ public partial class SettingsWindow : Window
 
         Store(_settings with { ShowMagnifier = shown, MagnifierGrid = grid });
         ShowMagnifierRow();
-        MagnifierChanged?.Invoke(this, shown);
     }
 
     private void ShowMagnifierRow()
@@ -567,9 +566,6 @@ public partial class SettingsWindow : Window
     private void StoreSave(Func<SaveOptions, SaveOptions> change) =>
         Store(_settings with { Save = change(_settings.Save ?? SaveOptions.Default) });
 
-    /// <summary>The overlay has to hear about this without waiting for a restart.</summary>
-    public event EventHandler<bool>? MagnifierChanged;
-
     private void OnAutostartChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         if (_loading || _autostart is null)
@@ -592,9 +588,17 @@ public partial class SettingsWindow : Window
         ShowFailure("Не удалось изменить автозапуск.");
     }
 
+    /// <summary>
+    /// Something was changed. Raised on every edit rather than on close: this
+    /// window is left open while the next screenshot is taken, and a setting
+    /// that waits for the window to shut is a setting that did not work.
+    /// </summary>
+    public event EventHandler<AppSettings>? Changed;
+
     private void Store(AppSettings settings)
     {
         _settings = settings;
+        Changed?.Invoke(this, settings);
 
         // A setting that looks applied but was never written down comes back
         // wrong after a restart, and nobody connects that to this moment.

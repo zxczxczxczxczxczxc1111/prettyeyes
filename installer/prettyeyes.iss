@@ -1,7 +1,7 @@
 ﻿; prettyeyes installer. Per-user install: a tray utility has no business
 ; asking for administrator rights.
 #define AppName "prettyeyes"
-#define AppVersion "1.0.1"
+#define AppVersion "1.1.0"
 #define AppExe "PrettyEyes.App.exe"
 #define AppId "{{8E5C1F42-4E2B-4E4A-9E4B-4B6E4B0A7D31}"
 #define PublishDir "..\src\PrettyEyes.App\bin\Release\net10.0-windows10.0.22621.0\win-x64\publish"

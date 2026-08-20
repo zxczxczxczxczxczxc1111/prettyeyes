@@ -317,6 +317,10 @@ public partial class App : Application
             Services.Updates,
             InstallUpdateAsync);
 
+        // Applied the moment it changes, not when the window shuts: the
+        // settings window stays open while the next screenshot is taken.
+        _settings.Changed += (_, settings) => Services.Settings = settings;
+
         _settings.Closed += (_, _) =>
         {
             if (_settings is not null)
