@@ -41,6 +41,7 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
     private readonly IDirect3DDevice _winrtDevice;
     private readonly Dictionary<IntPtr, MonitorCapture> _captures = [];
     private readonly MtaWorker _worker = new();
+    private readonly FrameBuffers _buffers = new();
 
     /// <summary>
     /// Where the per-step timings go. Null in the application: the numbers are
@@ -104,11 +105,16 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
 
         var handles = Win32MonitorEnumerator.Handles();
 
-        // One buffer for the whole desktop, handed over to Skia at the end. It
-        // is allocated per capture rather than pooled because the image outlives
-        // the call: the overlay keeps it until the capture is done with.
+        // One buffer for the whole desktop, handed over to Skia at the end and
+        // taken back here when the image dies.
         var stride = bounds.Width * 4;
-        var frame = Step("alloc", () => Allocate(bounds, layout, stride));
+        var size = (nuint)((long)stride * bounds.Height);
+
+        // Zeroed only when the monitors do not tile the virtual desktop
+        // exactly: on a plain side-by-side setup every byte is overwritten
+        // anyway, and clearing 28 MB is not free.
+        var covered = layout.Monitors.Sum(monitor => (long)monitor.Bounds.Width * monitor.Bounds.Height);
+        var frame = Step("alloc", () => _buffers.Rent(size, zeroed: covered < (long)bounds.Width * bounds.Height));
 
         try
         {
@@ -131,7 +137,7 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
         }
         catch (AggregateException error)
         {
-            NativeMemory.Free((void*)frame);
+            _buffers.Return(frame, size);
 
             // One monitor failing is the whole capture failing; the first
             // reason is the useful one.
@@ -139,7 +145,7 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
         }
         catch
         {
-            NativeMemory.Free((void*)frame);
+            _buffers.Return(frame, size);
             throw;
         }
 
@@ -150,7 +156,7 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
         // one 28 MB copy less on every capture.
         using var pixmap = new SKPixmap(info, frame, stride);
 
-        var image = Step("image", () => SKImage.FromPixels(pixmap, Release, null))
+        var image = Step("image", () => SKImage.FromPixels(pixmap, (address, _) => _buffers.Return(address, size), null))
             ?? throw new InvalidOperationException("Skia rejected the captured pixel buffer.");
 
         return new CaptureResult(image, layout);
@@ -166,6 +172,7 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
         _disposed = true;
 
         _worker.Dispose();
+        _buffers.Dispose();
 
         lock (_captures)
         {
@@ -180,24 +187,6 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
         _winrtDevice.Dispose();
         _context.Dispose();
         _device.Dispose();
-    }
-
-    private static void Release(IntPtr address, object context) => NativeMemory.Free((void*)address);
-
-    /// <summary>
-    /// The desktop buffer. Zeroed only when the monitors do not tile the virtual
-    /// desktop exactly: on a plain side-by-side setup every byte is overwritten
-    /// anyway, and zeroing 28 MB is not free.
-    /// </summary>
-    private static IntPtr Allocate(CaptureRect bounds, DesktopLayout layout, int stride)
-    {
-        var size = (nuint)((long)stride * bounds.Height);
-        var covered = layout.Monitors.Sum(monitor => (long)monitor.Bounds.Width * monitor.Bounds.Height);
-        var whole = (long)bounds.Width * bounds.Height;
-
-        return covered >= whole
-            ? (IntPtr)NativeMemory.Alloc(size)
-            : (IntPtr)NativeMemory.AllocZeroed(size);
     }
 
     /// <summary>Times one step and reports it, when anyone is listening.</summary>
@@ -244,9 +233,7 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
     }
 
     /// <summary>
-    /// Frame texture to desktop buffer, one pass. The staging texture is mapped
-    /// read-only, so the missing alpha cannot be fixed in place: it rides along
-    /// with the copy instead of costing a second pass over 28 MB.
+    /// Frame texture to desktop buffer, one copy per row and nothing more.
     /// </summary>
     private void CopyPixels(Direct3D11CaptureFrame frame, CaptureRect monitorBounds, IntPtr destination, int stride)
     {
@@ -302,16 +289,22 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
 
             Step("rows", () =>
             {
+                // Rows straight across, nothing else.
+                //
+                // The alpha byte is left exactly as the capture delivered it,
+                // which is usually zero: Skia ignores it entirely for an image
+                // declared SKAlphaType.Opaque. That was checked rather than
+                // assumed - the encoded PNG comes out with alpha 255 either
+                // way. Fixing it by hand cost a pass over 3.7 million pixels
+                // per monitor for nothing.
+                var bytes = (nuint)(width * 4);
+
                 for (var row = 0; row < height; row++)
                 {
-                    var from = new ReadOnlySpan<uint>((void*)(origin + (row * pitch)), width);
-                    var to = new Span<uint>((void*)(destination + (row * (nint)stride)), width);
-
-                    for (var x = 0; x < width; x++)
-                    {
-                        // The desktop is opaque; the capture leaves alpha unset.
-                        to[x] = from[x] | 0xFF000000;
-                    }
+                    NativeMemory.Copy(
+                        (void*)(origin + (row * pitch)),
+                        (void*)(destination + (row * (nint)stride)),
+                        bytes);
                 }
 
                 return 0;

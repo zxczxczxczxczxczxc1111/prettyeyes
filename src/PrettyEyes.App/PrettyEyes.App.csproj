@@ -6,6 +6,11 @@
     <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\prettyeyes.ico</ApplicationIcon>
+    <!-- The pixel copy is a tight loop over 3.7 million pixels, and the quick
+         JIT compiles it without optimisations the first few times: measured 61
+         ms against 15 ms once the real compiler caught up. Nothing here starts
+         fast enough for that trade to be worth it. -->
+    <TieredCompilationQuickJitForLoops>false</TieredCompilationQuickJitForLoops>
   </PropertyGroup>
 
   <ItemGroup>

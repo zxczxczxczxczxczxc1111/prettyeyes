@@ -82,8 +82,21 @@ public sealed class AppServices : IDisposable
     /// </summary>
     private static IScreenCapture CreateCapture(IMonitorEnumerator monitors) =>
         WgcScreenCapture.IsSupported
-            ? new WgcScreenCapture(monitors)
+            ? new WgcScreenCapture(monitors, ReportSlowStep)
             : new GdiScreenCapture(monitors);
+
+    /// <summary>
+    /// Only the steps that took long enough to notice. A line per step per
+    /// capture would bury the log; a capture that suddenly costs three times
+    /// its usual is exactly what the log is for.
+    /// </summary>
+    private static void ReportSlowStep(string step, double milliseconds)
+    {
+        if (milliseconds >= 15)
+        {
+            Log.Default.Info($"снимок, шаг {step}: {milliseconds:F1} мс");
+        }
+    }
 
     /// <summary>Last known settings; the settings window updates them.</summary>
     public AppSettings Settings { get; set; }
