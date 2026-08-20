@@ -1,3 +1,4 @@
+using Avalonia.Threading;
 using PrettyEyes.App.Views;
 using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Geometry;
@@ -16,9 +17,23 @@ namespace PrettyEyes.App.Services;
 /// </summary>
 public sealed class OverlayWindowPool
 {
+    /// <summary>
+    /// How long an emptied window stays on screen before it is hidden. Three
+    /// frames at 60 Hz, spent by a window that draws nothing at all, against a
+    /// visible flash of the previous capture at the start of the next one.
+    /// </summary>
+    private static readonly TimeSpan BlankDelay = TimeSpan.FromMilliseconds(50);
+
     private readonly List<OverlayWindow> _windows = [];
+    private readonly DispatcherTimer _blank;
 
     private bool _warm;
+
+    public OverlayWindowPool()
+    {
+        _blank = new DispatcherTimer { Interval = BlankDelay };
+        _blank.Tick += HideBlanked;
+    }
 
     /// <summary>
     /// Builds the windows and pays the one-off cost while nobody is waiting.
@@ -41,6 +56,11 @@ public sealed class OverlayWindowPool
     /// <summary>The windows for this capture, one per monitor, hidden.</summary>
     public IReadOnlyList<OverlayWindow> Take(DesktopLayout layout)
     {
+        // A capture that comes in before the windows were hidden finds them
+        // already empty and simply fills them again; what it must not do is
+        // leave a hide pending over the overlay it is about to open.
+        _blank.Stop();
+
         if (!_warm)
         {
             Warm(layout.Monitors.Count);
@@ -54,11 +74,33 @@ public sealed class OverlayWindowPool
     }
 
     /// <summary>Hides the windows and forgets the capture they were showing.</summary>
+    /// <summary>
+    /// Emptied now, hidden a moment later.
+    ///
+    /// A hidden window keeps whatever was last composited into it, and nothing
+    /// can repaint it while it is hidden. Clearing and hiding in the same breath
+    /// therefore stores the frame that still has the old capture and the old
+    /// selection frame on it, and that is what flashes at the start of the next
+    /// capture. Cleared while still on screen, the stored frame is the empty
+    /// one, and an empty overlay is invisible.
+    /// </summary>
     public void Release()
     {
         foreach (var window in _windows)
         {
             window.Reset();
+        }
+
+        _blank.Stop();
+        _blank.Start();
+    }
+
+    private void HideBlanked(object? sender, EventArgs e)
+    {
+        _blank.Stop();
+
+        foreach (var window in _windows)
+        {
             window.Hide();
         }
     }

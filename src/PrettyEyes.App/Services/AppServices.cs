@@ -132,8 +132,6 @@ public sealed class AppServices : IDisposable
 
         var monitors = new Win32MonitorEnumerator();
 
-        var clipboard = host.Clipboard
-            ?? throw new InvalidOperationException("The host window exposes no clipboard.");
 
         // Our own tray icon: Avalonia's only comes with a native menu, and a
         // native menu cannot be made to look like the rest of the app.
@@ -192,7 +190,7 @@ public sealed class AppServices : IDisposable
             host,
             monitors,
             CreateCapture(monitors),
-            new ClipboardSink(clipboard),
+            new WindowsClipboard(),
             new FileSink(host.StorageProvider, () => DateTimeOffset.Now),
             folder,
             notifier,
