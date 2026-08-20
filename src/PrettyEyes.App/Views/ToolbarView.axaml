@@ -3,6 +3,11 @@
              x:Class="PrettyEyes.App.Views.ToolbarView">
   <UserControl.Styles>
     <Style Selector="Button.tool">
+      <!-- The toolbar never takes the keyboard. A focused button swallowed the
+           bare C that reads a colour, and left a focus ring on a tool the
+           pointer had already moved away from. Every action here has a key of
+           its own on the window, so nothing is lost by not being tabbable. -->
+      <Setter Property="Focusable" Value="False"/>
       <Setter Property="Width" Value="32"/>
       <Setter Property="Height" Value="32"/>
       <Setter Property="Background" Value="Transparent"/>

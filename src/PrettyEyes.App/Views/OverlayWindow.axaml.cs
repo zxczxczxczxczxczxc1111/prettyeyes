@@ -155,6 +155,16 @@ public partial class OverlayWindow : Window
         Hide();
     }
 
+    /// <summary>
+    /// This window has the pointer. On more than one monitor the other overlays
+    /// stop getting pointer moves the moment the cursor crosses the boundary,
+    /// and without this they keep drawing the last place they saw it.
+    /// </summary>
+    public event EventHandler? PointerSeen;
+
+    /// <summary>Takes the magnifier away because another overlay has it now.</summary>
+    public void DropMagnifier() => HideMagnifier();
+
     /// <summary>Off means the magnifier never shows, whatever the pointer does.</summary>
     public void SetMagnifierEnabled(bool enabled)
     {
@@ -179,6 +189,11 @@ public partial class OverlayWindow : Window
     /// </summary>
     private void UpdateMagnifier(int x, int y)
     {
+        // Raised even when this window is about to hide its own magnifier: the
+        // pointer being over this toolbar is still news to the other monitor,
+        // which would otherwise keep the magnifier it drew a moment ago.
+        PointerSeen?.Invoke(this, EventArgs.Empty);
+
         if (!_magnifierWanted || _mode == OverlayMode.Drawing || OverToolbar(x, y))
         {
             HideMagnifier();
@@ -673,7 +688,7 @@ public partial class OverlayWindow : Window
 
             // Bare C, so it cannot be reached while Ctrl is held for a copy.
             case Key.C:
-                CopyColour();
+                ColourRequested?.Invoke(this, EventArgs.Empty);
                 break;
 
             case Key.Left or Key.Right or Key.Up or Key.Down:
@@ -709,15 +724,27 @@ public partial class OverlayWindow : Window
         SelectionSettled?.Invoke(this, moved);
     }
 
-    /// <summary>The colour under the crosshair, as text, in the clipboard.</summary>
-    private void CopyColour()
+    /// <summary>
+    /// Somebody pressed C. Which window answers is not this window's business:
+    /// clicking the toolbar moves the keyboard to the window the toolbar is in,
+    /// and on two monitors that is not the window holding the magnifier.
+    /// </summary>
+    public event EventHandler? ColourRequested;
+
+    /// <summary>
+    /// The colour under this window's crosshair, as text, in the clipboard.
+    /// False when this window has no magnifier up and therefore no colour.
+    /// </summary>
+    public bool TryCopyColour()
     {
         if (Surface.MagnifierAt is not { } at || Surface.ColorAt(at.X, at.Y) is not { } colour)
         {
-            return;
+            return false;
         }
 
         ColourCopyRequested?.Invoke(this, $"#{colour.Red:X2}{colour.Green:X2}{colour.Blue:X2}");
         Loupe.ShowCopied(colour);
+
+        return true;
     }
 }

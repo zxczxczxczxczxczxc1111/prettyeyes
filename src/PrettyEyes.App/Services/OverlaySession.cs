@@ -17,6 +17,9 @@ public sealed class OverlaySession
 {
     private readonly AppServices _services;
     private IReadOnlyList<OverlayWindow> _windows = [];
+
+    /// <summary>The window the pointer was last seen over, magnifier and all.</summary>
+    private OverlayWindow? _pointerWindow;
     private DesktopLayout? _layout;
     private ToolKind? _activeTool;
     private readonly ToolStyles _styles;
@@ -76,6 +79,8 @@ public sealed class OverlaySession
             window.ToolbarControl.CopyClicked += OnCopyClicked;
             window.ToolbarControl.SaveClicked += OnSaveRequested;
 
+            window.PointerSeen += OnPointerSeen;
+            window.ColourRequested += OnColourRequested;
             window.SetMagnifierEnabled(_services.Settings.ShowMagnifier);
             window.SetMagnifierGrid(_services.Settings.MagnifierGrid);
             window.SetExportStyle(_services.Settings.Export ?? ExportStyle.None);
@@ -108,6 +113,42 @@ public sealed class OverlaySession
         window.ToolbarControl.UndoClicked -= OnUndoRequested;
         window.ToolbarControl.CopyClicked -= OnCopyClicked;
         window.ToolbarControl.SaveClicked -= OnSaveRequested;
+        window.PointerSeen -= OnPointerSeen;
+        window.ColourRequested -= OnColourRequested;
+    }
+
+    /// <summary>
+    /// One magnifier at a time, on the monitor the pointer is actually on.
+    /// Setting a property to the value it already holds costs nothing, so this
+    /// runs on every pointer move without a repaint to show for it.
+    /// </summary>
+    private void OnPointerSeen(object? sender, EventArgs e)
+    {
+        _pointerWindow = sender as OverlayWindow;
+
+        foreach (var window in _windows)
+        {
+            if (!ReferenceEquals(window, sender))
+            {
+                window.DropMagnifier();
+            }
+        }
+    }
+
+    /// <summary>
+    /// C reads the colour under the magnifier, and the magnifier belongs to the
+    /// window the pointer is over. That is not the window with the keyboard as
+    /// soon as the toolbar has been clicked once, so the key is answered here
+    /// rather than where it was pressed.
+    /// </summary>
+    private void OnColourRequested(object? sender, EventArgs e)
+    {
+        if (_pointerWindow?.TryCopyColour() == true)
+        {
+            return;
+        }
+
+        (sender as OverlayWindow)?.TryCopyColour();
     }
 
     private void OnCancelled(object? sender, EventArgs e) => Close();
