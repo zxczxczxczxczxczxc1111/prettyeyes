@@ -76,7 +76,13 @@ public partial class App : Application
                 screens.Changed += (_, _) => Dispatcher.UIThread.Post(OnDisplayChanged);
             }
 
-            desktop.ShutdownRequested += (_, _) => Services.Dispose();
+            // Logged so that a silent death is unmistakable: an exit that
+            // leaves no line at all was not an exit, it was a crash.
+            desktop.ShutdownRequested += (_, _) =>
+            {
+                Log.Default.Info("завершение по запросу");
+                Services.Dispose();
+            };
         }
 
         base.OnFrameworkInitializationCompleted();

@@ -27,7 +27,7 @@ public sealed class OverlayWindowPool
     private readonly DispatcherTimer _blank;
     private readonly DispatcherTimer _hide;
 
-    private Action? _cleared;
+    private Action? _retire;
 
     private bool _warm;
 
@@ -67,6 +67,7 @@ public sealed class OverlayWindowPool
         _blank.Stop();
         _hide.Stop();
         Clear();
+        Retire();
 
 
         if (!_warm)
@@ -93,9 +94,9 @@ public sealed class OverlayWindowPool
     /// still on screen, what gets stored is the empty frame, and the window is
     /// transparent, so the empty frame is nothing at all.
     /// </summary>
-    public void Release(TimeSpan after, Action cleared)
+    public void Release(TimeSpan after, Action retire)
     {
-        _cleared = cleared;
+        _retire = retire;
         _blank.Stop();
         _blank.Interval = after + BlankDelay;
         _blank.Start();
@@ -113,21 +114,30 @@ public sealed class OverlayWindowPool
         _hide.Start();
     }
 
-    /// <summary>
-    /// Lets go of the capture, and tells whoever was holding it that they can
-    /// too. Until this runs the windows are still drawing that image, so the
-    /// frame it came from has to stay alive.
-    /// </summary>
+    /// <summary>Empties the windows. What they were showing stays alive.</summary>
     private void Clear()
     {
         foreach (var window in _windows)
         {
             window.Reset();
         }
+    }
 
-        var cleared = _cleared;
-        _cleared = null;
-        cleared?.Invoke();
+    /// <summary>
+    /// Frees the capture the windows were showing.
+    ///
+    /// Deliberately not done when they are emptied, and not when they are
+    /// hidden either. Drawing happens on its own thread, and a frame handed to
+    /// it a moment ago can still be executing after the window has been told to
+    /// let go; freeing the image out from under it takes the whole process down
+    /// without so much as an exception to log. Waiting until the next capture
+    /// costs one frame of memory while idle and removes the race entirely.
+    /// </summary>
+    private void Retire()
+    {
+        var retire = _retire;
+        _retire = null;
+        retire?.Invoke();
     }
 
     private void HideEmptied(object? sender, EventArgs e)
@@ -152,6 +162,7 @@ public sealed class OverlayWindowPool
         _blank.Stop();
         _hide.Stop();
         Clear();
+        Retire();
 
         foreach (var window in _windows)
         {
