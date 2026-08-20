@@ -75,6 +75,10 @@ public sealed class JsonSettingsStore : ISettingsStore
         // Schema 4 added per-tool styles. Missing means every tool draws the
         // default, which is exactly what an empty dictionary says.
         ToolStyles = stored.ToolStyles ?? [],
+
+        // Schema 5 added emoji. No glyph chosen yet is a valid state: the grid
+        // opens on the first click instead of stamping something arbitrary.
+        RecentEmoji = stored.RecentEmoji ?? [],
         SchemaVersion = AppSettings.CurrentSchema,
     };
 

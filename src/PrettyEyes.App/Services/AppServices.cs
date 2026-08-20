@@ -28,6 +28,7 @@ public sealed class AppServices : IDisposable
         IPointerLocation pointer,
         Win32TrayIcon tray,
         OverlayWindowPool overlayWindows,
+        EmojiAtlas emoji,
         AppSettings settings)
     {
         Host = host;
@@ -42,6 +43,7 @@ public sealed class AppServices : IDisposable
         Pointer = pointer;
         Tray = tray;
         OverlayWindows = overlayWindows;
+        Emoji = emoji;
         Settings = settings;
     }
 
@@ -69,6 +71,9 @@ public sealed class AppServices : IDisposable
 
     /// <summary>Overlay windows, built once and reused between captures.</summary>
     public OverlayWindowPool OverlayWindows { get; }
+
+    /// <summary>The bundled emoji, decoded once at start-up.</summary>
+    public EmojiAtlas Emoji { get; }
 
     /// <summary>False when a combination was taken at startup.</summary>
     public bool RegionHotkeyRegistered { get; set; }
@@ -124,6 +129,11 @@ public sealed class AppServices : IDisposable
         var overlayWindows = new OverlayWindowPool();
         overlayWindows.Warm(monitors.Enumerate().Monitors.Count);
 
+        // Decoded in the background: forty PNGs on a frozen screen would be a
+        // pause the user can see.
+        var emoji = new EmojiAtlas();
+        _ = emoji.WarmAsync();
+
         var settingsStore = new JsonSettingsStore(JsonSettingsStore.DefaultPath);
         var settings = settingsStore.Load();
 
@@ -160,6 +170,7 @@ public sealed class AppServices : IDisposable
             new Win32PointerLocation(),
             tray,
             overlayWindows,
+            emoji,
             settings)
         {
             RegionHotkeyRegistered = regionRegistered,
@@ -198,6 +209,7 @@ public sealed class AppServices : IDisposable
     {
         Hotkeys.Dispose();
         Tray.Dispose();
+        Emoji.Dispose();
         (Capture as IDisposable)?.Dispose();
     }
 }

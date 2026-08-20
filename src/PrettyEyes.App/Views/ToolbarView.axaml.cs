@@ -39,6 +39,7 @@ public partial class ToolbarView : UserControl
         ArrowButton.Click += (_, _) => Pick(ToolKind.Arrow);
         LineButton.Click += (_, _) => Pick(ToolKind.Line);
         RectButton.Click += (_, _) => Pick(ToolKind.Rectangle);
+        EmojiButton.Click += (_, _) => Pick(ToolKind.Emoji);
         UndoButton.Click += (_, _) => UndoClicked?.Invoke(this, EventArgs.Empty);
         CopyButton.Click += (_, _) => CopyClicked?.Invoke(this, EventArgs.Empty);
         SaveButton.Click += (_, _) => SaveClicked?.Invoke(this, EventArgs.Empty);
@@ -135,5 +136,17 @@ public partial class ToolbarView : UserControl
         yield return (ArrowButton, ToolKind.Arrow);
         yield return (LineButton, ToolKind.Line);
         yield return (RectButton, ToolKind.Rectangle);
+        yield return (EmojiButton, ToolKind.Emoji);
+    }
+
+    /// <summary>Puts the chosen glyph on the emoji button.</summary>
+    public void ShowGlyph(string code)
+    {
+        EmojiGlyph.Source = new Avalonia.Media.Imaging.Bitmap(
+            Avalonia.Platform.AssetLoader.Open(
+                new Uri($"avares://PrettyEyes.App/Assets/Emoji/{code}.png")));
+
+        EmojiGlyph.IsVisible = true;
+        EmojiOutline.IsVisible = false;
     }
 }

@@ -20,6 +20,7 @@ public sealed class OverlaySession
     private DesktopLayout? _layout;
     private ToolKind? _activeTool;
     private readonly ToolStyles _styles;
+    private string? _emoji;
     private bool _toolbarShown;
     private bool _closed;
 
@@ -27,6 +28,7 @@ public sealed class OverlaySession
     {
         _services = services;
         _styles = new ToolStyles(services.Settings.ToolStyles ?? []);
+        _emoji = services.Settings.Emoji;
     }
 
     public event EventHandler? Finished;
@@ -60,6 +62,13 @@ public sealed class OverlaySession
             window.ToolCleared += OnToolCleared;
             window.ToolbarControl.StyleRequested += OnStyleRequested;
             window.StyleCardControl.StyleChanged += OnStyleChanged;
+            window.EmojiCardControl.Picked += OnEmojiPicked;
+            window.EmojiCardControl.Restore(_services.Settings.RecentEmoji ?? []);
+
+            if (_emoji is not null)
+            {
+                window.ToolbarControl.ShowGlyph(_emoji);
+            }
             window.ToolbarControl.ShowStyles(_styles);
             window.ToolFactory = () => _activeTool is null ? null : CreateTool(_activeTool.Value);
             window.ToolbarControl.ToolPicked += OnToolPicked;
@@ -92,6 +101,7 @@ public sealed class OverlaySession
         window.ToolCleared -= OnToolCleared;
         window.ToolbarControl.StyleRequested -= OnStyleRequested;
         window.StyleCardControl.StyleChanged -= OnStyleChanged;
+        window.EmojiCardControl.Picked -= OnEmojiPicked;
         window.ToolFactory = null;
         window.ToolbarControl.ToolPicked -= OnToolPicked;
         window.ToolbarControl.UndoClicked -= OnUndoRequested;
@@ -221,14 +231,54 @@ public sealed class OverlaySession
     {
         foreach (var window in _windows)
         {
-            if (ReferenceEquals(window.ToolbarControl, sender))
+            var owner = ReferenceEquals(window.ToolbarControl, sender);
+
+            window.HideStyleCard();
+            window.HideEmojiCard();
+
+            if (!owner)
             {
-                window.ShowStyleCard(kind, _styles.For(kind));
+                continue;
+            }
+
+            // Emoji has a grid of glyphs where the others have colours.
+            if (kind == ToolKind.Emoji)
+            {
+                window.ShowEmojiCard();
             }
             else
             {
-                window.HideStyleCard();
+                window.ShowStyleCard(kind, _styles.For(kind));
             }
+        }
+    }
+
+    /// <summary>
+    /// A glyph was chosen. The grid closes: unlike colour and thickness, this
+    /// is one choice and the next thing to do is stamp it.
+    /// </summary>
+    private void OnEmojiPicked(object? sender, string code)
+    {
+        _emoji = code;
+
+        var recent = (sender as EmojiPickerView)?.Recent.ToList() ?? [];
+
+        foreach (var window in _windows)
+        {
+            window.ToolbarControl.ShowGlyph(code);
+            window.HideEmojiCard();
+            window.ToolbarControl.SetActive(ToolKind.Emoji);
+            window.SetToolActive(active: true);
+        }
+
+        _activeTool = ToolKind.Emoji;
+
+        var settings = _services.Settings with { Emoji = code, RecentEmoji = recent };
+        _services.Settings = settings;
+
+        if (!_services.SettingsStore.Save(settings))
+        {
+            Log.Default.Info("не удалось сохранить выбор эмодзи");
         }
     }
 
@@ -260,6 +310,14 @@ public sealed class OverlaySession
 
     private void OnToolPicked(object? sender, ToolKind? kind)
     {
+        // Emoji without a glyph has nothing to stamp: the grid opens instead of
+        // the tool arming itself with nothing.
+        if (kind == ToolKind.Emoji && _emoji is null)
+        {
+            OnStyleRequested(sender, ToolKind.Emoji);
+            return;
+        }
+
         _activeTool = kind;
 
         // Only the visible toolbar raised this, but the others have to agree:
@@ -390,6 +448,10 @@ public sealed class OverlaySession
         ToolKind.Arrow => new ArrowTool(_styles.For(kind)),
         ToolKind.Line => new LineTool(_styles.For(kind)),
         ToolKind.Rectangle => new RectangleTool(_styles.For(kind)),
+        ToolKind.Emoji => new EmojiTool(
+            _services.Emoji.Glyph(_emoji ?? string.Empty)
+                ?? throw new InvalidOperationException("Эмодзи не выбран."),
+            Document?.Selection ?? CaptureRect.Empty),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown tool."),
     };
 

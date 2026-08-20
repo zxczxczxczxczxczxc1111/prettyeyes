@@ -1,0 +1,56 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PrettyEyes.App.Views.EmojiPickerView">
+  <UserControl.Styles>
+    <Style Selector="Button.glyph">
+      <Setter Property="Width" Value="32"/>
+      <Setter Property="Height" Value="32"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Background" Value="Transparent"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+    </Style>
+    <Style Selector="Button.glyph /template/ ContentPresenter">
+      <Setter Property="Transitions">
+        <Transitions>
+          <BrushTransition Property="Background" Duration="0:0:0.12"/>
+        </Transitions>
+      </Setter>
+    </Style>
+    <Style Selector="Button.glyph:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource Fill}"/>
+    </Style>
+  </UserControl.Styles>
+
+  <Border x:Name="Card"
+          Background="{StaticResource Surface}"
+          BorderBrush="{StaticResource Border}"
+          BorderThickness="1"
+          CornerRadius="{StaticResource RCard}"
+          Padding="12"
+          BoxShadow="{StaticResource Shadow2}"
+          Opacity="0">
+    <Border.RenderTransform>
+      <TranslateTransform Y="6"/>
+    </Border.RenderTransform>
+    <Border.Transitions>
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.12" Easing="CubicEaseOut"/>
+        <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" Easing="CubicEaseOut"/>
+      </Transitions>
+    </Border.Transitions>
+
+    <StackPanel Spacing="10">
+      <StackPanel Spacing="6">
+        <TextBlock Text="Недавние" Foreground="{StaticResource TextFaint}" FontSize="11"/>
+        <!-- Height is reserved even when empty: a card that grows after the
+             first pick moves out from under the cursor. -->
+        <StackPanel x:Name="RecentRow" Orientation="Horizontal" Spacing="2" Height="32"/>
+      </StackPanel>
+
+      <Rectangle Height="1" Fill="{StaticResource Border}"/>
+
+      <WrapPanel x:Name="Grid" Width="280" Orientation="Horizontal"/>
+    </StackPanel>
+  </Border>
+</UserControl>

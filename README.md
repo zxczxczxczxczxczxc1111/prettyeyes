@@ -65,6 +65,11 @@ dotnet test
 окна с аппаратным ускорением, второй не требует от системы ничего, кроме
 `BitBlt`.
 
+## Авторство
+
+Набор эмодзи - [Twemoji](https://github.com/jdecked/twemoji), лицензия CC-BY 4.0.
+Emoji artwork by Twitter, Inc and other contributors.
+
 ## Стек
 
 C# / .NET 10, Avalonia 11.3, SkiaSharp 3.116, xUnit, Inno Setup 6.
