@@ -92,9 +92,7 @@ public partial class SettingsWindow : Window
         RegionHotkey.Value = settings.Hotkey;
         FullScreenHotkey.Value = settings.FullScreenHotkey;
         Autostart.IsChecked = autostart.IsEnabled;
-        ShowMagnifier.IsChecked = settings.ShowMagnifier;
-        MagnifierGrid.IsChecked = settings.MagnifierGrid;
-        MagnifierGrid.IsEnabled = settings.ShowMagnifier;
+        ShowMagnifierRow();
 
         var save = settings.Save ?? SaveOptions.Default;
         Autosave.IsChecked = save.Enabled;
@@ -121,8 +119,9 @@ public partial class SettingsWindow : Window
         RegionHotkey.HotkeyChanged += (_, hotkey) => Apply(HotkeyAction.Region, hotkey);
         FullScreenHotkey.HotkeyChanged += (_, hotkey) => Apply(HotkeyAction.FullScreen, hotkey);
         Autostart.IsCheckedChanged += OnAutostartChanged;
-        ShowMagnifier.IsCheckedChanged += OnMagnifierChanged;
-        MagnifierGrid.IsCheckedChanged += OnMagnifierGridChanged;
+        MagnifierOff.Click += (_, _) => ApplyMagnifier(shown: false, grid: _settings.MagnifierGrid);
+        MagnifierPlain.Click += (_, _) => ApplyMagnifier(shown: true, grid: false);
+        MagnifierWithGrid.Click += (_, _) => ApplyMagnifier(shown: true, grid: true);
         Autosave.IsCheckedChanged += OnAutosaveChanged;
         SaveTemplate.TextChanged += OnTemplateChanged;
         PickFolder.Click += OnPickFolder;
@@ -333,18 +332,38 @@ public partial class SettingsWindow : Window
         _loading = false;
     }
 
-    private void OnMagnifierChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    /// <summary>
+    /// Off, on, on with the grid. Turning it off keeps whatever grid choice was
+    /// made: coming back should land where it was left, not on a default.
+    /// </summary>
+    private void ApplyMagnifier(bool shown, bool grid)
     {
         if (_loading)
         {
             return;
         }
 
-        var enabled = ShowMagnifier.IsChecked == true;
+        Store(_settings with { ShowMagnifier = shown, MagnifierGrid = grid });
+        ShowMagnifierRow();
+        MagnifierChanged?.Invoke(this, shown);
+    }
 
-        MagnifierGrid.IsEnabled = enabled;
-        Store(_settings with { ShowMagnifier = enabled });
-        MagnifierChanged?.Invoke(this, enabled);
+    private void ShowMagnifierRow()
+    {
+        foreach (var (button, on) in new[]
+        {
+            (MagnifierOff, !_settings.ShowMagnifier),
+            (MagnifierPlain, _settings.ShowMagnifier && !_settings.MagnifierGrid),
+            (MagnifierWithGrid, _settings.ShowMagnifier && _settings.MagnifierGrid),
+        })
+        {
+            button.Classes.Remove("active");
+
+            if (on)
+            {
+                button.Classes.Add("active");
+            }
+        }
     }
 
     /// <summary>
@@ -547,16 +566,6 @@ public partial class SettingsWindow : Window
 
     private void StoreSave(Func<SaveOptions, SaveOptions> change) =>
         Store(_settings with { Save = change(_settings.Save ?? SaveOptions.Default) });
-
-    private void OnMagnifierGridChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        if (_loading)
-        {
-            return;
-        }
-
-        Store(_settings with { MagnifierGrid = MagnifierGrid.IsChecked == true });
-    }
 
     /// <summary>The overlay has to hear about this without waiting for a restart.</summary>
     public event EventHandler<bool>? MagnifierChanged;
