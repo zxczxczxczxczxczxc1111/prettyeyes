@@ -19,8 +19,6 @@ public sealed class TextAnnotation : IMovable
     /// <summary>How much one turn of the wheel is worth, in points.</summary>
     public const int SizeStep = 2;
 
-    private readonly IReadOnlyList<string> _lines;
-
     public TextAnnotation(string text, int x, int y, int? maxWidth, ToolStyle style)
     {
         Text = text;
@@ -29,11 +27,17 @@ public sealed class TextAnnotation : IMovable
 
         using var font = TextLayout.FontFor(style);
 
-        _lines = TextLayout.Wrap(text, font, maxWidth);
-        Bounds = TextLayout.Measure(_lines, font, style.TextPadding) with { X = x, Y = y };
+        Segments = TextLayout.Segments(text, font, maxWidth);
+        Bounds = TextLayout.Measure(Segments, font, style.TextPadding) with { X = x, Y = y };
     }
 
     public string Text { get; }
+
+    /// <summary>
+    /// The drawn lines and where each starts in the text. Laid out once here so
+    /// that the caret, the mouse and the glyphs all agree on the same numbers.
+    /// </summary>
+    public IReadOnlyList<TextSegment> Segments { get; }
 
     /// <summary>
     /// The width the text wraps at, or null when the label grows with whatever
@@ -69,10 +73,20 @@ public sealed class TextAnnotation : IMovable
             (Bounds.Height - resized.Bounds.Height) / 2);
     }
 
-    public void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin)
+    public void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin) => Draw(canvas, underlay: null);
+
+    /// <summary>
+    /// The same drawing with something painted between the plate and the
+    /// glyphs. That gap is where a selection highlight belongs: over it and the
+    /// highlight hides the very text being selected, under the plate and it is
+    /// not there at all.
+    /// </summary>
+    public void Draw(SKCanvas canvas, Action<SKCanvas, SKFont>? underlay)
     {
         if (Bounds.IsEmpty)
         {
+            // Nothing to put a highlight behind either: an empty label is only
+            // ever a caret, and whoever is drawing that owns it.
             return;
         }
 
@@ -92,6 +106,8 @@ public sealed class TextAnnotation : IMovable
                 plate);
         }
 
+        underlay?.Invoke(canvas, font);
+
         using var outline = new SKPaint
         {
             Color = contrast,
@@ -110,8 +126,10 @@ public sealed class TextAnnotation : IMovable
         // box to the first baseline.
         var baseline = Bounds.Y + Style.TextPadding - font.Metrics.Ascent;
 
-        foreach (var line in _lines)
+        foreach (var segment in Segments)
         {
+            var line = segment.Text;
+
             if (Style.TextBackdrop == TextBackdrop.Outline)
             {
                 canvas.DrawText(line, left, baseline, font, outline);
