@@ -30,6 +30,31 @@ public class DowngradeTests
     }
 
     [Fact]
+    public void A_file_naming_the_new_text_tool_still_opens_in_1_2()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pe-{Guid.NewGuid()}.json");
+        new JsonSettingsStore(path).Save(AppSettings.Default with
+        {
+            Autostart = true,
+            Tools = new Dictionary<ToolKind, bool> { [ToolKind.Text] = false },
+        });
+
+        var json = File.ReadAllText(path);
+
+        // Asserted on the file and not only on the round trip: with a name in
+        // the key this test would still be green until somebody downgrades.
+        Assert.Contains("\"7\":", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("Text", json, StringComparison.Ordinal);
+
+        // Key "7" means nothing to LegacyToolKind and is swallowed. Key "Text"
+        // throws, Load answers with defaults, and the user loses every setting.
+        var old = JsonSerializer.Deserialize<LegacyAppSettings>(json, Legacy);
+
+        Assert.NotNull(old);
+        Assert.True(old!.Autostart);
+    }
+
+    [Fact]
     public void A_round_trip_down_and_back_up_keeps_autostart()
     {
         var path = Path.Combine(Path.GetTempPath(), $"pe-{Guid.NewGuid()}.json");

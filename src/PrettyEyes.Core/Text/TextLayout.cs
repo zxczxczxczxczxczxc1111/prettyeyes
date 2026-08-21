@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using PrettyEyes.Core.Geometry;
+using PrettyEyes.Core.Tools;
 using SkiaSharp;
 
 namespace PrettyEyes.Core.Text;
@@ -14,6 +16,25 @@ namespace PrettyEyes.Core.Text;
 /// </summary>
 public static class TextLayout
 {
+    /// <summary>
+    /// Typefaces are cached because building one walks the font directory, and
+    /// a label is measured on every rendered frame while it is being dragged.
+    /// SKTypeface is immutable and safe to share; SKFont is not, so callers get
+    /// a fresh one of those every time.
+    /// </summary>
+    private static readonly ConcurrentDictionary<string, SKTypeface> Typefaces = new();
+
+    /// <summary>
+    /// The font a style asks for. An unknown family name falls back to the
+    /// system default rather than throwing: the name may have come from a
+    /// settings file written on a machine that had the font.
+    /// </summary>
+    public static SKFont FontFor(ToolStyle style) =>
+        new(style.FontFamily is null
+                ? SKTypeface.Default
+                : Typefaces.GetOrAdd(style.FontFamily, name => SKTypeface.FromFamilyName(name) ?? SKTypeface.Default),
+            style.FontSize);
+
     /// <summary>
     /// Hard line breaks are always honoured. A width limit additionally breaks
     /// between words, and inside a word when the word alone does not fit.
