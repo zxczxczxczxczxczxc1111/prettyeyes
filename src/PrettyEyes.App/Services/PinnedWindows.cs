@@ -215,20 +215,38 @@ public sealed class PinnedWindows
     /// </summary>
     public void CloseAll()
     {
-        if (!AnyWithAnnotations)
-        {
-            Force();
-            return;
-        }
+        var count = _registry.Count;
 
-        var windows = Windows().ToList();
-        var count = windows.Count;
-
-        windows[^1].Question(
+        var asked = AskFirst(
             count > 1
                 ? $"Закрыть все закреплённые ({count})? Нарисованное в них пропадёт"
                 : "Закрыть? Нарисованное здесь пропадёт",
             Force);
+
+        if (!asked)
+        {
+            Force();
+        }
+    }
+
+    /// <summary>
+    /// Asks the question in the topmost pin when there is anything to lose, and
+    /// says whether it did. False means nobody was asked and the caller may go
+    /// ahead: no drawings, nothing to warn about.
+    ///
+    /// The question lives in a pin rather than in a window of its own: it is
+    /// about those windows, and the app has no other place to put a dialog.
+    /// </summary>
+    public bool AskFirst(string question, Action yes)
+    {
+        if (!AnyWithAnnotations)
+        {
+            return false;
+        }
+
+        Windows().Last().Question(question, yes);
+
+        return true;
     }
 
     /// <summary>Over a copy: each close takes itself out of the registry.</summary>

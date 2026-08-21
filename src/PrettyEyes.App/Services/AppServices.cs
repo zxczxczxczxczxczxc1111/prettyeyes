@@ -92,10 +92,10 @@ public sealed class AppServices : IDisposable
     public UpdateService Updates { get; }
 
     /// <summary>
-    /// Whether an overlay is up. Set by the application, which is the only
-    /// thing that knows: an update must not close the app mid-selection.
+    /// Why an update must wait, or null when nothing is in the way. Set by the
+    /// application, which is the only thing that knows what is open.
     /// </summary>
-    public Func<bool>? IsCapturing { get; set; }
+    public Func<string?>? Busy { get; set; }
 
     /// <summary>False when a combination was taken at startup.</summary>
     public bool RegionHotkeyRegistered { get; set; }
@@ -170,7 +170,7 @@ public sealed class AppServices : IDisposable
         var updates = new UpdateService(
             new GitHubUpdateSource(),
             () => built?.Settings.CheckUpdates ?? true,
-            () => built?.IsCapturing?.Invoke() ?? false);
+            () => built?.Busy?.Invoke());
 
         // Built here and not lazily: the message-only window belongs to the
         // thread that creates it, and this runs on the UI thread.

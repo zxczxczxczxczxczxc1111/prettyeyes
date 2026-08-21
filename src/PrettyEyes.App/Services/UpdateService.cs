@@ -47,18 +47,23 @@ public sealed class UpdateService : IDisposable
 
     private readonly IUpdateSource _source;
     private readonly Func<bool> _enabled;
-    private readonly Func<bool> _capturing;
+    private readonly Func<string?> _busy;
     private readonly DispatcherTimer _timer;
 
     private CancellationTokenSource? _work;
     private ReleaseInfo? _found;
     private bool _announced;
 
-    public UpdateService(IUpdateSource source, Func<bool> enabled, Func<bool> capturing)
+    /// <param name="busy">
+    /// Why the installer must wait, or null when it may go ahead. A reason
+    /// rather than a flag: there is more than one kind of work an update would
+    /// throw away, and the log has to say which one it was.
+    /// </param>
+    public UpdateService(IUpdateSource source, Func<bool> enabled, Func<string?> busy)
     {
         _source = source;
         _enabled = enabled;
-        _capturing = capturing;
+        _busy = busy;
 
         _timer = new DispatcherTimer { Interval = FirstCheck };
         _timer.Tick += (_, _) =>
@@ -174,11 +179,12 @@ public sealed class UpdateService : IDisposable
             return false;
         }
 
-        // An installer that closes the app mid-selection throws away work that
-        // exists nowhere else yet.
-        if (_capturing())
+        // The installer runs with /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS, and
+        // a restart takes with it everything that exists nowhere else yet: a
+        // selection in progress, and the drawings inside pinned windows.
+        if (_busy() is { } reason)
         {
-            Log.Default.Info("обновление отложено: открыт оверлей");
+            Log.Default.Info($"обновление отложено: {reason}");
 
             return false;
         }

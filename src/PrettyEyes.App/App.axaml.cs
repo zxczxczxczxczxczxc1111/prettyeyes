@@ -64,7 +64,11 @@ public partial class App : Application
             // and the coordinates no longer describe the same desktop.
             Services.WarmCapture();
 
-            Services.IsCapturing = () => _session is not null;
+            Services.Busy = () => _session is not null
+                ? "открыт оверлей"
+                : Services.Pins.AnyWithAnnotations
+                    ? "есть закреплённые с разметкой"
+                    : null;
 
             // Shown once, and only in the tray balloon: somebody who never
             // opens the settings would otherwise never learn there is a newer
@@ -318,7 +322,27 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// Quitting takes the pinned windows with it, and what was drawn in them
+    /// exists nowhere else: never a file, never in the clipboard.
+    /// </summary>
     private void Exit()
+    {
+        var count = Services?.Pins.Count ?? 0;
+
+        if (Services?.Pins.AskFirst(
+                count > 1
+                    ? $"Выйти? Нарисованное в закреплённых ({count}) пропадёт"
+                    : "Выйти? Нарисованное в закреплённом пропадёт",
+                Shutdown) == true)
+        {
+            return;
+        }
+
+        Shutdown();
+    }
+
+    private void Shutdown()
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
