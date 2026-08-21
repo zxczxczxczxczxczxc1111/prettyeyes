@@ -28,6 +28,74 @@ public class DocumentTests
     }
 
     [Fact]
+    public void Remove_takes_the_annotation_out()
+    {
+        using var document = NewDocument();
+        var annotation = new FakeAnnotation();
+        document.Add(annotation);
+
+        Assert.True(document.Remove(annotation));
+        Assert.Empty(document.Annotations);
+    }
+
+    [Fact]
+    public void Removing_something_that_was_never_there_changes_nothing()
+    {
+        using var document = NewDocument();
+        document.Add(new FakeAnnotation());
+
+        Assert.False(document.Remove(new FakeAnnotation()));
+        Assert.Single(document.Annotations);
+    }
+
+    [Fact]
+    public void Undo_brings_a_removed_annotation_back_where_it_was()
+    {
+        using var document = NewDocument();
+        var first = new FakeAnnotation();
+        var second = new FakeAnnotation();
+        document.Add(first);
+        document.Add(second);
+
+        document.Remove(first);
+
+        Assert.True(document.Undo());
+        Assert.Equal([first, second], document.Annotations);
+    }
+
+    [Fact]
+    public void A_removal_ends_a_run_of_wheel_steps()
+    {
+        using var document = NewDocument();
+        var stays = new FakeAnnotation();
+        document.Add(stays);
+        document.Add(new FakeAnnotation());
+
+        // Otherwise the next wheel notch would fold itself into the undo entry
+        // of the removal and take the deleted object back out.
+        document.Remove(document.Annotations[1]);
+        document.Undo();
+
+        Assert.Equal(2, document.Annotations.Count);
+    }
+
+    [Fact]
+    public void The_render_snapshot_notices_a_removal()
+    {
+        using var document = NewDocument();
+        var annotation = new FakeAnnotation();
+        document.Add(annotation);
+
+        // Asked for before the change on purpose: the snapshot is cached, and a
+        // stale one keeps drawing the label the user just deleted.
+        Assert.Single(document.SnapshotAnnotations());
+
+        document.Remove(annotation);
+
+        Assert.Empty(document.SnapshotAnnotations());
+    }
+
+    [Fact]
     public void New_document_has_no_annotations()
     {
         using var document = NewDocument();

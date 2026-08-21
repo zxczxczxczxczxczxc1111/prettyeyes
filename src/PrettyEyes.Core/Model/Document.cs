@@ -75,6 +75,34 @@ public sealed class Document : IDisposable
     }
 
     /// <summary>
+    /// Takes an annotation off the picture. History keeps whole states, so this
+    /// undoes into its old place in the stack rather than onto the top of it.
+    /// Answers false when it was not there in the first place.
+    /// </summary>
+    public bool Remove(IAnnotation annotation)
+    {
+        var index = _annotations.IndexOf(annotation);
+
+        if (index < 0)
+        {
+            return false;
+        }
+
+        Remember();
+        _annotations.RemoveAt(index);
+        _snapshot = null;
+
+        if (ReferenceEquals(_detached, annotation))
+        {
+            // It was being dragged. Leaving it detached would keep the overlay
+            // drawing a label that no longer belongs to anything.
+            _detached = null;
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Puts an annotation somewhere else, keeping its place in the stack: a
     /// glyph that jumps in front of the arrow it was behind has moved in a way
     /// nobody asked for. Does nothing if it is not in the list.
