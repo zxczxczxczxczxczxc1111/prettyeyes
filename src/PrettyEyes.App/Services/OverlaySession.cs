@@ -74,6 +74,10 @@ public sealed class OverlaySession
             {
                 window.ToolbarControl.ShowGlyph(_emoji);
             }
+            // The window comes out of a pool and remembers the highlight from
+            // the last capture. The session is new and remembers nothing. Say
+            // it out loud.
+            window.ToolbarControl.SetActive(_activeTool);
             window.ToolbarControl.ShowStyles(_styles);
             window.ToolbarControl.ShowTools(new ToolVisibility(_services.Settings.Tools));
             window.ToolFactory = () => _activeTool is null ? null : CreateTool(_activeTool.Value);

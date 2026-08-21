@@ -144,10 +144,10 @@ public partial class ToolbarView : UserControl
     /// </summary>
     private void Pick(ToolKind kind)
     {
-        var next = _active == kind ? (ToolKind?)null : kind;
-
-        SetActive(next);
-        ToolPicked?.Invoke(this, next);
+        // No SetActive here on purpose. The session owns the truth; the toolbar
+        // is a display. It used to be both, and the two drifted apart every
+        // time the pooled window outlived the session that set it.
+        ToolPicked?.Invoke(this, ToolSelection.Next(_active, kind));
     }
 
     private IEnumerable<(Button Button, ToolKind Kind)> Buttons()
