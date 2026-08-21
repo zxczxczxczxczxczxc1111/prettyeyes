@@ -1,5 +1,4 @@
 using PrettyEyes.Core.Annotations;
-using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 
 namespace PrettyEyes.Core.Tools;
@@ -30,8 +29,11 @@ public sealed class LineTool : ITool
 
     private IAnnotation? Build(int x, int y)
     {
-        var line = CaptureRect.FromPoints(_x, _y, x, y);
-        return line.IsEmpty
+        // Not "is the bounding box empty": a segment dragged along one axis has
+        // a box of zero height, and refusing that made the straightest line a
+        // person can draw the one line that never appeared. Only a gesture that
+        // went nowhere at all is nothing.
+        return _x == x && _y == y
             ? null
             : new LineAnnotation(_x, _y, x, y, _style.Color, _style.StrokeWidth);
     }
