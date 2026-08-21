@@ -18,7 +18,7 @@ public sealed class ToolVisibility
     public static IReadOnlyList<ToolKind> All { get; } =
     [
         ToolKind.Blur, ToolKind.Arrow, ToolKind.Line, ToolKind.Rectangle,
-        ToolKind.Pencil, ToolKind.Marker, ToolKind.Emoji,
+        ToolKind.Pencil, ToolKind.Marker, ToolKind.Emoji, ToolKind.Text,
     ];
 
     public bool IsShown(ToolKind kind) => !_shown.TryGetValue(kind, out var shown) || shown;

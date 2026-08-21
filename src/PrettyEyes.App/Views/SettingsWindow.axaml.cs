@@ -553,6 +553,7 @@ public partial class SettingsWindow : Window
         ToolKind.Pencil => "M3.5,12.5 L4.2,9.8 L10,4 L12,6 L6.2,11.8 Z M9,5.2 L10.8,7",
         ToolKind.Marker => "M5.5,9.5 L9.8,5.2 L11.8,7.2 L7.5,11.5 H5.5 Z M3.5,13.5 H12.5",
         ToolKind.Emoji => "M8,2.5 A5.5,5.5 0 1 0 8.01,2.5 M6,6.5 V7 M10,6.5 V7 M5.5,9.5 A3,3 0 0 0 10.5,9.5",
+        ToolKind.Text => "M4,4.5 H12 M8,4.5 V12 M6,12 H10",
         _ => "M3.5,4 H12.5 V12 H3.5 Z",
     };
 
@@ -564,6 +565,7 @@ public partial class SettingsWindow : Window
         ToolKind.Pencil => "Карандаш",
         ToolKind.Marker => "Маркер",
         ToolKind.Emoji => "Эмодзи",
+        ToolKind.Text => "Надпись",
         _ => "Рамка",
     };
 
@@ -581,6 +583,7 @@ public partial class SettingsWindow : Window
         FeatureId.Pencil => ToolIcon(ToolKind.Pencil),
         FeatureId.Marker => ToolIcon(ToolKind.Marker),
         FeatureId.Emoji => ToolIcon(ToolKind.Emoji),
+        FeatureId.Text => ToolIcon(ToolKind.Text),
         FeatureId.Magnifier => "M7,2.5 A4.5,4.5 0 1 0 7.01,2.5 M10.3,10.3 L13.5,13.5",
         FeatureId.Cursor => "M4,2.5 L4,12 L6.5,9.5 L8.5,13.5 L10,12.7 L8,9 L11.5,8.5 Z",
         FeatureId.QuickSave => "M8,3 V10 M5,7.5 L8,10.5 L11,7.5 M3.5,12.5 H12.5",
@@ -598,6 +601,7 @@ public partial class SettingsWindow : Window
         FeatureId.Pencil => ToolName(ToolKind.Pencil),
         FeatureId.Marker => ToolName(ToolKind.Marker),
         FeatureId.Emoji => ToolName(ToolKind.Emoji),
+        FeatureId.Text => ToolName(ToolKind.Text),
         FeatureId.Magnifier => "Лупа",
         FeatureId.Cursor => "Курсор",
         FeatureId.QuickSave => "Быстрое сохранение",

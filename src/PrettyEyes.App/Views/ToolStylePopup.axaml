@@ -77,7 +77,7 @@
 
       <Rectangle Height="1" Fill="{StaticResource Border}"/>
 
-      <StackPanel Orientation="Horizontal" Spacing="4">
+      <StackPanel x:Name="StrokeRow" Orientation="Horizontal" Spacing="4">
         <Button Classes="step" x:Name="SmallStep" ToolTip.Tip="Тонкая">
           <Rectangle Height="2"/>
         </Button>
@@ -87,6 +87,41 @@
         <Button Classes="step" x:Name="LargeStep" ToolTip.Tip="Толстая">
           <Rectangle Height="5"/>
         </Button>
+      </StackPanel>
+
+      <!-- The text tool has nothing to do with stroke width, so it gets this
+           row instead of that one. Both never show at once. -->
+      <StackPanel x:Name="TextRow" IsVisible="False" Spacing="10">
+        <StackPanel x:Name="Fonts" Spacing="4"/>
+
+        <TextBlock x:Name="FontMissing"
+                   IsVisible="False"
+                   TextWrapping="Wrap"
+                   MaxWidth="220"
+                   Foreground="{StaticResource TextDim}"/>
+
+        <StackPanel Orientation="Horizontal" Spacing="4">
+          <Button Classes="step" x:Name="SmallerType" MinWidth="32" ToolTip.Tip="Мельче">
+            <TextBlock Text="-"/>
+          </Button>
+          <Border MinWidth="44" VerticalAlignment="Center">
+            <TextBlock x:Name="TypeSize"
+                       HorizontalAlignment="Center"
+                       Foreground="{StaticResource TextStrong}"/>
+          </Border>
+          <Button Classes="step" x:Name="BiggerType" MinWidth="32" ToolTip.Tip="Крупнее">
+            <TextBlock Text="+"/>
+          </Button>
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Spacing="4">
+          <Button Classes="step" x:Name="PlateBackdrop" MinWidth="66">
+            <TextBlock Text="Плашка"/>
+          </Button>
+          <Button Classes="step" x:Name="OutlineBackdrop" MinWidth="66">
+            <TextBlock Text="Обводка"/>
+          </Button>
+        </StackPanel>
       </StackPanel>
     </StackPanel>
   </Border>

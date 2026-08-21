@@ -1,9 +1,13 @@
+using System.Globalization;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Transformation;
+using PrettyEyes.Core.Annotations;
 using PrettyEyes.Core.Tools;
+using SkiaSharp;
 
 namespace PrettyEyes.App.Views;
 
@@ -34,7 +38,36 @@ public partial class ToolStylePopup : UserControl
         SmallStep.Click += (_, _) => Pick(_style with { Size = StrokeSize.Small });
         MediumStep.Click += (_, _) => Pick(_style with { Size = StrokeSize.Medium });
         LargeStep.Click += (_, _) => Pick(_style with { Size = StrokeSize.Large });
+
+        foreach (var family in Families)
+        {
+            Fonts.Children.Add(NewFontButton(family));
+        }
+
+        SmallerType.Click += (_, _) => Resize(-TextAnnotation.SizeStep);
+        BiggerType.Click += (_, _) => Resize(TextAnnotation.SizeStep);
+        PlateBackdrop.Click += (_, _) => Pick(_style with { TextBackdrop = TextBackdrop.Plate });
+        OutlineBackdrop.Click += (_, _) => Pick(_style with { TextBackdrop = TextBackdrop.Outline });
     }
+
+    /// <summary>
+    /// The families offered, in the order they are shown. Null is whatever this
+    /// machine calls its interface font.
+    ///
+    /// A short list rather than everything installed: a picker over three
+    /// hundred families is a different control than this card has, and none of
+    /// the rest are fonts anybody labels a screenshot with. What is stored is
+    /// still a name, so a settings file may carry any family at all.
+    /// </summary>
+    private static readonly string?[] Families =
+        [null, "Segoe UI", "Arial", "Times New Roman", "Consolas"];
+
+    /// <summary>
+    /// Only the families this machine actually has. Offering one that is not
+    /// installed would silently draw something else.
+    /// </summary>
+    private static readonly HashSet<string> Installed =
+        [.. SKFontManager.Default.GetFontFamilies()];
 
     /// <summary>The tool and the style it should draw with from now on.</summary>
     public event EventHandler<(ToolKind Kind, ToolStyle Style)>? StyleChanged;
@@ -69,6 +102,11 @@ public partial class ToolStylePopup : UserControl
             }
         }
 
+        var text = _kind == ToolKind.Text;
+
+        StrokeRow.IsVisible = !text;
+        TextRow.IsVisible = text;
+
         foreach (var (button, size) in Steps())
         {
             button.Classes.Remove(ActiveClass);
@@ -78,6 +116,85 @@ public partial class ToolStylePopup : UserControl
                 button.Classes.Add(ActiveClass);
             }
         }
+
+        if (!text)
+        {
+            return;
+        }
+
+        TypeSize.Text = _style.FontSize.ToString(CultureInfo.InvariantCulture);
+
+        foreach (var child in Fonts.Children)
+        {
+            if (child is not Button button)
+            {
+                continue;
+            }
+
+            button.Classes.Remove(ActiveClass);
+
+            if ((button.Tag as string) == _style.FontFamily)
+            {
+                button.Classes.Add(ActiveClass);
+            }
+        }
+
+        Mark(PlateBackdrop, _style.TextBackdrop == TextBackdrop.Plate);
+        Mark(OutlineBackdrop, _style.TextBackdrop == TextBackdrop.Outline);
+
+        // Said out loud rather than silently substituted. A settings file can
+        // arrive from another machine, and "why is the font wrong" has no other
+        // answer anywhere in the interface.
+        var missing = _style.FontFamily is { } family && !Installed.Contains(family);
+
+        FontMissing.IsVisible = missing;
+        FontMissing.Text = missing ? $"Шрифта «{_style.FontFamily}» здесь нет, взят системный" : string.Empty;
+    }
+
+    private static void Mark(Button button, bool active)
+    {
+        button.Classes.Remove(ActiveClass);
+
+        if (active)
+        {
+            button.Classes.Add(ActiveClass);
+        }
+    }
+
+    /// <summary>
+    /// The size for the next label. Labels already on the screenshot keep
+    /// theirs: the wheel over one of those is what changes that one, and this
+    /// card has no idea which one the user means.
+    /// </summary>
+    private void Resize(int step) =>
+        Pick(_style with
+        {
+            FontSize = Math.Clamp(_style.FontSize + step, ToolStyle.MinFontSize, ToolStyle.MaxFontSize),
+        });
+
+    private Button NewFontButton(string? family)
+    {
+        var button = new Button
+        {
+            Tag = family,
+            MinWidth = 136,
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            Padding = new Thickness(8, 0, 8, 0),
+            Content = new TextBlock
+            {
+                Text = family ?? "Системный",
+                FontFamily = family is null ? FontFamily.Default : new FontFamily(family),
+            },
+        };
+
+        button.Classes.Add("step");
+
+        // Not installed, so not offered: picking it would draw something else
+        // and call it that font.
+        button.IsVisible = family is null || Installed.Contains(family);
+        button.Click += (_, _) => Pick(_style with { FontFamily = family });
+
+        return button;
     }
 
     private void Pick(ToolStyle style)

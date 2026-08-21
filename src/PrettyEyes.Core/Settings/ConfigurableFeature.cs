@@ -23,6 +23,7 @@ public enum FeatureId
     Pencil,
     Marker,
     Emoji,
+    Text,
     Magnifier,
     Cursor,
     QuickSave,
@@ -49,6 +50,7 @@ public sealed record ConfigurableFeature(
         [ToolKind.Pencil] = FeatureId.Pencil,
         [ToolKind.Marker] = FeatureId.Marker,
         [ToolKind.Emoji] = FeatureId.Emoji,
+        [ToolKind.Text] = FeatureId.Text,
     };
 
     /// <summary>

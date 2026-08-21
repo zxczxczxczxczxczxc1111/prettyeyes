@@ -128,6 +128,14 @@
             <Image x:Name="EmojiGlyph" Width="18" Height="18" IsVisible="False"/>
           </Panel>
         </Button>
+        <Button Classes="tool" x:Name="TextButton" ToolTip.Tip="Надпись, правая кнопка - шрифт и кегль">
+          <Panel>
+            <Path Data="M4,4.5 H12 M8,4.5 V12 M6,12 H10"/>
+            <Ellipse x:Name="TextDot" Width="6" Height="6"
+                     HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                     Margin="0,0,-3,-3"/>
+          </Panel>
+        </Button>
       </StackPanel>
 
       <Rectangle Width="1" Margin="0,2" Fill="{StaticResource Border}"/>

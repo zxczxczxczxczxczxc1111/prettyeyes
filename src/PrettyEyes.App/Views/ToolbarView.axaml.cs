@@ -42,6 +42,7 @@ public partial class ToolbarView : UserControl
         PencilButton.Click += (_, _) => Pick(ToolKind.Pencil);
         MarkerButton.Click += (_, _) => Pick(ToolKind.Marker);
         EmojiButton.Click += (_, _) => Pick(ToolKind.Emoji);
+        TextButton.Click += (_, _) => Pick(ToolKind.Text);
         UndoButton.Click += (_, _) => UndoClicked?.Invoke(this, EventArgs.Empty);
         CopyButton.Click += (_, _) => CopyClicked?.Invoke(this, EventArgs.Empty);
         // Shift on the save button means "ask me where", even when autosave is
@@ -107,6 +108,7 @@ public partial class ToolbarView : UserControl
         yield return (RectDot, ToolKind.Rectangle);
         yield return (PencilDot, ToolKind.Pencil);
         yield return (MarkerDot, ToolKind.Marker);
+        yield return (TextDot, ToolKind.Text);
     }
 
     /// <summary>Null means no tool is picked and the pointer edits the selection.</summary>
@@ -159,6 +161,7 @@ public partial class ToolbarView : UserControl
         yield return (RectButton, ToolKind.Rectangle);
         yield return (PencilButton, ToolKind.Pencil);
         yield return (MarkerButton, ToolKind.Marker);
+        yield return (TextButton, ToolKind.Text);
     }
 
     /// <summary>Puts the chosen glyph on the emoji button.</summary>
