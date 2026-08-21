@@ -26,6 +26,9 @@ public partial class ToolStylePopup : UserControl
     private ToolKind _kind = ToolKind.Arrow;
     private ToolStyle _style = ToolStyle.Default;
 
+    /// <summary>Showing a style rather than reacting to a choice.</summary>
+    private bool _loading;
+
     public ToolStylePopup()
     {
         InitializeComponent();
@@ -39,10 +42,17 @@ public partial class ToolStylePopup : UserControl
         MediumStep.Click += (_, _) => Pick(_style with { Size = StrokeSize.Medium });
         LargeStep.Click += (_, _) => Pick(_style with { Size = StrokeSize.Large });
 
-        foreach (var family in Families)
+        // Null first, then whatever this machine has, alphabetically. The list
+        // is no longer curated: a dropdown can hold three hundred families
+        // where a column of buttons could not.
+        Fonts.ItemsSource = Families;
+        Fonts.SelectionChanged += (_, _) =>
         {
-            Fonts.Children.Add(NewFontButton(family));
-        }
+            if (!_loading && Fonts.SelectedItem is string chosen)
+            {
+                Pick(_style with { FontFamily = chosen == SystemFont ? null : chosen });
+            }
+        };
 
         SmallerType.Click += (_, _) => Resize(-TextAnnotation.SizeStep);
         BiggerType.Click += (_, _) => Resize(TextAnnotation.SizeStep);
@@ -50,17 +60,8 @@ public partial class ToolStylePopup : UserControl
         OutlineBackdrop.Click += (_, _) => Pick(_style with { TextBackdrop = TextBackdrop.Outline });
     }
 
-    /// <summary>
-    /// The families offered, in the order they are shown. Null is whatever this
-    /// machine calls its interface font.
-    ///
-    /// A short list rather than everything installed: a picker over three
-    /// hundred families is a different control than this card has, and none of
-    /// the rest are fonts anybody labels a screenshot with. What is stored is
-    /// still a name, so a settings file may carry any family at all.
-    /// </summary>
-    private static readonly string?[] Families =
-        [null, "Segoe UI", "Arial", "Times New Roman", "Consolas"];
+    /// <summary>What the first entry says. Stored as null, shown as a word.</summary>
+    private const string SystemFont = "Системный";
 
     /// <summary>
     /// Only the families this machine actually has. Offering one that is not
@@ -68,6 +69,14 @@ public partial class ToolStylePopup : UserControl
     /// </summary>
     private static readonly HashSet<string> Installed =
         [.. SKFontManager.Default.GetFontFamilies()];
+
+    /// <summary>
+    /// Everything installed, with the system font first. Sorted, because the
+    /// font manager hands them back in whatever order it found them and a list
+    /// of three hundred unsorted names is a list nobody can use.
+    /// </summary>
+    private static readonly string[] Families =
+        [SystemFont, .. Installed.OrderBy(name => name, StringComparer.CurrentCultureIgnoreCase)];
 
     /// <summary>The tool and the style it should draw with from now on.</summary>
     public event EventHandler<(ToolKind Kind, ToolStyle Style)>? StyleChanged;
@@ -124,20 +133,11 @@ public partial class ToolStylePopup : UserControl
 
         TypeSize.Text = _style.FontSize.ToString(CultureInfo.InvariantCulture);
 
-        foreach (var child in Fonts.Children)
-        {
-            if (child is not Button button)
-            {
-                continue;
-            }
-
-            button.Classes.Remove(ActiveClass);
-
-            if ((button.Tag as string) == _style.FontFamily)
-            {
-                button.Classes.Add(ActiveClass);
-            }
-        }
+        // Setting the selection raises SelectionChanged, and answering that
+        // would store the style we are only displaying.
+        _loading = true;
+        Fonts.SelectedItem = _style.FontFamily ?? SystemFont;
+        _loading = false;
 
         Mark(PlateBackdrop, _style.TextBackdrop == TextBackdrop.Plate);
         Mark(OutlineBackdrop, _style.TextBackdrop == TextBackdrop.Outline);
@@ -171,31 +171,6 @@ public partial class ToolStylePopup : UserControl
         {
             FontSize = Math.Clamp(_style.FontSize + step, ToolStyle.MinFontSize, ToolStyle.MaxFontSize),
         });
-
-    private Button NewFontButton(string? family)
-    {
-        var button = new Button
-        {
-            Tag = family,
-            MinWidth = 136,
-            HorizontalContentAlignment = HorizontalAlignment.Left,
-            Padding = new Thickness(8, 0, 8, 0),
-            Content = new TextBlock
-            {
-                Text = family ?? "Системный",
-                FontFamily = family is null ? FontFamily.Default : new FontFamily(family),
-            },
-        };
-
-        button.Classes.Add("step");
-
-        // Not installed, so not offered: picking it would draw something else
-        // and call it that font.
-        button.IsVisible = family is null || Installed.Contains(family);
-        button.Click += (_, _) => Pick(_style with { FontFamily = family });
-
-        return button;
-    }
 
     private void Pick(ToolStyle style)
     {

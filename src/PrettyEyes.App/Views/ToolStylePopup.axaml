@@ -26,6 +26,10 @@
 
     <Style Selector="Button.step">
       <Setter Property="Height" Value="28"/>
+      <!-- Said out loud: a Button left to itself puts its content at the top,
+           and the minus of the size stepper sat on the ceiling. -->
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="MinWidth" Value="44"/>
       <Setter Property="Padding" Value="0"/>
       <Setter Property="Background" Value="Transparent"/>
@@ -90,35 +94,42 @@
       </StackPanel>
 
       <!-- The text tool has nothing to do with stroke width, so it gets this
-           row instead of that one. Both never show at once. -->
-      <StackPanel x:Name="TextRow" IsVisible="False" Spacing="10">
-        <StackPanel x:Name="Fonts" Spacing="4"/>
+           row instead of that one. Both never show at once.
+
+           One column of three short rows rather than a tower: font, then size
+           and backdrop side by side. The card used to run twice as tall as the
+           others for no reason anybody could name. -->
+      <StackPanel x:Name="TextRow" IsVisible="False" Spacing="8">
+        <ComboBox x:Name="Fonts" Classes="field" HorizontalAlignment="Stretch"
+                  MaxDropDownHeight="260"/>
 
         <TextBlock x:Name="FontMissing"
                    IsVisible="False"
                    TextWrapping="Wrap"
-                   MaxWidth="220"
+                   MaxWidth="240"
+                   FontSize="11"
                    Foreground="{StaticResource TextDim}"/>
 
         <StackPanel Orientation="Horizontal" Spacing="4">
-          <Button Classes="step" x:Name="SmallerType" MinWidth="32" ToolTip.Tip="Мельче">
+          <Button Classes="step" x:Name="SmallerType" MinWidth="28" ToolTip.Tip="Мельче">
             <TextBlock Text="-"/>
           </Button>
-          <Border MinWidth="44" VerticalAlignment="Center">
+          <Border MinWidth="34" VerticalAlignment="Center">
             <TextBlock x:Name="TypeSize"
                        HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
                        Foreground="{StaticResource TextStrong}"/>
           </Border>
-          <Button Classes="step" x:Name="BiggerType" MinWidth="32" ToolTip.Tip="Крупнее">
+          <Button Classes="step" x:Name="BiggerType" MinWidth="28" ToolTip.Tip="Крупнее">
             <TextBlock Text="+"/>
           </Button>
-        </StackPanel>
 
-        <StackPanel Orientation="Horizontal" Spacing="4">
-          <Button Classes="step" x:Name="PlateBackdrop" MinWidth="66">
+          <Rectangle Width="1" Margin="6,4" Fill="{StaticResource Border}"/>
+
+          <Button Classes="step" x:Name="PlateBackdrop" MinWidth="58" ToolTip.Tip="Подложка под текстом">
             <TextBlock Text="Плашка"/>
           </Button>
-          <Button Classes="step" x:Name="OutlineBackdrop" MinWidth="66">
+          <Button Classes="step" x:Name="OutlineBackdrop" MinWidth="58" ToolTip.Tip="Обводка вместо подложки">
             <TextBlock Text="Обводка"/>
           </Button>
         </StackPanel>
