@@ -43,6 +43,7 @@ public partial class ToolbarView : UserControl
         MarkerButton.Click += (_, _) => Pick(ToolKind.Marker);
         EmojiButton.Click += (_, _) => Pick(ToolKind.Emoji);
         TextButton.Click += (_, _) => Pick(ToolKind.Text);
+        PinButton.Click += (_, _) => PinClicked?.Invoke(this, EventArgs.Empty);
         UndoButton.Click += (_, _) => UndoClicked?.Invoke(this, EventArgs.Empty);
         CopyButton.Click += (_, _) => CopyClicked?.Invoke(this, EventArgs.Empty);
         // Shift on the save button means "ask me where", even when autosave is
@@ -56,6 +57,9 @@ public partial class ToolbarView : UserControl
     /// </summary>
     public event EventHandler<ToolKind?>? ToolPicked;
 
+    /// <summary>Nail the selection above every window and leave the overlay up.</summary>
+    public event EventHandler? PinClicked;
+
     public event EventHandler? UndoClicked;
 
     public event EventHandler? CopyClicked;
@@ -65,6 +69,16 @@ public partial class ToolbarView : UserControl
 
     /// <summary>Right click on a tool: its style card wants to open.</summary>
     public event EventHandler<ToolKind>? StyleRequested;
+
+    /// <summary>
+    /// Whether the pin button is offered at all. A pinned window is already
+    /// pinned, and the button there would nail a copy of itself to the same
+    /// spot.
+    /// </summary>
+    public bool CanPin
+    {
+        set => PinButton.IsVisible = value;
+    }
 
     /// <summary>Paints the dot that says what colour each tool will draw with.</summary>
     public void ShowStyles(ToolStyles styles)

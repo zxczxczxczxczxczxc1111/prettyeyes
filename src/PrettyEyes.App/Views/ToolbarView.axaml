@@ -141,6 +141,11 @@
       <Rectangle Width="1" Margin="0,2" Fill="{StaticResource Border}"/>
 
       <StackPanel Orientation="Horizontal" Spacing="2">
+        <!-- A pushpin. Next to the outputs rather than among the tools: it
+             produces something, it does not draw. -->
+        <Button Classes="tool" x:Name="PinButton" ToolTip.Tip="Закрепить поверх окон">
+          <Path Data="M9.5,2.5 L13.5,6.5 M11,4 L7.5,6 L5,8.5 L7.5,11 L10,8.5 L12,5 M5,11 L2.5,13.5"/>
+        </Button>
         <Button Classes="tool" x:Name="UndoButton" ToolTip.Tip="Отменить">
           <Path Data="M6,4.5 L3,7.5 L6,10.5 M3,7.5 H9.5 A3.25,3.25 0 1 1 9.5,14 H7"/>
         </Button>

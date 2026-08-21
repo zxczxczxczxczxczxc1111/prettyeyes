@@ -1,0 +1,26 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:PrettyEyes.App.Controls"
+        xmlns:views="using:PrettyEyes.App.Views"
+        x:Class="PrettyEyes.App.Views.PinnedWindow"
+        SystemDecorations="None"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Background="Transparent"
+        CanResize="False">
+  <Panel x:Name="Root">
+    <controls:PinnedCanvas x:Name="Surface"/>
+
+    <!-- A hairline so a screenshot pinned over a window of the same colour is
+         still a thing with edges rather than a hole in the desktop. -->
+    <Border BorderBrush="{StaticResource Border}" BorderThickness="1" IsHitTestVisible="False"/>
+
+    <views:ToolbarView x:Name="Toolbar" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                       Margin="0,0,0,8" IsVisible="False"/>
+    <views:ToolStylePopup x:Name="StyleCard" HorizontalAlignment="Left" VerticalAlignment="Top"
+                          IsVisible="False"/>
+    <views:EmojiPickerView x:Name="EmojiCard" HorizontalAlignment="Left" VerticalAlignment="Top"
+                           IsVisible="False"/>
+  </Panel>
+</Window>

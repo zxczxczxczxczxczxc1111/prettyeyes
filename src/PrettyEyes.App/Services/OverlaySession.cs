@@ -70,6 +70,7 @@ public sealed class OverlaySession
             window.SaveRequested += OnSaveRequested;
             window.ColourCopyRequested += OnColourCopyRequested;
             window.ToolCleared += OnToolCleared;
+            window.ToolbarControl.PinClicked += OnPinClicked;
             window.ToolbarControl.StyleRequested += OnStyleRequested;
             window.StyleCardControl.StyleChanged += OnStyleChanged;
             window.EmojiCardControl.Picked += OnEmojiPicked;
@@ -133,6 +134,7 @@ public sealed class OverlaySession
         window.SaveRequested -= OnSaveRequested;
         window.ColourCopyRequested -= OnColourCopyRequested;
         window.ToolCleared -= OnToolCleared;
+        window.ToolbarControl.PinClicked -= OnPinClicked;
         window.ToolbarControl.StyleRequested -= OnStyleRequested;
         window.StyleCardControl.StyleChanged -= OnStyleChanged;
         window.EmojiCardControl.Picked -= OnEmojiPicked;
@@ -1074,20 +1076,39 @@ public sealed class OverlaySession
             DispatcherPriority.Background);
     }
 
-    private ITool CreateTool(ToolKind kind) => kind switch
+    /// <summary>
+    /// Nails the selection above every window. The overlay stays up on purpose:
+    /// what the overlay drew is baked into the pin's pixels, so the overlay is
+    /// the only way back from "pinned it with the arrow in the wrong place".
+    /// </summary>
+    private void OnPinClicked(object? sender, EventArgs e)
     {
-        ToolKind.Blur => new BlurTool(),
-        ToolKind.Arrow => new ArrowTool(_styles.For(kind)),
-        ToolKind.Line => new LineTool(_styles.For(kind)),
-        ToolKind.Rectangle => new RectangleTool(_styles.For(kind)),
-        ToolKind.Pencil => new StrokeTool(_styles.For(kind)),
-        ToolKind.Marker => new StrokeTool(_styles.For(kind), highlighter: true),
-        ToolKind.Emoji => new EmojiTool(
-            _services.Emoji.Glyph(_emoji ?? string.Empty)
-                ?? throw new InvalidOperationException("Эмодзи не выбран."),
-            Document?.Selection ?? CaptureRect.Empty),
-        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown tool."),
-    };
+        if (Document is null || Document.Selection.IsEmpty)
+        {
+            return;
+        }
+
+        try
+        {
+            _services.Pins.Pin(
+                Document,
+                Document.Selection,
+                _styles,
+                new ToolVisibility(_services.Settings.Tools),
+                drawingAllowed: true,
+                () => _services.Emoji.Glyph(_emoji ?? string.Empty));
+        }
+        catch (InvalidOperationException ex)
+        {
+            Log.Default.Error("не удалось закрепить", ex);
+        }
+    }
+
+    private ITool CreateTool(ToolKind kind) => ToolMaker.Create(
+        kind,
+        _styles,
+        Document?.Selection ?? CaptureRect.Empty,
+        () => _services.Emoji.Glyph(_emoji ?? string.Empty));
 
     public void Redraw()
     {

@@ -79,6 +79,12 @@ public sealed class AppServices : IDisposable
     /// <summary>Overlay windows, built once and reused between captures.</summary>
     public OverlayWindowPool OverlayWindows { get; }
 
+    /// <summary>
+    /// Screenshots pinned above everything. Unlike the overlay pool these are
+    /// not reused: a pin lives as long as somebody keeps it.
+    /// </summary>
+    public PinnedWindows Pins { get; } = new();
+
     /// <summary>The bundled emoji, decoded once at start-up.</summary>
     public EmojiAtlas Emoji { get; }
 
