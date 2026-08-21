@@ -221,50 +221,153 @@ public partial class SettingsWindow : Window
     private void BuildToolRow()
     {
         ToolRow.Children.Clear();
+        FeatureRow.Children.Clear();
 
-        foreach (var kind in ToolVisibility.All)
+        foreach (var feature in ConfigurableFeature.All)
         {
-            var button = new Button
+            var button = NewFeatureButton(feature);
+
+            if (feature.Group == FeatureGroup.DrawingTool)
             {
-                Tag = kind,
-                Content = new Avalonia.Controls.Shapes.Path
-                {
-                    Data = Avalonia.Media.Geometry.Parse(ToolIcon(kind)),
-                },
-            };
-
-            button.Classes.Add("toolpick");
-            ToolTip.SetTip(button, ToolName(kind));
-            button.Click += OnToolToggled;
-
-            ToolRow.Children.Add(button);
+                button.Click += OnToolToggled;
+                ToolRow.Children.Add(button);
+            }
+            else
+            {
+                button.Click += OnFeatureToggled;
+                FeatureRow.Children.Add(button);
+            }
         }
 
         ShowToolRow();
     }
 
+    /// <summary>
+    /// One square in either row. The corner is the whole point of the mark: a
+    /// feature with settings has to look different before the right button is
+    /// pressed, because an invisible button nobody presses is not an affordance.
+    /// Blur is the one square without it.
+    /// </summary>
+    private static Button NewFeatureButton(ConfigurableFeature feature)
+    {
+        var icon = new Avalonia.Controls.Shapes.Path
+        {
+            Data = Avalonia.Media.Geometry.Parse(FeatureIcon(feature.Id)),
+        };
+
+        var content = new Panel();
+        content.Children.Add(icon);
+
+        if (feature.HasSettings)
+        {
+            content.Children.Add(new Avalonia.Controls.Shapes.Path
+            {
+                Data = Avalonia.Media.Geometry.Parse("M0,6 L6,6 L6,0 Z"),
+                Width = 6,
+                Height = 6,
+                Stretch = Avalonia.Media.Stretch.None,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom,
+                Margin = new Thickness(0, 0, 3, 3),
+                Fill = Avalonia.Media.Brushes.Gray,
+                Stroke = null,
+            });
+        }
+
+        var button = new Button
+        {
+            Tag = feature,
+            Content = content,
+        };
+
+        button.Classes.Add("toolpick");
+        ToolTip.SetTip(button, FeatureName(feature.Id));
+
+        return button;
+    }
+
     /// <summary>Which of them are on, right now.</summary>
     private void ShowToolRow()
     {
-        foreach (var child in ToolRow.Children)
+        foreach (var child in ToolRow.Children.Concat(FeatureRow.Children))
         {
-            if (child is not Button button || button.Tag is not ToolKind kind)
+            if (child is not Button button || button.Tag is not ConfigurableFeature feature)
             {
                 continue;
             }
 
             button.Classes.Remove("active");
 
-            if (_tools.IsShown(kind))
+            if (IsFeatureOn(feature))
             {
                 button.Classes.Add("active");
             }
         }
     }
 
+    /// <summary>
+    /// Whether the square is lit. A drawing tool answers from ToolVisibility;
+    /// a feature answers from its own setting, and the cursor answers "yes"
+    /// because there is no such thing as having no cursor.
+    /// </summary>
+    private bool IsFeatureOn(ConfigurableFeature feature) => feature.Id switch
+    {
+        _ when feature.Tool is { } tool => _tools.IsShown(tool),
+        FeatureId.Magnifier => _settings.ShowMagnifier,
+        FeatureId.Cursor => true,
+        FeatureId.QuickSave => (_settings.Save ?? SaveOptions.Default).Enabled,
+        FeatureId.Export => _export.Enabled,
+        FeatureId.Pin => _settings.PinButtonShown,
+        _ => true,
+    };
+
+    /// <summary>
+    /// Left click on a feature square. Deliberately not a switch over every
+    /// FeatureId: the cursor has no off state, and pretending otherwise would
+    /// mean inventing a setting nobody asked for.
+    /// </summary>
+    private void OnFeatureToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    {
+        if (_loading || sender is not Button button || button.Tag is not ConfigurableFeature feature)
+        {
+            return;
+        }
+
+        switch (feature.Id)
+        {
+            case FeatureId.Magnifier:
+                Store(_settings with { ShowMagnifier = !_settings.ShowMagnifier });
+                ShowMagnifierRow();
+                break;
+
+            case FeatureId.QuickSave:
+                var enabled = !(_settings.Save ?? SaveOptions.Default).Enabled;
+                Autosave.IsChecked = enabled;
+                ShowAutosaveState(enabled);
+                StoreSave(save => save with { Enabled = enabled });
+                break;
+
+            case FeatureId.Export:
+                ApplyExport(_export with { Enabled = !_export.Enabled });
+                break;
+
+            case FeatureId.Pin:
+                Store(_settings with { PinButtonShown = !_settings.PinButtonShown });
+                break;
+
+            default:
+                // Cursor, and anything added later without an off state.
+                return;
+        }
+
+        ShowToolRow();
+    }
+
     private void OnToolToggled(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
-        if (_loading || sender is not Button button || button.Tag is not ToolKind kind)
+        if (_loading
+            || sender is not Button button
+            || button.Tag is not ConfigurableFeature { Tool: { } kind })
         {
             return;
         }
@@ -304,6 +407,45 @@ public partial class SettingsWindow : Window
         ToolKind.Pencil => "Карандаш",
         ToolKind.Marker => "Маркер",
         ToolKind.Emoji => "Эмодзи",
+        _ => "Рамка",
+    };
+
+    /// <summary>
+    /// Icons for both rows. Drawing tools keep the outlines the toolbar uses;
+    /// the features borrow shapes from the sections they stand for, so the row
+    /// reads as a map of this window rather than as new vocabulary.
+    /// </summary>
+    private static string FeatureIcon(FeatureId id) => id switch
+    {
+        FeatureId.Blur => ToolIcon(ToolKind.Blur),
+        FeatureId.Arrow => ToolIcon(ToolKind.Arrow),
+        FeatureId.Line => ToolIcon(ToolKind.Line),
+        FeatureId.Rectangle => ToolIcon(ToolKind.Rectangle),
+        FeatureId.Pencil => ToolIcon(ToolKind.Pencil),
+        FeatureId.Marker => ToolIcon(ToolKind.Marker),
+        FeatureId.Emoji => ToolIcon(ToolKind.Emoji),
+        FeatureId.Magnifier => "M7,2.5 A4.5,4.5 0 1 0 7.01,2.5 M10.3,10.3 L13.5,13.5",
+        FeatureId.Cursor => "M4,2.5 L4,12 L6.5,9.5 L8.5,13.5 L10,12.7 L8,9 L11.5,8.5 Z",
+        FeatureId.QuickSave => "M8,3 V10 M5,7.5 L8,10.5 L11,7.5 M3.5,12.5 H12.5",
+        FeatureId.Export => "M3,3.5 H13 V12.5 H3 Z M5.5,6 H10.5 M5.5,8.5 H10.5",
+        FeatureId.Pin => "M9.5,2.5 L13.5,6.5 L11,7 L8,11 L5,8 L9,5 Z M5,11 L2.5,13.5",
+        _ => "M3.5,4 H12.5 V12 H3.5 Z",
+    };
+
+    private static string FeatureName(FeatureId id) => id switch
+    {
+        FeatureId.Blur => ToolName(ToolKind.Blur),
+        FeatureId.Arrow => ToolName(ToolKind.Arrow),
+        FeatureId.Line => ToolName(ToolKind.Line),
+        FeatureId.Rectangle => ToolName(ToolKind.Rectangle),
+        FeatureId.Pencil => ToolName(ToolKind.Pencil),
+        FeatureId.Marker => ToolName(ToolKind.Marker),
+        FeatureId.Emoji => ToolName(ToolKind.Emoji),
+        FeatureId.Magnifier => "Лупа",
+        FeatureId.Cursor => "Курсор",
+        FeatureId.QuickSave => "Быстрое сохранение",
+        FeatureId.Export => "Оформление",
+        FeatureId.Pin => "Закрепление",
         _ => "Рамка",
     };
 
