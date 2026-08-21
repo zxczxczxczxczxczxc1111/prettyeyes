@@ -86,6 +86,11 @@ public sealed class OverlaySession
             window.ToolbarControl.SetActive(_activeTool);
             window.ToolbarControl.ShowStyles(_styles);
             window.ToolbarControl.ShowTools(new ToolVisibility(_services.Settings.Tools));
+
+            // Pinning is not a ToolKind, so its button has a switch of its own.
+            // It arrives on: the headline feature of a release must not be
+            // invisible, and one click puts it away.
+            window.ToolbarControl.CanPin = _services.Settings.PinButtonShown;
             // Text is armed like any other tool but builds nothing: its whole
             // gesture is deciding where the caret goes.
             window.ToolFactory = () =>
@@ -1081,7 +1086,13 @@ public sealed class OverlaySession
     /// what the overlay drew is baked into the pin's pixels, so the overlay is
     /// the only way back from "pinned it with the arrow in the wrong place".
     /// </summary>
-    private void OnPinClicked(object? sender, EventArgs e)
+    private void OnPinClicked(object? sender, EventArgs e) => PinSelection();
+
+    /// <summary>
+    /// Nails the current selection. Public because the hotkey reaches it from
+    /// the application, not through a button.
+    /// </summary>
+    public void PinSelection()
     {
         if (Document is null || Document.Selection.IsEmpty)
         {

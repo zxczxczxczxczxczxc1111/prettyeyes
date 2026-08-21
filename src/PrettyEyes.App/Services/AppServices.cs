@@ -178,6 +178,22 @@ public sealed class AppServices : IDisposable
         var regionRegistered = hotkeys.TryRegister(HotkeyAction.Region, settings.Hotkey);
         var fullScreenRegistered = hotkeys.TryRegister(HotkeyAction.FullScreen, settings.FullScreenHotkey);
 
+        // The three pinning ones arrive unassigned and stay that way until
+        // somebody types something: registering nothing is not a failure, so
+        // they are not part of the warning below either.
+        foreach (var (action, hotkey) in new[]
+        {
+            (HotkeyAction.Pin, settings.PinHotkey),
+            (HotkeyAction.HidePinned, settings.HidePinnedHotkey),
+            (HotkeyAction.ShowPinned, settings.ShowPinnedHotkey),
+        })
+        {
+            if (hotkey is { Assigned: true })
+            {
+                hotkeys.TryRegister(action, hotkey);
+            }
+        }
+
         foreach (var (registered, hotkey) in new[]
         {
             (regionRegistered, settings.Hotkey),

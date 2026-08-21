@@ -43,6 +43,13 @@ public partial class SettingsWindow : Window
     /// a fresh one per right click would rebuild the whole palette each time.
     /// </summary>
     private readonly ToolStylePopup _stylePopup = new();
+
+    /// <summary>
+    /// Pinning has settings of its own and no old section to live in, so its
+    /// card is built here next to the style card rather than waiting for the
+    /// general move of the other sections.
+    /// </summary>
+    private readonly PinSettingsView _pinSettings = new();
     private bool _loading;
 
     /// <summary>
@@ -56,6 +63,9 @@ public partial class SettingsWindow : Window
         // The window has no system frame, so dragging is ours to implement.
         TitleBar.PointerPressed += (_, e) => BeginMoveDrag(e);
         CloseButton.Click += (_, _) => Close();
+
+        _pinSettings.Changed += (_, change) => Store(change(_settings));
+        _pinSettings.HotkeyChanged += (_, typed) => Apply(typed.Action, typed.Hotkey);
 
         _stylePopup.StyleChanged += (_, change) =>
         {
@@ -418,6 +428,14 @@ public partial class SettingsWindow : Window
     /// </summary>
     private void OpenFeatureSettings(ConfigurableFeature feature)
     {
+        if (feature.Id == FeatureId.Pin)
+        {
+            _pinSettings.Load(_settings);
+            Modal.Show(_pinSettings, FeatureName(feature.Id));
+
+            return;
+        }
+
         if (feature.Tool is not { } tool)
         {
             return;
@@ -686,49 +704,100 @@ public partial class SettingsWindow : Window
         if (Taken(action, hotkey))
         {
             Restore(action);
-            ShowWarning("Эта комбинация уже занята вторым хоткеем. Оставил прежнюю.");
+            ShowWarning("Эта комбинация уже занята другим хоткеем. Оставил прежнюю.");
+            return;
+        }
+
+        // Clearing one is not a registration: there is nothing to give to the
+        // system, and asking it for virtual key zero would fail and look like
+        // "the combination is busy".
+        if (!hotkey.Assigned)
+        {
+            _hotkeys.Unregister(action);
+            HideMessage();
+            Store(With(action, hotkey));
+
             return;
         }
 
         if (_hotkeys.TryRegister(action, hotkey))
         {
             HideMessage();
-            Store(action == HotkeyAction.Region
-                ? _settings with { Hotkey = hotkey }
-                : _settings with { FullScreenHotkey = hotkey });
+            Store(With(action, hotkey));
+
             return;
         }
 
         // Put the working combination back so the user is never left without one.
-        _hotkeys.TryRegister(action, Existing(action));
+        if (Existing(action) is { Assigned: true } previous)
+        {
+            _hotkeys.TryRegister(action, previous);
+        }
         Restore(action);
         ShowWarning($"{HotkeyBox.Busy(hotkey)} Оставил прежнюю.");
     }
 
-    /// <summary>Our own two hotkeys must not fight over one combination.</summary>
+    /// <summary>
+    /// Our own hotkeys must not fight over one combination. A table rather than
+    /// a fork: with five actions "Region or else FullScreen" stops being a
+    /// sentence anybody can read.
+    /// </summary>
     private bool Taken(HotkeyAction action, HotkeyDefinition hotkey) =>
-        action == HotkeyAction.Region
-            ? hotkey == _settings.FullScreenHotkey
-            : hotkey == _settings.Hotkey;
+        hotkey.Assigned
+        && Actions()
+            .Where(other => other != action)
+            .Any(other => Existing(other) is { Assigned: true } taken && taken == hotkey);
 
-    private HotkeyDefinition Existing(HotkeyAction action) =>
-        action == HotkeyAction.Region ? _settings.Hotkey : _settings.FullScreenHotkey;
+    private static IEnumerable<HotkeyAction> Actions() =>
+        Enum.GetValues<HotkeyAction>();
 
+    /// <summary>What is currently assigned to an action.</summary>
+    private HotkeyDefinition Existing(HotkeyAction action) => action switch
+    {
+        HotkeyAction.Region => _settings.Hotkey,
+        HotkeyAction.FullScreen => _settings.FullScreenHotkey,
+        HotkeyAction.Pin => _settings.PinHotkey ?? HotkeyDefinition.None,
+        HotkeyAction.HidePinned => _settings.HidePinnedHotkey ?? HotkeyDefinition.None,
+        HotkeyAction.ShowPinned => _settings.ShowPinnedHotkey ?? HotkeyDefinition.None,
+        _ => HotkeyDefinition.None,
+    };
+
+    /// <summary>The same settings with one action's combination replaced.</summary>
+    private AppSettings With(HotkeyAction action, HotkeyDefinition hotkey) => action switch
+    {
+        HotkeyAction.Region => _settings with { Hotkey = hotkey },
+        HotkeyAction.FullScreen => _settings with { FullScreenHotkey = hotkey },
+        HotkeyAction.Pin => _settings with { PinHotkey = hotkey },
+        HotkeyAction.HidePinned => _settings with { HidePinnedHotkey = hotkey },
+        HotkeyAction.ShowPinned => _settings with { ShowPinnedHotkey = hotkey },
+        _ => _settings,
+    };
+
+    /// <summary>Puts the field back to what is actually registered.</summary>
     private void Restore(HotkeyAction action)
     {
         _loading = true;
 
-        if (action == HotkeyAction.Region)
+        var field = Field(action);
+
+        if (field is not null)
         {
-            RegionHotkey.Value = _settings.Hotkey;
-        }
-        else
-        {
-            FullScreenHotkey.Value = _settings.FullScreenHotkey;
+            field.Value = Existing(action);
         }
 
         _loading = false;
     }
+
+    /// <summary>
+    /// The box an action is typed into, or null when its card is not open: the
+    /// three pinning fields live in a modal that exists only while it is shown.
+    /// </summary>
+    private HotkeyBox? Field(HotkeyAction action) => action switch
+    {
+        HotkeyAction.Region => RegionHotkey,
+        HotkeyAction.FullScreen => FullScreenHotkey,
+        _ => _pinSettings.Field(action),
+    };
 
     /// <summary>
     /// Off, on, on with the grid. Turning it off keeps whatever grid choice was
@@ -1136,6 +1205,13 @@ public partial class SettingsWindow : Window
 
     private void Show(string text, string brushKey)
     {
+        // The card covers the page and dims it; the line below would be talking
+        // to a wall.
+        if (Modal.IsOpen)
+        {
+            _pinSettings.Warn(text);
+        }
+
         Message.Text = text;
         Message.Foreground = (IBrush)Application.Current!.FindResource(brushKey)!;
         Message.IsVisible = true;

@@ -34,13 +34,29 @@ public partial class App : Application
 
             Services.Hotkeys.Pressed += (_, action) =>
             {
-                if (action == HotkeyAction.Region)
+                switch (action)
                 {
-                    StartCapture();
-                }
-                else
-                {
-                    _ = CaptureMonitorAsync();
+                    case HotkeyAction.Region:
+                        StartCapture();
+                        break;
+
+                    case HotkeyAction.FullScreen:
+                        _ = CaptureMonitorAsync();
+                        break;
+
+                    case HotkeyAction.HidePinned:
+                        Services.Pins.HideAll();
+                        break;
+
+                    case HotkeyAction.ShowPinned:
+                        Services.Pins.ShowAll();
+                        break;
+
+                    // Pin has nothing to act on outside a capture: it pins the
+                    // current selection, and without an overlay there is none.
+                    case HotkeyAction.Pin:
+                        _session?.PinSelection();
+                        break;
                 }
             };
 
@@ -338,7 +354,15 @@ public partial class App : Application
 
         // Applied the moment it changes, not when the window shuts: the
         // settings window stays open while the next screenshot is taken.
-        _settings.Changed += (_, settings) => Services.Settings = settings;
+        _settings.Changed += (_, settings) =>
+        {
+            Services.Settings = settings;
+
+            // Applied to the windows already on screen, not only to the next
+            // one: this is the switch that keeps a pin out of a shared screen,
+            // and "from now on" would be the wrong moment.
+            Services.Pins.HideFromCapture(settings.HidePinnedOnCapture);
+        };
 
         _settings.Closed += (_, _) =>
         {

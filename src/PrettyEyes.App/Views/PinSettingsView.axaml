@@ -1,0 +1,73 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:PrettyEyes.App.Controls"
+             x:Class="PrettyEyes.App.Views.PinSettingsView"
+             Width="360">
+  <UserControl.Styles>
+    <!-- Local, because Button.step lives inside the tool card's own styles and
+         does not reach a control that is not its child. -->
+    <Style Selector="Button.step">
+      <Setter Property="Height" Value="28"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Background" Value="{StaticResource Fill}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+      <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.step:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource FillHover}"/>
+    </Style>
+  </UserControl.Styles>
+
+  <StackPanel Spacing="16">
+    <!-- The window's own message line sits at the very bottom of a long page,
+         behind the dimmed sheet: a warning shown there while this card is open
+         is a warning nobody sees. -->
+    <TextBlock x:Name="Message" IsVisible="False" FontSize="12" TextWrapping="Wrap"
+               Foreground="{StaticResource Warn}"/>
+
+    <StackPanel Spacing="8">
+      <TextBlock Text="Прозрачность нового окна" Foreground="{StaticResource Text}"/>
+      <TextBlock Text="Крутится колесом с Ctrl в самом окне, здесь только то, с чего оно открывается"
+                 Foreground="{StaticResource TextFaint}" FontSize="11" TextWrapping="Wrap"/>
+      <StackPanel Orientation="Horizontal" Spacing="4">
+        <Button Classes="step" x:Name="LessOpaque" MinWidth="32" ToolTip.Tip="Прозрачнее">
+          <TextBlock Text="-" VerticalAlignment="Center"/>
+        </Button>
+        <Border MinWidth="56" VerticalAlignment="Center">
+          <TextBlock x:Name="OpacityValue" HorizontalAlignment="Center"
+                     Foreground="{StaticResource TextStrong}"/>
+        </Border>
+        <Button Classes="step" x:Name="MoreOpaque" MinWidth="32" ToolTip.Tip="Плотнее">
+          <TextBlock Text="+" VerticalAlignment="Center"/>
+        </Button>
+      </StackPanel>
+    </StackPanel>
+
+    <CheckBox x:Name="DrawOnPinned" Content="Рисовать на закреплённом"/>
+
+    <StackPanel Spacing="4">
+      <CheckBox x:Name="HideOnCapture" Content="Скрывать закреплённые при захвате"/>
+      <TextBlock Text="Их не будет и в демонстрации экрана, и в записи"
+                 Foreground="{StaticResource TextFaint}" FontSize="11" TextWrapping="Wrap"
+                 Margin="26,0,0,0"/>
+    </StackPanel>
+
+    <StackPanel Spacing="8">
+      <TextBlock Text="Закрепить выделенное" Foreground="{StaticResource Text}"/>
+      <controls:HotkeyBox x:Name="PinHotkey" Classes="field" HorizontalAlignment="Stretch"/>
+    </StackPanel>
+
+    <StackPanel Spacing="8">
+      <TextBlock Text="Спрятать все закреплённые" Foreground="{StaticResource Text}"/>
+      <controls:HotkeyBox x:Name="HidePinnedHotkey" Classes="field" HorizontalAlignment="Stretch"/>
+    </StackPanel>
+
+    <StackPanel Spacing="8">
+      <TextBlock Text="Показать все закреплённые" Foreground="{StaticResource Text}"/>
+      <controls:HotkeyBox x:Name="ShowPinnedHotkey" Classes="field" HorizontalAlignment="Stretch"/>
+    </StackPanel>
+  </StackPanel>
+</UserControl>

@@ -52,6 +52,11 @@ public sealed class HotkeyBox : Button
 
     public static string Describe(HotkeyDefinition hotkey)
     {
+        if (!hotkey.Assigned)
+        {
+            return "не назначена";
+        }
+
         var parts = new List<string>();
 
         if (hotkey.Modifiers.HasFlag(HotkeyModifiers.Control))
