@@ -1,5 +1,6 @@
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
+using PrettyEyes.Core.Rendering;
 using PrettyEyes.Core.Text;
 using PrettyEyes.Core.Tools;
 using SkiaSharp;
@@ -73,7 +74,7 @@ public sealed class TextAnnotation : IMovable
             (Bounds.Height - resized.Bounds.Height) / 2);
     }
 
-    public void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin) => Draw(canvas, underlay: null);
+    public void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin, BlurCache cache) => Draw(canvas, underlay: null);
 
     /// <summary>
     /// The same drawing with something painted between the plate and the

@@ -3,6 +3,7 @@ using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Text;
 using PrettyEyes.Core.Tools;
 using SkiaSharp;
+using PrettyEyes.Core.Tests.Rendering;
 using Xunit;
 
 namespace PrettyEyes.Core.Tests.Text;
@@ -53,13 +54,13 @@ public class TextPreviewTests
         using (source)
         using (on)
         {
-            new TextPreview(label, editor, caretOn: true).Draw(on.Canvas, source, CaptureRect.Empty);
+            new TextPreview(label, editor, caretOn: true).Draw(on.Canvas, source, CaptureRect.Empty, Caches.Unused);
 
             var (off, _) = Canvas();
 
             using (off)
             {
-                new TextPreview(label, editor, caretOn: false).Draw(off.Canvas, source, CaptureRect.Empty);
+                new TextPreview(label, editor, caretOn: false).Draw(off.Canvas, source, CaptureRect.Empty, Caches.Unused);
 
                 // The caret is drawn in the colour of the text: it is the
                 // text, one character early.
@@ -83,7 +84,7 @@ public class TextPreviewTests
         using (surface)
         {
             var preview = new TextPreview(label, editor, caretOn: true);
-            preview.Draw(surface.Canvas, source, CaptureRect.Empty);
+            preview.Draw(surface.Canvas, source, CaptureRect.Empty, Caches.Unused);
 
             // The label has no box of its own yet, so the preview has to own one
             // or the caret has nowhere to be.
@@ -104,14 +105,14 @@ public class TextPreviewTests
         using (source)
         using (surface)
         {
-            new TextPreview(label, editor, caretOn: false).Draw(surface.Canvas, source, CaptureRect.Empty);
+            new TextPreview(label, editor, caretOn: false).Draw(surface.Canvas, source, CaptureRect.Empty, Caches.Unused);
 
             var (plain, _) = Canvas();
 
             using (plain)
             {
                 new TextPreview(label, new TextEditor("abc"), caretOn: false)
-                    .Draw(plain.Canvas, source, CaptureRect.Empty);
+                    .Draw(plain.Canvas, source, CaptureRect.Empty, Caches.Unused);
 
                 Assert.NotEqual(Pixels(plain), Pixels(surface));
             }
@@ -135,9 +136,9 @@ public class TextPreviewTests
         using (plain)
         {
             new TextPreview(label, new TextEditor("abc"), caretOn: false)
-                .Draw(preview.Canvas, source, CaptureRect.Empty);
+                .Draw(preview.Canvas, source, CaptureRect.Empty, Caches.Unused);
 
-            label.Draw(plain.Canvas, source, CaptureRect.Empty);
+            label.Draw(plain.Canvas, source, CaptureRect.Empty, Caches.Unused);
 
             // Nothing extra creeps in between keystrokes: what is on screen
             // while typing is what stays there after the label is committed.

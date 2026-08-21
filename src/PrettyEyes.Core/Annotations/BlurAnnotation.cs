@@ -28,7 +28,7 @@ public sealed class BlurAnnotation : IAnnotation
 
     public CaptureRect Bounds { get; }
 
-    public void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin)
+    public void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin, BlurCache cache)
     {
         if (Bounds.IsEmpty)
         {
@@ -55,7 +55,7 @@ public sealed class BlurAnnotation : IAnnotation
         // Computed once per region and kept: the blur tool builds a new
         // annotation on every pointer move, so a cache inside this object would
         // never be hit. Measured cost of a miss: about 1.5 ms.
-        var blurred = BlurCache.Shared.Get(source, padded, sigma, () => Build(source, padded, sigma));
+        var blurred = cache.Get(source, padded, sigma, () => Build(source, padded, sigma));
 
         var clip = SKRect.Create(Bounds.X, Bounds.Y, Bounds.Width, Bounds.Height);
 

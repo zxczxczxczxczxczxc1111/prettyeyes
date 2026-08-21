@@ -1,4 +1,5 @@
 using PrettyEyes.Core.Geometry;
+using PrettyEyes.Core.Rendering;
 using SkiaSharp;
 
 namespace PrettyEyes.Core.Model;
@@ -42,6 +43,16 @@ public sealed class Document : IDisposable
     }
 
     public SKImage Source { get; }
+
+    /// <summary>
+    /// Blurred slices of this document's capture. One per document rather than
+    /// one per process: a pinned window and a live overlay are two documents at
+    /// once, and a shared sixteen-entry cache had them evicting each other.
+    ///
+    /// Keyed by the capture's own id, so it cannot hand out a stale slice, and
+    /// it dies with the frame it sampled.
+    /// </summary>
+    public BlurCache BlurCache { get; } = new();
 
     /// <summary>
     /// Where the captured frame sits in virtual-desktop coordinates.
@@ -248,5 +259,9 @@ public sealed class Document : IDisposable
             ? [.. _annotations]
             : [.. _annotations.Where(annotation => !ReferenceEquals(annotation, _detached))];
 
-    public void Dispose() => Source.Dispose();
+    public void Dispose()
+    {
+        BlurCache.Dispose();
+        Source.Dispose();
+    }
 }

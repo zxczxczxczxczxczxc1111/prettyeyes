@@ -115,4 +115,53 @@ public class BlurCacheTests
 
         cache.Dispose();
     }
+
+    [Fact]
+    public void Eviction_lets_go_of_the_image_instead_of_disposing_it()
+    {
+        // A pinned window can still be drawing with a slice that fell out of
+        // the cache: eviction is a memory decision, not permission to destroy
+        // pixels somebody else is holding. Disposing here is how a live window
+        // lost its image mid-frame, in silence.
+        using var cache = new BlurCache();
+        using var source = NewSource(SKColors.Blue);
+
+        var oldest = cache.Get(source, new CaptureRect(0, 0, 40, 40), 8f, NewSlice);
+
+        // Capacity is sixteen, so sixteen more distinct regions push it out.
+        for (var i = 1; i <= 16; i++)
+        {
+            cache.Get(source, new CaptureRect(i, 0, 40, 40), 8f, NewSlice);
+        }
+
+        // IsDisposed is protected internal on SKNativeObject and invisible from
+        // here; the handle is the same fact said out loud.
+        Assert.NotEqual(IntPtr.Zero, oldest.Handle);
+
+        oldest.Dispose();
+    }
+
+    [Fact]
+    public void One_documents_cache_does_not_evict_another_documents_image()
+    {
+        // Guard rather than driver: separate instances are already separate.
+        // What it pins down is that nothing goes back to a process-wide cache,
+        // which is what made a pinned window and a live overlay share one
+        // sixteen-entry budget.
+        using var mine = new BlurCache();
+        using var theirs = new BlurCache();
+        using var source = NewSource(SKColors.Blue);
+        var region = new CaptureRect(10, 10, 40, 40);
+
+        var kept = theirs.Get(source, region, 8f, NewSlice);
+
+        // Different regions on purpose: sixty-four hits on one key evict nothing.
+        for (var i = 0; i < 64; i++)
+        {
+            mine.Get(source, new CaptureRect(i, 0, 40, 40), 8f, NewSlice);
+        }
+
+        Assert.Same(kept, theirs.Get(source, region, 8f, NewSlice));
+        Assert.Equal(1, theirs.Computed);
+    }
 }

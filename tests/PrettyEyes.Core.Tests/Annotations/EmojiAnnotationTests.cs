@@ -2,6 +2,7 @@ using PrettyEyes.Core.Annotations;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Tools;
 using SkiaSharp;
+using PrettyEyes.Core.Tests.Rendering;
 using Xunit;
 
 namespace PrettyEyes.Core.Tests.Annotations;
@@ -24,7 +25,7 @@ public class EmojiAnnotationTests
         surface.Canvas.Clear(SKColors.Black);
 
         new EmojiAnnotation(new CaptureRect(50, 50, 40, 40), glyph)
-            .Draw(surface.Canvas, glyph, new CaptureRect(0, 0, 200, 200));
+            .Draw(surface.Canvas, glyph, new CaptureRect(0, 0, 200, 200), Caches.Unused);
 
         using var image = surface.Snapshot();
         using var pixels = image.PeekPixels();
@@ -42,7 +43,7 @@ public class EmojiAnnotationTests
         surface.Canvas.Clear(SKColors.Black);
 
         new EmojiAnnotation(CaptureRect.Empty, glyph)
-            .Draw(surface.Canvas, glyph, new CaptureRect(0, 0, 50, 50));
+            .Draw(surface.Canvas, glyph, new CaptureRect(0, 0, 50, 50), Caches.Unused);
 
         using var image = surface.Snapshot();
         using var pixels = image.PeekPixels();

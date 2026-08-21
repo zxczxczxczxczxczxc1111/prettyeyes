@@ -124,7 +124,7 @@ public static class DocumentRenderer
 
         foreach (var annotation in document.SnapshotAnnotations())
         {
-            annotation.Draw(canvas, document.Source, frame);
+            annotation.Draw(canvas, document.Source, frame, document.BlurCache);
         }
 
         return surface.Snapshot();

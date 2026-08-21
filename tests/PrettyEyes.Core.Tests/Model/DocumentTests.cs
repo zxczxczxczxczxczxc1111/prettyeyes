@@ -1,5 +1,6 @@
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
+using PrettyEyes.Core.Rendering;
 using SkiaSharp;
 using Xunit;
 
@@ -11,7 +12,7 @@ public class DocumentTests
     {
         public CaptureRect Bounds => new(0, 0, 10, 10);
 
-        public void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin)
+        public void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin, BlurCache cache)
         {
         }
     }

@@ -1148,11 +1148,10 @@ public sealed class OverlaySession
             FadeOut,
             () =>
             {
-                // Blurred slices belong to the capture that is going away.
-                BlurCache.Shared.Clear();
-
                 // Roughly 29 MB on two 2K monitors: one leak per hotkey press
-                // adds up fast.
+                // adds up fast. The blurred slices go with it: the cache is a
+                // field of the document now, so it no longer needs clearing by
+                // hand and cannot outlive the frame it sampled.
                 frame?.Dispose();
             });
 

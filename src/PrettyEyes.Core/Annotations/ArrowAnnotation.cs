@@ -1,5 +1,6 @@
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
+using PrettyEyes.Core.Rendering;
 using SkiaSharp;
 
 namespace PrettyEyes.Core.Annotations;
@@ -35,7 +36,7 @@ public sealed class ArrowAnnotation : IAnnotation
 
     public CaptureRect Bounds { get; }
 
-    public void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin)
+    public void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin, BlurCache cache)
     {
         using var paint = new SKPaint
         {

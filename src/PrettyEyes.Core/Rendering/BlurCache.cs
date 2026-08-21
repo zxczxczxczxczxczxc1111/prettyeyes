@@ -16,6 +16,10 @@ namespace PrettyEyes.Core.Rendering;
 /// Entries are raster images: the same one is drawn by the overlay on the
 /// render thread and by the exporter on the UI thread. That is also why every
 /// access is behind a lock.
+///
+/// One cache per document, not one per process. Two documents alive at once -
+/// a pinned window and a fresh overlay - would otherwise share a sixteen-entry
+/// budget and evict each other's pixels.
 /// </summary>
 public sealed class BlurCache : IDisposable
 {
@@ -25,8 +29,6 @@ public sealed class BlurCache : IDisposable
     /// pixels for its own region only.
     /// </summary>
     private const int Capacity = 16;
-
-    private static BlurCache? _shared;
 
     private readonly object _gate = new();
 
@@ -41,13 +43,6 @@ public sealed class BlurCache : IDisposable
     /// is a cache nobody can trust.
     /// </summary>
     public int Computed { get; private set; }
-
-    /// <summary>
-    /// One cache for the process. The captured screen changes between captures,
-    /// but so do the regions, and a stale entry cannot be addressed: the key
-    /// carries the capture's own identity.
-    /// </summary>
-    public static BlurCache Shared => _shared ??= new BlurCache();
 
     /// <summary>
     /// The blurred slice for this region, computed once. The factory runs under
@@ -76,10 +71,11 @@ public sealed class BlurCache : IDisposable
                 var oldest = _order[0];
                 _order.RemoveAt(0);
 
-                if (_entries.Remove(oldest, out var evicted))
-                {
-                    evicted.Dispose();
-                }
+                // Dropped, not disposed: somebody may still be drawing with
+                // this slice, and eviction is a memory decision rather than
+                // permission to destroy pixels that are in use. The finalizer
+                // collects it once nobody holds it.
+                _entries.Remove(oldest);
             }
 
             return image;

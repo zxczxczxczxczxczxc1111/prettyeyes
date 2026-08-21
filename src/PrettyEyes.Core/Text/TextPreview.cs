@@ -1,6 +1,7 @@
 using PrettyEyes.Core.Annotations;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
+using PrettyEyes.Core.Rendering;
 using PrettyEyes.Core.Tools;
 using SkiaSharp;
 
@@ -44,7 +45,7 @@ public sealed class TextPreview : IAnnotation
 
     public CaptureRect Bounds { get; }
 
-    public void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin)
+    public void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin, BlurCache cache)
     {
         _label.Draw(canvas, DrawSelection);
 

@@ -10,6 +10,7 @@ using Avalonia.Skia;
 using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
+using PrettyEyes.Core.Rendering;
 using SkiaSharp;
 using CaptureRect = PrettyEyes.Core.Geometry.CaptureRect;
 
@@ -260,6 +261,7 @@ public sealed class CaptureCanvas : Control
         context.Custom(new CaptureDrawOperation(
             new Rect(Bounds.Size),
             _source,
+            _document.BlurCache,
             _frameBounds,
             _monitorBounds,
             _monitorUsable,
@@ -306,6 +308,12 @@ public sealed class CaptureCanvas : Control
         private const byte GridAlpha = 15;
 
         private readonly SKImage _source;
+
+        // The operation deliberately does not hold the document: it lives on
+        // the render thread. The cache comes along as its own field because the
+        // blur still needs the one that belongs to this capture.
+        private readonly BlurCache _cache;
+
         private readonly CaptureRect _frame;
         private readonly CaptureRect _monitor;
 
@@ -322,7 +330,7 @@ public sealed class CaptureCanvas : Control
         private readonly bool _magnifierGrid;
 
         public CaptureDrawOperation(
-            Rect bounds, SKImage source, CaptureRect frame, CaptureRect monitor,
+            Rect bounds, SKImage source, BlurCache cache, CaptureRect frame, CaptureRect monitor,
             CaptureRect usable, CaptureRect selection, IReadOnlyList<IAnnotation> annotations,
             IAnnotation? preview, float scaling, float veilOpacity, float frameOpacity,
             PixelPoint? magnifierAt, bool magnifierGrid)
@@ -331,6 +339,7 @@ public sealed class CaptureCanvas : Control
             _magnifierGrid = magnifierGrid;
             Bounds = bounds;
             _source = source;
+            _cache = cache;
             _frame = frame;
             _monitor = monitor;
             _usable = usable;
@@ -428,10 +437,13 @@ public sealed class CaptureCanvas : Control
 
                 foreach (var annotation in _annotations)
                 {
-                    annotation.Draw(canvas, _source, _frame);
+                    annotation.Draw(canvas, _source, _frame, _cache);
                 }
 
-                _preview?.Draw(canvas, _source, _frame);
+                // The preview is not in the document, but a blur being dragged
+                // is exactly the case the cache exists for, so it gets the same
+                // one.
+                _preview?.Draw(canvas, _source, _frame, _cache);
 
                 canvas.Restore();
 

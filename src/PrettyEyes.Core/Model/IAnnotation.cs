@@ -1,4 +1,5 @@
 using PrettyEyes.Core.Geometry;
+using PrettyEyes.Core.Rendering;
 using SkiaSharp;
 
 namespace PrettyEyes.Core.Model;
@@ -22,5 +23,10 @@ public interface IAnnotation
     /// are negative whenever a monitor is placed left of or above the primary
     /// one, and sampling code has to subtract them to hit the right pixels.
     /// </param>
-    void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin);
+    /// <param name="cache">
+    /// Where expensive sampled effects keep their result. Handed in rather than
+    /// reached for: the cache belongs to one document, and an annotation has no
+    /// way to know which document is drawing it.
+    /// </param>
+    void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin, BlurCache cache);
 }

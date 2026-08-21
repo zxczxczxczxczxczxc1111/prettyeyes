@@ -3,6 +3,7 @@ using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Tools;
 using SkiaSharp;
+using PrettyEyes.Core.Tests.Rendering;
 using Xunit;
 
 namespace PrettyEyes.Core.Tests.Annotations;
@@ -139,7 +140,7 @@ public class TextAnnotationTests
 
         // No exception and no pixels: an empty label exists only while the
         // caret is in it, and it must not paint a lonely plate on the shot.
-        empty.Draw(surface.Canvas, source, new CaptureRect(0, 0, 200, 200));
+        empty.Draw(surface.Canvas, source, new CaptureRect(0, 0, 200, 200), Caches.Unused);
 
         using var image = surface.Snapshot();
         using var pixels = image.PeekPixels();
@@ -157,7 +158,7 @@ public class TextAnnotationTests
         surface.Canvas.Clear(SKColors.Black);
         using var source = surface.Snapshot();
 
-        label.Draw(surface.Canvas, source, new CaptureRect(0, 0, 200, 200));
+        label.Draw(surface.Canvas, source, new CaptureRect(0, 0, 200, 200), Caches.Unused);
 
         using var image = surface.Snapshot();
         using var pixels = image.PeekPixels();
@@ -193,7 +194,7 @@ public class TextAnnotationTests
         surface.Canvas.Clear(SKColors.Black);
         using var source = surface.Snapshot();
 
-        label.Draw(surface.Canvas, source, new CaptureRect(0, 0, 200, 200));
+        label.Draw(surface.Canvas, source, new CaptureRect(0, 0, 200, 200), Caches.Unused);
 
         using var image = surface.Snapshot();
         using var pixels = image.PeekPixels();
