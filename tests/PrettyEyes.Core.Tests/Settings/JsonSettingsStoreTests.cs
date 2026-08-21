@@ -290,4 +290,22 @@ public class JsonSettingsStoreTests
 
         Assert.False(store.Load().CheckUpdates);
     }
+
+    [Fact]
+    public void A_schema_11_file_reads_and_gets_the_1_3_defaults()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"pe-{Guid.NewGuid()}.json");
+        File.WriteAllText(path, """{ "Autostart": true, "SchemaVersion": 11 }""");
+
+        var settings = new JsonSettingsStore(path).Load();
+
+        Assert.True(settings.Autostart);
+        Assert.Null(settings.DefaultTool);          // "not chosen" is the default
+        Assert.True(settings.PinButtonShown);       // the headline feature is visible
+        Assert.False(settings.HidePinnedOnCapture); // screen sharing beats screenshots
+        Assert.Null(settings.PinHotkey);
+        // Not asserting SchemaVersion here: Normalize assigns it unconditionally,
+        // so the check would pass no matter what the rest of this does.
+        Assert.Equal(12, AppSettings.CurrentSchema);
+    }
 }

@@ -18,6 +18,14 @@ public sealed record AppSettings(
     bool CheckUpdates = true,
     Dictionary<ToolKind, bool>? Tools = null,
     CursorStyle Cursor = CursorStyle.Cross,
+    ToolKind? DefaultTool = null,
+    bool PinButtonShown = true,
+    HotkeyDefinition? PinHotkey = null,
+    HotkeyDefinition? HidePinnedHotkey = null,
+    HotkeyDefinition? ShowPinnedHotkey = null,
+    double PinOpacity = 1.0,
+    bool DrawOnPinned = true,
+    bool HidePinnedOnCapture = false,
     int SchemaVersion = AppSettings.CurrentSchema)
 {
     /// <summary>
@@ -25,7 +33,7 @@ public sealed record AppSettings(
     /// older build is missing everything added since, and the reader has to
     /// know what to fill in rather than hand out nulls.
     /// </summary>
-    public const int CurrentSchema = 11;
+    public const int CurrentSchema = 12;
 
     public static AppSettings Default =>
         new(HotkeyDefinition.Default, HotkeyDefinition.DefaultFullScreen, false);

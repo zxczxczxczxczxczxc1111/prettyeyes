@@ -5,6 +5,9 @@ public enum HotkeyAction
 {
     Region,
     FullScreen,
+    Pin,
+    HidePinned,
+    ShowPinned,
 }
 
 public interface IHotkeys : IDisposable
