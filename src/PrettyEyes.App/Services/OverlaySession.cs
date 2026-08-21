@@ -228,8 +228,19 @@ public sealed class OverlaySession
     /// </summary>
     private void OnSelectionSettled(object? sender, CaptureRect selection)
     {
+        // Read before the assignment: this fires on every finished drag, and
+        // only the first one is the toolbar appearing.
+        var chosen = DefaultTool.Apply(_services.Settings.DefaultTool, _toolbarShown);
+
         _toolbarShown = true;
         PlaceToolbar(selection);
+
+        if (chosen is not null)
+        {
+            // Through the session, like any other pick: the toolbar is a
+            // display and stopped deciding anything in task 4.
+            OnToolPicked(this, chosen);
+        }
     }
 
     /// <summary>

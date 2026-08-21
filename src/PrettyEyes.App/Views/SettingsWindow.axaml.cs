@@ -264,7 +264,72 @@ public partial class SettingsWindow : Window
             }
         }
 
+        BuildDefaultToolRow();
         ShowToolRow();
+    }
+
+    /// <summary>
+    /// The tool a capture starts with. "Не выбран" comes first and is the
+    /// default: a screenshot tool that arms a pen before anyone asked is a
+    /// screenshot tool that draws by accident.
+    /// </summary>
+    private void BuildDefaultToolRow()
+    {
+        DefaultToolRow.Children.Clear();
+
+        var none = new Button { Tag = null, Content = "не выбран" };
+        none.Classes.Add("choice");
+        none.Click += (_, _) => PickDefaultTool(null);
+        DefaultToolRow.Children.Add(none);
+
+        foreach (var tool in ConfigurableFeature.DefaultToolChoices)
+        {
+            var button = new Button
+            {
+                Tag = tool,
+                Content = new Avalonia.Controls.Shapes.Path
+                {
+                    Data = Avalonia.Media.Geometry.Parse(ToolIcon(tool)),
+                },
+            };
+
+            button.Classes.Add("toolpick");
+            ToolTip.SetTip(button, ToolName(tool));
+            button.Click += (_, _) => PickDefaultTool(tool);
+
+            DefaultToolRow.Children.Add(button);
+        }
+
+        ShowDefaultToolRow();
+    }
+
+    private void ShowDefaultToolRow()
+    {
+        foreach (var child in DefaultToolRow.Children)
+        {
+            if (child is not Button button)
+            {
+                continue;
+            }
+
+            button.Classes.Remove("active");
+
+            if ((button.Tag as ToolKind?) == _settings.DefaultTool)
+            {
+                button.Classes.Add("active");
+            }
+        }
+    }
+
+    private void PickDefaultTool(ToolKind? tool)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        Store(_settings with { DefaultTool = tool });
+        ShowDefaultToolRow();
     }
 
     /// <summary>
@@ -461,7 +526,18 @@ public partial class SettingsWindow : Window
         }
 
         ShowToolRow();
-        Store(_settings with { Tools = _tools.ToDictionary() });
+
+        // A hidden tool cannot be the one every capture starts with. Reset only
+        // after TrySet said yes: the refusal path leaves everything as it was.
+        var settings = _settings with { Tools = _tools.ToDictionary() };
+
+        if (!_tools.IsShown(kind) && settings.DefaultTool == kind)
+        {
+            settings = settings with { DefaultTool = null };
+        }
+
+        Store(settings);
+        ShowDefaultToolRow();
     }
 
     /// <summary>
