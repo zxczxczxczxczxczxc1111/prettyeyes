@@ -61,17 +61,10 @@ public static class DocumentRenderer
     {
         var frame = document.SourceBounds;
 
-        var selection = document.Selection.IsEmpty
-            ? frame
-            : document.Selection.Intersect(frame);
+        var selection = document.Selection.IsEmpty ? frame : document.Selection;
 
-        if (selection.IsEmpty)
-        {
-            throw new InvalidOperationException("Selection lies entirely outside the captured frame.");
-        }
-
-        var shot = Flatten(document, frame, selection);
-        var fitted = style.FitTo(selection.Width, selection.Height);
+        var shot = Crop(document, selection);
+        var fitted = style.FitTo(shot.Width, shot.Height);
 
         // Without decoration the caller owns the screenshot as it is.
         if (!fitted.Enabled)
@@ -109,9 +102,31 @@ public static class DocumentRenderer
         return surface.Snapshot();
     }
 
-    /// <summary>The screenshot itself: the captured pixels plus what was drawn on them.</summary>
-    private static SKImage Flatten(Document document, CaptureRect frame, CaptureRect selection)
+    /// <summary>
+    /// One rectangle of the document: the captured pixels plus what was drawn
+    /// on them, cut to that area.
+    ///
+    /// Public because the pinned window asks for a crop on its own schedule and
+    /// has nothing to do with exporting. There is deliberately no second
+    /// implementation of this: the export path goes through here too.
+    /// </summary>
+    /// <param name="area">
+    /// In virtual-desktop coordinates. Clipped to the captured frame, so the
+    /// result can come back smaller than what was asked for.
+    /// </param>
+    public static SKImage Crop(Document document, CaptureRect area)
     {
+        var frame = document.SourceBounds;
+        var selection = area.Intersect(frame);
+
+        // Checked here rather than at the caller: an empty rectangle makes
+        // SKSurface.Create return null, and that surfaces three frames later as
+        // "could not allocate a 0x0 surface", which explains nothing.
+        if (selection.IsEmpty)
+        {
+            throw new InvalidOperationException("The area lies entirely outside the captured frame.");
+        }
+
         var info = new SKImageInfo(selection.Width, selection.Height);
         using var surface = SKSurface.Create(info)
             ?? throw new InvalidOperationException($"Could not allocate a {selection.Width}x{selection.Height} surface.");
