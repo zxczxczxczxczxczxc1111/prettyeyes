@@ -108,7 +108,14 @@ public partial class App : Application
 
         Log.Default.Info("конфигурация мониторов изменилась");
         _session?.Close();
-        Services.OverlayWindows.Rebuild(Services.Monitors.Enumerate().Monitors.Count);
+
+        var layout = Services.Monitors.Enumerate();
+
+        Services.OverlayWindows.Rebuild(layout.Monitors.Count);
+
+        // A pin left on a monitor that is gone is a pin nobody can reach, and
+        // what it shows exists nowhere else. It is moved, never closed.
+        Services.Pins.Rehome(layout.Monitors);
     }
 
     public void StartCapture()

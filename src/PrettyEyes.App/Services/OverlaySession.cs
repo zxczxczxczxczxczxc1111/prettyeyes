@@ -1094,8 +1094,6 @@ public sealed class OverlaySession
                 Document,
                 Document.Selection,
                 _styles,
-                new ToolVisibility(_services.Settings.Tools),
-                drawingAllowed: true,
                 () => _services.Emoji.Glyph(_emoji ?? string.Empty));
         }
         catch (InvalidOperationException ex)

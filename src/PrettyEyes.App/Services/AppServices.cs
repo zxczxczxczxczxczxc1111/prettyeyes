@@ -214,6 +214,10 @@ public sealed class AppServices : IDisposable
             FullScreenHotkeyRegistered = fullScreenRegistered,
         };
 
+        // After the record exists, because the pins ask it for the current
+        // settings on every open rather than keeping a copy.
+        built.Pins.Use(built);
+
         return built;
     }
 

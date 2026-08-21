@@ -4,6 +4,7 @@ using Avalonia.Input;
 using PrettyEyes.App.Controls;
 using PrettyEyes.App.Services;
 using PrettyEyes.Core.Model;
+using PrettyEyes.Core.Rendering;
 using PrettyEyes.Core.Pinning;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Core.Tools;
@@ -121,6 +122,8 @@ public partial class PinnedWindow : Window, IPinned
             Surface.InvalidateVisual();
         };
 
+        Toolbar.CopyClicked += (_, _) => CopyRequested?.Invoke(this, EventArgs.Empty);
+        Toolbar.SaveClicked += (_, _) => SaveRequested?.Invoke(this, EventArgs.Empty);
         Toolbar.StyleRequested += (_, kind) => StyleCard.Open(kind, _styles.For(kind));
 
         StyleCard.StyleChanged += (_, change) =>
@@ -146,6 +149,12 @@ public partial class PinnedWindow : Window, IPinned
     /// <summary>Raised when the window is gone for good.</summary>
     public event EventHandler? Gone;
 
+    /// <summary>The frame is wanted in the clipboard.</summary>
+    public event EventHandler? CopyRequested;
+
+    /// <summary>The frame is wanted in a file, through the dialog.</summary>
+    public event EventHandler? SaveRequested;
+
     /// <inheritdoc/>
     public bool HasOwnAnnotations => _document?.Annotations.Count > 0;
 
@@ -162,7 +171,8 @@ public partial class PinnedWindow : Window, IPinned
         CaptureRect at,
         ToolStyles styles,
         ToolVisibility tools,
-        bool drawingAllowed)
+        bool drawingAllowed,
+        double opacity)
     {
         _document = document;
         _styles = styles;
@@ -191,7 +201,21 @@ public partial class PinnedWindow : Window, IPinned
         // A pin belongs to the desktop, not to the task switcher: it is always
         // on top, so there is never anything to switch back to.
         WindowSwitcher.Hide(handle);
+
+        SeeThrough(opacity);
     }
+
+    /// <summary>
+    /// The frame as it would go into a file: in frame pixels, at whatever the
+    /// export style says. Zoom and transparency are how the window is shown,
+    /// not what it holds, so neither is baked in.
+    /// </summary>
+    public SKImage? Snapshot(ExportStyle style) =>
+        _document is null ? null : DocumentRenderer.Render(_document, style);
+
+    /// <summary>Whether this window shows up in captures of the screen.</summary>
+    public void HideFromCapture(bool hidden) =>
+        WindowCapture.Exclude(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero, hidden);
 
     /// <summary>
     /// Whether a tool is armed and allowed to draw right now. Zoom counts: a
@@ -410,6 +434,14 @@ public partial class PinnedWindow : Window, IPinned
             // is nowhere to get the drawings back from.
             case Key.Escape when !HasOwnAnnotations:
                 Close();
+                break;
+
+            case Key.C when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                CopyRequested?.Invoke(this, EventArgs.Empty);
+                break;
+
+            case Key.S when e.KeyModifiers.HasFlag(KeyModifiers.Control):
+                SaveRequested?.Invoke(this, EventArgs.Empty);
                 break;
 
             case Key.Z when e.KeyModifiers.HasFlag(KeyModifiers.Control):

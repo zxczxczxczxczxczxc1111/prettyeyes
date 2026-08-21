@@ -260,4 +260,19 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool SetLayeredWindowAttributes(IntPtr hWnd, uint key, byte alpha, uint flags);
+
+    /// <summary>The window is captured like any other.</summary>
+    internal const uint WDA_NONE = 0x00000000;
+
+    /// <summary>
+    /// The window is missing from anything that captures the screen - and that
+    /// includes a shared screen in a call, not only our own screenshots.
+    /// Windows 10 2004 and newer; older builds fail the call and stay as they
+    /// were, which is the right way round.
+    /// </summary>
+    internal const uint WDA_EXCLUDEFROMCAPTURE = 0x00000011;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint affinity);
 }

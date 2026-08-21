@@ -2,7 +2,11 @@ using Avalonia;
 using PrettyEyes.App.Views;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Pinning;
+using PrettyEyes.Core.Diagnostics;
+using PrettyEyes.Core.Geometry;
+using PrettyEyes.Core.Platform;
 using PrettyEyes.Core.Rendering;
+using PrettyEyes.Core.Settings;
 using PrettyEyes.Core.Tools;
 using SkiaSharp;
 using CaptureRect = PrettyEyes.Core.Geometry.CaptureRect;
@@ -25,6 +29,15 @@ public sealed class PinnedWindows
 
     private readonly PinRegistry _registry = new();
 
+    /// <summary>
+    /// Late-bound the same way the folder sink is: the settings record is
+    /// replaced whole on every change, so a captured copy goes stale on the
+    /// first edit.
+    /// </summary>
+    private AppServices? _services;
+
+    public void Use(AppServices services) => _services = services;
+
     /// <summary>Whether anything drawn inside a pin would be lost right now.</summary>
     public bool AnyWithAnnotations => _registry.AnyWithAnnotations;
 
@@ -40,10 +53,10 @@ public sealed class PinnedWindows
         Document source,
         CaptureRect area,
         ToolStyles styles,
-        ToolVisibility tools,
-        bool drawingAllowed,
         Func<SKImage?> glyph)
     {
+        var settings = _services?.Settings ?? AppSettings.Default;
+
         var cropped = DocumentRenderer.Crop(source, area);
 
         // The bounds are the area in the coordinates of the original capture,
@@ -62,10 +75,108 @@ public sealed class PinnedWindows
             }
         };
 
+        window.CopyRequested += async (sender, _) => await SendAsync(sender, _services?.Clipboard);
+        window.SaveRequested += async (sender, _) => await SendAsync(sender, _services?.File);
+
         _registry.Add(window);
-        window.Open(document, Free(area), styles, WithoutText(tools), drawingAllowed);
+
+        window.Open(
+            document,
+            Free(area),
+            styles,
+            WithoutText(new ToolVisibility(settings.Tools)),
+            settings.DrawOnPinned,
+            settings.PinOpacity);
+
+        // After Open: there is no window handle to speak of before it is shown.
+        window.HideFromCapture(settings.HidePinnedOnCapture);
 
         return window;
+    }
+
+    /// <summary>
+    /// The frame out of a pin, into the clipboard or into a file.
+    ///
+    /// Quick save is deliberately not triggered: a pin lives for hours, and a
+    /// folder filling up with copies of the same window is not what that switch
+    /// promised.
+    /// </summary>
+    private async Task SendAsync(object? sender, IImageSink? sink)
+    {
+        if (sender is not PinnedWindow window || sink is null)
+        {
+            return;
+        }
+
+        try
+        {
+            using var image = window.Snapshot(_services?.Settings.Export ?? ExportStyle.None);
+
+            if (image is null)
+            {
+                return;
+            }
+
+            await sink.SendAsync(image, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            // An async handler is the one place an exception has nowhere to go.
+            Log.Default.Error("не удалось отдать закреплённый кадр", ex);
+        }
+    }
+
+    /// <summary>
+    /// Puts back any pin whose centre ended up outside every monitor.
+    ///
+    /// It is moved rather than closed: what it shows exists nowhere else, and a
+    /// window that cannot be reached cannot be saved either.
+    /// </summary>
+    public void Rehome(IReadOnlyList<MonitorInfo> monitors)
+    {
+        if (monitors.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var window in Windows())
+        {
+            var width = (int)Math.Round(window.Bounds.Width * window.RenderScaling);
+            var height = (int)Math.Round(window.Bounds.Height * window.RenderScaling);
+            var centreX = window.Position.X + (width / 2);
+            var centreY = window.Position.Y + (height / 2);
+
+            if (monitors.Any(monitor => monitor.Bounds.Contains(centreX, centreY)))
+            {
+                continue;
+            }
+
+            var home = monitors
+                .OrderBy(monitor => Distance(monitor.Bounds, centreX, centreY))
+                .First()
+                .Bounds;
+
+            window.Position = new PixelPoint(
+                Math.Clamp(window.Position.X, home.X, Math.Max(home.X, home.X + home.Width - width)),
+                Math.Clamp(window.Position.Y, home.Y, Math.Max(home.Y, home.Y + home.Height - height)));
+        }
+    }
+
+    private static long Distance(CaptureRect monitor, int x, int y)
+    {
+        long dx = Math.Max(monitor.X - x, Math.Max(0, x - (monitor.X + monitor.Width)));
+        long dy = Math.Max(monitor.Y - y, Math.Max(0, y - (monitor.Y + monitor.Height)));
+
+        return (dx * dx) + (dy * dy);
+    }
+
+    /// <summary>Whether every pin is currently kept out of screen captures.</summary>
+    public void HideFromCapture(bool hidden)
+    {
+        foreach (var window in Windows())
+        {
+            window.HideFromCapture(hidden);
+        }
     }
 
     /// <summary>
