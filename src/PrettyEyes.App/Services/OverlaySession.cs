@@ -837,6 +837,9 @@ public sealed class OverlaySession
         using var font = TextLayout.FontFor(typing.Style);
         var padding = typing.Style.TextPadding;
 
+        // Marked case by case, never up front. A key reported as handled never
+        // becomes a character: the Win32 backend skips TranslateMessage for it,
+        // and a blanket true here means a caret that blinks and types nothing.
         e.Handled = true;
 
         switch (e.Key)
@@ -899,6 +902,12 @@ public sealed class OverlaySession
 
             case Key.V when control:
                 PasteAsync();
+                return;
+
+            default:
+                // A letter, a digit, a space. It has to travel on to the
+                // platform and come back as text input.
+                e.Handled = false;
                 return;
         }
 

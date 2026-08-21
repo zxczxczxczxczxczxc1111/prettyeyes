@@ -737,9 +737,18 @@ public partial class OverlayWindow : Window
             return;
         }
 
-        // Back into a finished label. Checked before the double-click-selects-
-        // the-monitor rule can see it, which is why that rule sits below.
-        if (TextToolArmed && e.ClickCount == 2 && _document?.MovableAt(x, y) is TextAnnotation label)
+        // Back into a finished label. A single click, not a double one: the
+        // first click of a double would already have placed a fresh caret on
+        // top of the label, and the second would land in that instead. The
+        // double click then means what it means everywhere else - select all -
+        // because by the time it arrives a caret is up and the branch above
+        // takes it.
+        //
+        // Ctrl is excluded on purpose: that is the carry gesture, and it has to
+        // keep working on labels like it does on every other annotation.
+        if (TextToolArmed
+            && !e.KeyModifiers.HasFlag(KeyModifiers.Control)
+            && _document?.MovableAt(x, y) is TextAnnotation label)
         {
             TextEditRequested?.Invoke(this, label);
             return;
@@ -1066,10 +1075,19 @@ public partial class OverlayWindow : Window
         {
             TextKeyPressed?.Invoke(this, e);
 
-            if (e.Handled)
+            // Handled means the session ate the key. Anything else has to reach
+            // base: the Win32 backend only calls TranslateMessage for keys that
+            // came back unhandled, and without that call there is no WM_CHAR
+            // and no typing at all. Found the hard way - the caret was there
+            // and every letter went nowhere.
+            if (!e.Handled)
             {
-                return;
+                base.OnKeyDown(e);
             }
+
+            // Either way the overlay's own shortcuts stay out of it: bare C is
+            // a letter while a caret is up, not a colour pick.
+            return;
         }
 
         base.OnKeyDown(e);
