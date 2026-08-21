@@ -30,20 +30,28 @@
               <StackPanel x:Name="RadiusRow" Orientation="Horizontal" Spacing="6"/>
             </StackPanel>
 
-            <CheckBox x:Name="ExportShadow" Content="Тень"/>
-            <CheckBox x:Name="ExportGrain" Content="Зерно"/>
-            <CheckBox x:Name="ExportSheen" Content="Свет"/>
+            <!-- The three switches and the picture they change, side by side.
+                 Stacked, the card ran twice as tall as the others; here the
+                 preview stays in sight while a switch is being clicked, which
+                 is the whole point of having one. -->
+            <Grid ColumnDefinitions="Auto,12,*">
+              <StackPanel Grid.Column="0" Spacing="12" VerticalAlignment="Center">
+                <CheckBox x:Name="ExportShadow" Content="Тень"/>
+                <CheckBox x:Name="ExportGrain" Content="Зерно"/>
+                <CheckBox x:Name="ExportSheen" Content="Свет"/>
+              </StackPanel>
 
-            <!-- Drawn by the same code that writes the file: a preview that
-                 lies is worse than no preview. -->
-            <Border Background="{StaticResource Bg}"
+              <!-- Drawn by the same code that writes the file: a preview that
+                   lies is worse than no preview. -->
+              <Border Grid.Column="2" Background="{StaticResource Bg}"
                     BorderBrush="{StaticResource Border}"
                     BorderThickness="1"
                     CornerRadius="{StaticResource RField}"
                     Padding="8"
-                    HorizontalAlignment="Left">
-              <Image x:Name="ExportPreview" Width="176" Height="110"/>
-            </Border>
+                    HorizontalAlignment="Right">
+                <Image x:Name="ExportPreview" Width="176" Height="110"/>
+              </Border>
+            </Grid>
           </StackPanel>
   </StackPanel>
 </UserControl>

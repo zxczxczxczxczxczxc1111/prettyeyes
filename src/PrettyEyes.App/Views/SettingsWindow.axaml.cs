@@ -224,8 +224,21 @@ public partial class SettingsWindow : Window
     {
         DefaultToolRow.Children.Clear();
 
-        var none = new Button { Tag = null, Content = "не выбран" };
-        none.Classes.Add("choice");
+        // A cross rather than the words: in a row of icons a word is wider than
+        // all of them and reads as a caption for the row instead of one of its
+        // choices. The words stay in the tooltip - a cross means "none" to most
+        // people, not to everybody.
+        var none = new Button
+        {
+            Tag = null,
+            Content = new Avalonia.Controls.Shapes.Path
+            {
+                Data = Avalonia.Media.Geometry.Parse("M4.5,4.5 L11.5,11.5 M11.5,4.5 L4.5,11.5"),
+            },
+        };
+
+        none.Classes.Add("toolpick");
+        ToolTip.SetTip(none, "Не выбран");
         none.Click += (_, _) => PickDefaultTool(null);
         DefaultToolRow.Children.Add(none);
 

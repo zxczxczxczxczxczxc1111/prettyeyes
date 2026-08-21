@@ -65,12 +65,12 @@
                    setting is read as a picture of the toolbar rather than as a
                    list that happens to be about it. Filled from code: the list
                    cannot then drift from the tools that actually exist. -->
-              <TextBlock Text="рисование" Foreground="{StaticResource TextFaint}" FontSize="11"/>
+              <TextBlock Text="Рисование" Foreground="{StaticResource TextFaint}" FontSize="11"/>
               <StackPanel x:Name="ToolRow" Orientation="Horizontal" Spacing="8"/>
               <!-- Second row, same shapes: features are not tools, they never
                    enter ToolVisibility and the last-one-standing rule does not
                    apply to them. Two rows say that without a paragraph. -->
-              <TextBlock Text="функции" Foreground="{StaticResource TextFaint}" FontSize="11"/>
+              <TextBlock Text="Функции" Foreground="{StaticResource TextFaint}" FontSize="11"/>
               <StackPanel x:Name="FeatureRow" Orientation="Horizontal" Spacing="8"/>
 
               <!-- Out in the open rather than behind a right click: this is a
