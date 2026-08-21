@@ -916,7 +916,14 @@ public partial class OverlayWindow : Window
     {
         base.OnPointerWheelChanged(e);
 
-        e.Handled = _gesture.Wheel(e.GetPosition(this), e.KeyModifiers, e.Delta.Y);
+        // Alt is a synonym for Ctrl here rather than a replacement: the Ctrl
+        // gesture shipped, and breaking it for everybody - including people who
+        // never pin anything - to resolve a clash that only exists inside a
+        // pinned window would be a poor trade.
+        if (Grabbing(e.KeyModifiers))
+        {
+            e.Handled = _gesture.Wheel(e.GetPosition(this), e.Delta.Y);
+        }
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -981,12 +988,19 @@ public partial class OverlayWindow : Window
         SelectionSettled?.Invoke(this, _selection);
     }
 
+    /// <summary>
+    /// Whether these modifiers mean "the object under the pointer", for the
+    /// wheel and for the cursor that hints at it.
+    /// </summary>
+    private static bool Grabbing(KeyModifiers modifiers) =>
+        modifiers.HasFlag(KeyModifiers.Control) || modifiers.HasFlag(KeyModifiers.Alt);
+
     /// <summary>The cursor says what the next press will do.</summary>
     private void UpdateCursor(int x, int y, KeyModifiers modifiers)
     {
         // Ctrl over a stamped glyph picks it up, whatever tool is armed. The
         // cursor is the only place that says so.
-        if (_gesture.WouldCarry(x, y, modifiers))
+        if (Grabbing(modifiers) && _gesture.Over(x, y))
         {
             Cursor = Move;
             return;

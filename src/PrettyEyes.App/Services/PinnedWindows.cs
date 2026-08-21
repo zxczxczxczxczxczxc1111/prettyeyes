@@ -97,9 +97,32 @@ public sealed class PinnedWindows
         }
     }
 
+    /// <summary>
+    /// Closes every pin, asking once if anything drawn would be lost. Once,
+    /// not once per window: the answer is the same for all of them, and a
+    /// stack of questions is a stack nobody reads.
+    /// </summary>
     public void CloseAll()
     {
-        // Over a copy: each close takes itself out of the registry.
+        if (!AnyWithAnnotations)
+        {
+            Force();
+            return;
+        }
+
+        var windows = Windows().ToList();
+        var count = windows.Count;
+
+        windows[^1].Question(
+            count > 1
+                ? $"Закрыть все закреплённые ({count})? Нарисованное в них пропадёт"
+                : "Закрыть? Нарисованное здесь пропадёт",
+            Force);
+    }
+
+    /// <summary>Over a copy: each close takes itself out of the registry.</summary>
+    private void Force()
+    {
         foreach (var window in Windows())
         {
             window.Close();

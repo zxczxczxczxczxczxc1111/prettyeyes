@@ -26,6 +26,36 @@ public partial class PinnedWindow : Window, IPinned
     /// <summary>How much of the window has to stay reachable on a monitor.</summary>
     private const int MustStayVisible = 48;
 
+    /// <summary>
+    /// Zoom limits. Below a tenth a screenshot is a stamp, above eight times it
+    /// is wallpaper.
+    /// </summary>
+    private const double MinZoom = 0.1;
+    private const double MaxZoom = 8;
+
+    /// <summary>
+    /// Where tools still make sense. At eight times a three-pixel stroke is a
+    /// sausage across the screen; at a tenth nothing can be aimed at. Outside
+    /// this the pin behaves as though no tool were armed at all - otherwise the
+    /// left button would simply stop doing anything.
+    /// </summary>
+    private const double MinDrawZoom = 0.25;
+    private const double MaxDrawZoom = 4;
+
+    /// <summary>One wheel notch.</summary>
+    private const double ZoomStep = 1.1;
+
+    /// <summary>
+    /// Below this a pin is an invisible trap for clicks: it still swallows
+    /// them, and there is nothing on screen to say why.
+    /// </summary>
+    private const double MinOpacity = 0.2;
+
+    private const double OpacityStep = 0.05;
+
+    /// <summary>Where transparency currently stands, 1 being solid.</summary>
+    private double _seeThrough = 1;
+
     private static readonly Cursor Hand = new(StandardCursorType.SizeAll);
     private static readonly Cursor Aim = new(StandardCursorType.Cross);
 
@@ -43,6 +73,12 @@ public partial class PinnedWindow : Window, IPinned
     private PixelPoint _wasAt;
 
     private bool _spaceHeld;
+
+    /// <summary>The close was asked for and is waiting for an answer.</summary>
+    private bool _asking;
+
+    /// <summary>What a yes means. Closing this one, or closing all of them.</summary>
+    private Action? _onYes;
 
     public PinnedWindow()
     {
@@ -98,6 +134,10 @@ public partial class PinnedWindow : Window, IPinned
         // that was supposed to bring it out.
         Activated += (_, _) => ShowToolbar(active: true);
         Deactivated += (_, _) => ShowToolbar(active: false);
+
+        CloseButton.Click += (_, _) => AskThenClose();
+        KeepButton.Click += (_, _) => Ask(false);
+        DiscardButton.Click += (_, _) => _onYes?.Invoke();
     }
 
     /// <summary>The chosen emoji, asked for at the moment one is stamped.</summary>
@@ -153,8 +193,76 @@ public partial class PinnedWindow : Window, IPinned
         WindowSwitcher.Hide(handle);
     }
 
-    /// <summary>Whether a tool is armed and allowed to draw right now.</summary>
-    private bool Armed => _drawingAllowed && _tool is not null;
+    /// <summary>
+    /// Whether a tool is armed and allowed to draw right now. Zoom counts: a
+    /// tool the zoom has switched off is the same as no tool, so the left
+    /// button goes back to dragging the window.
+    /// </summary>
+    private bool Armed =>
+        _drawingAllowed
+        && _tool is not null
+        && Surface.Zoom >= MinDrawZoom
+        && Surface.Zoom <= MaxDrawZoom;
+
+    /// <summary>
+    /// The wheel. Plain is zoom, Ctrl is transparency, Alt is the size of the
+    /// object under the pointer.
+    ///
+    /// Ctrl means transparency here and only here: in the overlay it kept its
+    /// old meaning, and the clash it would have caused exists only inside a
+    /// pinned window.
+    /// </summary>
+    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
+    {
+        base.OnPointerWheelChanged(e);
+
+        var up = e.Delta.Y > 0;
+
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Alt))
+        {
+            e.Handled = _gesture.Wheel(e.GetPosition(Surface), e.Delta.Y);
+            Surface.InvalidateVisual();
+
+            return;
+        }
+
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            SeeThrough(Math.Clamp(_seeThrough + (up ? OpacityStep : -OpacityStep), MinOpacity, 1));
+            e.Handled = true;
+
+            return;
+        }
+
+        ZoomBy(up ? ZoomStep : 1 / ZoomStep);
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// Asks the compositor for the alpha rather than setting Avalonia's own
+    /// Opacity: on Win32 that one leaves the window unlayered and changes
+    /// nothing at all, which is exactly how it behaved on the first live run.
+    /// </summary>
+    private void SeeThrough(double opacity)
+    {
+        _seeThrough = opacity;
+
+        WindowTransparency.Set(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero, opacity);
+    }
+
+    /// <summary>
+    /// Grows or shrinks the window around its top-left corner. Around the
+    /// corner rather than the centre on purpose: a pin is put somewhere for a
+    /// reason, and a window that walks off while being zoomed loses that place.
+    /// </summary>
+    private void ZoomBy(double factor)
+    {
+        Surface.Zoom = Math.Clamp(Surface.Zoom * factor, MinZoom, MaxZoom);
+
+        var size = Surface.Wanted();
+        Width = size.Width;
+        Height = size.Height;
+    }
 
     private ITool? MakeTool() =>
         _tool is { } kind
@@ -178,6 +286,7 @@ public partial class PinnedWindow : Window, IPinned
         var wanted = _drawingAllowed && active;
 
         Toolbar.IsVisible = wanted;
+        CloseButton.IsVisible = active;
 
         if (wanted)
         {
@@ -199,6 +308,13 @@ public partial class PinnedWindow : Window, IPinned
         if (!IsActive)
         {
             e.Handled = true;
+            return;
+        }
+
+        // A question is up. Everything else waits for the answer, including
+        // dragging the window out from under it.
+        if (_asking)
+        {
             return;
         }
 
@@ -280,9 +396,20 @@ public partial class PinnedWindow : Window, IPinned
                 Surface.InvalidateVisual();
                 break;
 
+            case Key.Escape when _asking:
+                Ask(false);
+                break;
+
             case Key.Escape when _tool is not null:
                 _tool = null;
                 Toolbar.SetActive(null);
+                break;
+
+            // The end of the ladder. A pin with drawings of its own does not
+            // close on Escape at all: the key is pressed by reflex, and there
+            // is nowhere to get the drawings back from.
+            case Key.Escape when !HasOwnAnnotations:
+                Close();
                 break;
 
             case Key.Z when e.KeyModifiers.HasFlag(KeyModifiers.Control):
@@ -300,6 +427,43 @@ public partial class PinnedWindow : Window, IPinned
         {
             _spaceHeld = false;
         }
+    }
+
+    /// <summary>
+    /// Closes, or asks first. Asking, because what was drawn here exists
+    /// nowhere else: it was never a file and never went to the clipboard.
+    /// </summary>
+    public void AskThenClose()
+    {
+        if (!HasOwnAnnotations)
+        {
+            Close();
+            return;
+        }
+
+        Question("Закрыть? Нарисованное здесь пропадёт", Close);
+    }
+
+    /// <summary>
+    /// Asks something in this window and does <paramref name="yes"/> if the
+    /// answer is yes. Used for "close all of them" as well, which is why the
+    /// action is a parameter: the question is one, the windows are several.
+    /// </summary>
+    public void Question(string text, Action yes)
+    {
+        ConfirmText.Text = text;
+        _onYes = yes;
+        Ask(true);
+
+        // The question is only readable if the window is in front of the rest
+        // of the stack; it was asked from the tray, not from here.
+        Activate();
+    }
+
+    private void Ask(bool asking)
+    {
+        _asking = asking;
+        ConfirmBar.IsVisible = asking;
     }
 
     private void Haul(PointerPressedEventArgs e)

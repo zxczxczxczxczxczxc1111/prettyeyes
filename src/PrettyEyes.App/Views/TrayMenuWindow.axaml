@@ -33,6 +33,10 @@
       <!-- Only there once a newer release has actually been found: an entry
            that is grey nine days out of ten teaches people to ignore it. -->
       <Button x:Name="UpdateItem" Classes="menu" IsVisible="False"/>
+      <!-- Only there while something is pinned: two entries that are grey
+           most of the time are two entries nobody reads. -->
+      <Button x:Name="ShowPinsItem" Classes="menu" Content="Показать все закреплённые" IsVisible="False"/>
+      <Button x:Name="ClosePinsItem" Classes="menu" Content="Закрыть все закреплённые" IsVisible="False"/>
       <Button x:Name="SettingsItem" Classes="menu" Content="Настройки"/>
       <Rectangle Height="1" Margin="8,4" Fill="{StaticResource Border}"/>
       <Button x:Name="ExitItem" Classes="menu" Content="Выход"/>

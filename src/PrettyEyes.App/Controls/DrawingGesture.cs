@@ -167,13 +167,15 @@ public sealed class DrawingGesture
     }
 
     /// <summary>
-    /// Ctrl and the wheel over a stamped object makes it bigger or smaller.
-    /// The same modifier that picks one up, so there is one thing to remember
-    /// rather than two.
+    /// A size step for the object under the pointer.
+    ///
+    /// Which modifier asks for it is the host's business, not this class's: in
+    /// the overlay it is Ctrl or Alt, in a pinned window Ctrl already means
+    /// transparency and only Alt is left.
     /// </summary>
-    public bool Wheel(Point at, KeyModifiers modifiers, double delta)
+    public bool Wheel(Point at, double delta)
     {
-        if (!modifiers.HasFlag(KeyModifiers.Control) || _moving is not null)
+        if (_moving is not null)
         {
             return false;
         }
@@ -211,12 +213,11 @@ public sealed class DrawingGesture
     }
 
     /// <summary>
-    /// Whether Ctrl here would pick something up rather than draw. The host
-    /// paints the cursor itself: the crosshair chooses its ink from the pixels
-    /// under it, and that is the host's canvas, not this class's business.
+    /// Whether there is anything here to pick up. The host decides which
+    /// modifier asks and paints the cursor itself: the crosshair chooses its
+    /// ink from the pixels under it, and that is the host's canvas.
     /// </summary>
-    public bool WouldCarry(int x, int y, KeyModifiers modifiers) =>
-        modifiers.HasFlag(KeyModifiers.Control) && _document()?.MovableAt(x, y) is not null;
+    public bool Over(int x, int y) => _document()?.MovableAt(x, y) is not null;
 
     /// <summary>
     /// Forgets any gesture in progress, silently. For a window that is pooled

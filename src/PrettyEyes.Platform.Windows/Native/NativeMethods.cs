@@ -250,4 +250,14 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", SetLastError = true, EntryPoint = "SetWindowLongPtrW")]
     internal static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int index, IntPtr value);
+
+    /// <summary>A window with this style is composited with an alpha of its own.</summary>
+    internal const long WS_EX_LAYERED = 0x00080000;
+
+    /// <summary>Which of the two arguments below actually mean anything.</summary>
+    internal const uint LWA_ALPHA = 0x00000002;
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SetLayeredWindowAttributes(IntPtr hWnd, uint key, byte alpha, uint flags);
 }

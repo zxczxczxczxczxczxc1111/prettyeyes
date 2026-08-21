@@ -25,6 +25,8 @@ public partial class TrayMenuWindow : Window
         CaptureItem.Click += (_, _) => Pick(TrayMenuChoice.Capture);
         OpenFolderItem.Click += (_, _) => Pick(TrayMenuChoice.OpenFolder);
         UpdateItem.Click += (_, _) => Pick(TrayMenuChoice.Update);
+        ShowPinsItem.Click += (_, _) => Pick(TrayMenuChoice.ShowPins);
+        ClosePinsItem.Click += (_, _) => Pick(TrayMenuChoice.ClosePins);
         SettingsItem.Click += (_, _) => Pick(TrayMenuChoice.Settings);
         ExitItem.Click += (_, _) => Pick(TrayMenuChoice.Exit);
 
@@ -48,6 +50,16 @@ public partial class TrayMenuWindow : Window
     }
 
     public event EventHandler<TrayMenuChoice>? Picked;
+
+    /// <summary>The two pin entries, and how many windows they would touch.</summary>
+    public void ShowPinEntries(int pins)
+    {
+        ShowPinsItem.IsVisible = pins > 0;
+        ClosePinsItem.IsVisible = pins > 0;
+        ClosePinsItem.Content = pins > 1
+            ? $"Закрыть все закреплённые ({pins})"
+            : "Закрыть закреплённое";
+    }
 
     /// <summary>Shows the folder entry when autosave has one to show.</summary>
     public void ShowFolderEntry(bool visible) => OpenFolderItem.IsVisible = visible;

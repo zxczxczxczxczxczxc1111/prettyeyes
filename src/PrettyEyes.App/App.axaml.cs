@@ -238,6 +238,7 @@ public partial class App : Application
         _menu = new TrayMenuWindow();
         _menu.ShowFolderEntry(Services.Settings.Save?.Ready == true);
         _menu.ShowUpdateEntry(Services.Updates.Found?.Version.ToString());
+        _menu.ShowPinEntries(Services.Pins.Count);
         _menu.Picked += (_, choice) =>
         {
             switch (choice)
@@ -250,6 +251,12 @@ public partial class App : Application
                     break;
                 case TrayMenuChoice.Update:
                     _ = InstallUpdateAsync();
+                    break;
+                case TrayMenuChoice.ShowPins:
+                    Services.Pins.ShowAll();
+                    break;
+                case TrayMenuChoice.ClosePins:
+                    Services.Pins.CloseAll();
                     break;
                 case TrayMenuChoice.Settings:
                     OpenSettings();

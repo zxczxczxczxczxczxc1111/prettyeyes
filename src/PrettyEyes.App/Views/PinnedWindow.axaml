@@ -9,12 +9,65 @@
         ShowActivated="False"
         Background="Transparent"
         CanResize="False">
+  <Window.Styles>
+    <!-- Local copies rather than shared ones: Button.tool lives inside the
+         toolbar's own styles and Button.menu inside the tray menu's, and
+         neither reaches a control that is not their child. -->
+    <Style Selector="Button.chrome">
+      <Setter Property="Width" Value="28"/>
+      <Setter Property="Height" Value="28"/>
+      <Setter Property="Padding" Value="0"/>
+      <Setter Property="Background" Value="{StaticResource Surface}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+      <Setter Property="Opacity" Value="0.85"/>
+    </Style>
+    <Style Selector="Button.chrome:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource FillHover}"/>
+    </Style>
+
+    <Style Selector="Button.answer">
+      <Setter Property="Height" Value="30"/>
+      <Setter Property="Padding" Value="12,0"/>
+      <Setter Property="Background" Value="{StaticResource Fill}"/>
+      <Setter Property="BorderThickness" Value="0"/>
+      <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+      <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+    </Style>
+    <Style Selector="Button.answer:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{StaticResource FillHover}"/>
+    </Style>
+  </Window.Styles>
+
   <Panel x:Name="Root">
     <controls:PinnedCanvas x:Name="Surface"/>
 
     <!-- A hairline so a screenshot pinned over a window of the same colour is
          still a thing with edges rather than a hole in the desktop. -->
     <Border BorderBrush="{StaticResource Border}" BorderThickness="1" IsHitTestVisible="False"/>
+
+    <!-- The only piece of chrome a pin has. It appears with the toolbar, for
+         the same reason: a stack of pins should not be a stack of buttons. -->
+    <Button x:Name="CloseButton" Classes="chrome" HorizontalAlignment="Right" VerticalAlignment="Top"
+            Margin="0,8,8,0" IsVisible="False" ToolTip.Tip="Закрыть">
+      <Path Data="M4,4 L12,12 M12,4 L4,12" Stroke="{StaticResource TextStrong}" StrokeThickness="1.5"/>
+    </Button>
+
+    <Border x:Name="ConfirmBar" IsVisible="False"
+            HorizontalAlignment="Center" VerticalAlignment="Center"
+            Background="{StaticResource SurfaceRaised}"
+            BorderBrush="{StaticResource Border}"
+            BorderThickness="1"
+            CornerRadius="{StaticResource RCard}"
+            Padding="16,12">
+      <StackPanel Spacing="10">
+        <TextBlock x:Name="ConfirmText" Foreground="{StaticResource TextStrong}"/>
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+          <Button x:Name="KeepButton" Classes="answer" Content="Оставить"/>
+          <Button x:Name="DiscardButton" Classes="answer" Content="Закрыть"/>
+        </StackPanel>
+      </StackPanel>
+    </Border>
 
     <views:ToolbarView x:Name="Toolbar" HorizontalAlignment="Center" VerticalAlignment="Bottom"
                        Margin="0,0,0,8" IsVisible="False"/>
