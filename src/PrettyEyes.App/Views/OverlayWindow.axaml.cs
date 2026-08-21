@@ -149,7 +149,7 @@ public partial class OverlayWindow : Window
         // shows nothing but its own background, and the window is transparent
         // exactly so that "nothing" is the real desktop rather than a black
         // flash or the frame left over from the previous capture.
-        Surface.Attach(document, monitor.Bounds);
+        Surface.Attach(document, monitor.Bounds, monitor.Usable);
         Resize(monitor);
 
         Show();

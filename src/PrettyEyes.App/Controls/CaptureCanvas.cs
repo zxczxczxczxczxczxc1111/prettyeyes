@@ -24,6 +24,7 @@ public sealed class CaptureCanvas : Control
     private SKImage? _source;
     private CaptureRect _frameBounds;
     private CaptureRect _monitorBounds;
+    private CaptureRect _monitorUsable;
     private CaptureRect _selection;
     private Document? _document;
     private IAnnotation? _preview;
@@ -199,12 +200,13 @@ public sealed class CaptureCanvas : Control
         return counted == 0 ? null : total / (counted * 255.0);
     }
 
-    public void Attach(Document document, CaptureRect monitorBounds)
+    public void Attach(Document document, CaptureRect monitorBounds, CaptureRect usable)
     {
         _document = document;
         _source = document.Source;
         _frameBounds = document.SourceBounds;
         _monitorBounds = monitorBounds;
+        _monitorUsable = usable;
         InvalidateVisual();
     }
 
@@ -260,6 +262,7 @@ public sealed class CaptureCanvas : Control
             _source,
             _frameBounds,
             _monitorBounds,
+            _monitorUsable,
             _selection,
             annotations,
             _preview,
@@ -305,6 +308,10 @@ public sealed class CaptureCanvas : Control
         private readonly SKImage _source;
         private readonly CaptureRect _frame;
         private readonly CaptureRect _monitor;
+
+        // Copied, not held by reference: the operation runs on the render
+        // thread and must not read anything the UI thread is still editing.
+        private readonly CaptureRect _usable;
         private readonly CaptureRect _selection;
         private readonly IReadOnlyList<IAnnotation> _annotations;
         private readonly IAnnotation? _preview;
@@ -316,7 +323,7 @@ public sealed class CaptureCanvas : Control
 
         public CaptureDrawOperation(
             Rect bounds, SKImage source, CaptureRect frame, CaptureRect monitor,
-            CaptureRect selection, IReadOnlyList<IAnnotation> annotations,
+            CaptureRect usable, CaptureRect selection, IReadOnlyList<IAnnotation> annotations,
             IAnnotation? preview, float scaling, float veilOpacity, float frameOpacity,
             PixelPoint? magnifierAt, bool magnifierGrid)
         {
@@ -326,6 +333,7 @@ public sealed class CaptureCanvas : Control
             _source = source;
             _frame = frame;
             _monitor = monitor;
+            _usable = usable;
             _selection = selection;
             _annotations = annotations;
             _preview = preview;
@@ -532,6 +540,14 @@ public sealed class CaptureCanvas : Control
             using var dark = Stroke(new SKColor(0, 0, 0, Scaled(FrameDarkAlpha)));
             using var light = Stroke(new SKColor(255, 255, 255, Scaled(FrameLightAlpha)));
             using var glass = Stroke(new SKColor(255, 255, 255, Scaled(GlassAlpha)));
+
+            // A selection dragged to the very bottom used to draw its last line
+            // underneath the shell's bar, where nobody can see it. The pixels
+            // are captured from rcMonitor either way; only the line moves up.
+            var usable = _usable.IsEmpty ? _monitor : _usable;
+            hole.Bottom = Math.Min(
+                hole.Bottom,
+                FrameEdge.Bottom((int)hole.Bottom, usable.Bottom, _monitor.Bottom));
 
             // Half-pixel offsets: a 1px stroke centred on an integer coordinate
             // lands on two pixel rows and turns grey.
