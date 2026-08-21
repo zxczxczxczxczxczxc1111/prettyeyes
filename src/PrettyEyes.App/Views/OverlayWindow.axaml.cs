@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Threading;
+using PrettyEyes.App.Controls;
 using PrettyEyes.Core.Annotations;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
@@ -74,10 +75,6 @@ public partial class OverlayWindow : Window
     /// </summary>
     private const int CursorReach = 12;
 
-    /// <summary>The glyph being carried, and where it was picked up.</summary>
-    private IMovable? _moving;
-    private int _moveFromX;
-    private int _moveFromY;
     private SelectionGrip _grip = SelectionGrip.None;
 
     /// <summary>The selection as it stood when the current click began.</summary>
@@ -94,12 +91,32 @@ public partial class OverlayWindow : Window
     private int _textAnchorX;
     private int _textAnchorY;
     private OverlayMode _mode = OverlayMode.Selecting;
+
+    /// <summary>
+    /// Drawing and carrying, shared with the pinned window. Called from the
+    /// handlers below rather than subscribed: this window has a card to close,
+    /// a double click and selection grips to get through first.
+    /// </summary>
+    private readonly DrawingGesture _gesture;
     private Size? _toolbarSize;
     private bool _magnifierWanted = true;
     private ExportStyle? _export;
-    private ITool? _tool;
 
-    public OverlayWindow() => InitializeComponent();
+    public OverlayWindow()
+    {
+        InitializeComponent();
+
+        _gesture = new DrawingGesture(
+            ToVirtualPixels,
+            Surface.ShowPreview,
+            () => _selection,
+            () => _document,
+            () => ToolFactory?.Invoke());
+
+        _gesture.Drawn += (_, annotation) => AnnotationDrawn?.Invoke(this, annotation);
+        _gesture.Moved += (_, moved) => AnnotationMoved?.Invoke(this, moved);
+        _gesture.Resized += (_, resized) => AnnotationResized?.Invoke(this, resized);
+    }
 
     public event EventHandler<CaptureRect>? SelectionChanged;
 
@@ -427,24 +444,6 @@ public partial class OverlayWindow : Window
         Loupe.Show();
     }
 
-    /// <summary>
-    /// Puts the carried glyph back into the picture. Whether it lands where it
-    /// was or somewhere new is the caller's next line.
-    /// </summary>
-    private void DropCarried()
-    {
-        _moving = null;
-
-        // Back into the document first: ShowPreview redraws, and a frame drawn
-        // between the two would show the glyph nowhere at all.
-        if (_document is not null)
-        {
-            _document.Detached = null;
-        }
-
-        Surface.ShowPreview(null);
-    }
-
     private void HideMagnifier()
     {
         Surface.MagnifierAt = null;
@@ -494,7 +493,7 @@ public partial class OverlayWindow : Window
         _dragging = false;
         _pickingText = false;
         _placingText = false;
-        _tool = null;
+        _gesture.Reset();
         _toolbarSize = null;
 
         // Snapped rather than animated: see SnapOpacities.
@@ -800,37 +799,25 @@ public partial class OverlayWindow : Window
         // window - which is exactly what happens on the way to the next monitor.
         e.Pointer.Capture(this);
 
-        // Ctrl picks a stamped glyph up instead of drawing on top of it. Held
-        // rather than plain, because a plain drag over a glyph has to keep
-        // meaning what it means with every tool: draw a new one.
-        if (e.KeyModifiers.HasFlag(KeyModifiers.Control) && _document?.MovableAt(x, y) is { } carried)
+        // The text tool has no gesture to build a shape out of: the press and
+        // the release together only say where the caret goes. It is this
+        // window's business alone, so it is settled before the shared gesture
+        // is offered the press.
+        if (_mode == OverlayMode.Drawing && TextToolArmed)
         {
-            _moving = carried;
-            _moveFromX = x;
-            _moveFromY = y;
-            _document.Detached = carried;
-            Surface.ShowPreview(carried);
-            HideMagnifier();
+            (_textAnchorX, _textAnchorY) = _selection.ClampPoint(x, y);
+            _placingText = true;
+
             return;
         }
 
-        if (_mode == OverlayMode.Drawing)
+        if (_gesture.Press(e.GetPosition(this), e.KeyModifiers, _mode == OverlayMode.Drawing))
         {
-            var (toolX, toolY) = _selection.ClampPoint(x, y);
-
-            // The text tool has no gesture to build a shape out of: the press
-            // and the release together only say where the caret goes.
-            if (TextToolArmed)
+            if (_gesture.Carrying)
             {
-                _placingText = true;
-                _textAnchorX = toolX;
-                _textAnchorY = toolY;
-
-                return;
+                HideMagnifier();
             }
 
-            _tool = ToolFactory?.Invoke();
-            _tool?.Begin(toolX, toolY);
             return;
         }
 
@@ -870,9 +857,9 @@ public partial class OverlayWindow : Window
             return;
         }
 
-        if (_moving is not null)
+        if (_gesture.Carrying)
         {
-            Surface.ShowPreview(_moving.MovedBy(x - _moveFromX, y - _moveFromY));
+            _gesture.Move(e.GetPosition(this));
             _lastX = x;
             _lastY = y;
             return;
@@ -903,7 +890,7 @@ public partial class OverlayWindow : Window
                     break;
                 }
 
-                Surface.ShowPreview(_tool?.Preview(toolX, toolY));
+                _gesture.Move(e.GetPosition(this));
                 break;
 
             case OverlayMode.Selecting:
@@ -929,20 +916,7 @@ public partial class OverlayWindow : Window
     {
         base.OnPointerWheelChanged(e);
 
-        if (!e.KeyModifiers.HasFlag(KeyModifiers.Control) || _moving is not null)
-        {
-            return;
-        }
-
-        var (x, y) = ToVirtualPixels(e.GetPosition(this));
-
-        if (_document?.MovableAt(x, y) is not { } target)
-        {
-            return;
-        }
-
-        AnnotationResized?.Invoke(this, (target, e.Delta.Y > 0 ? 1 : -1));
-        e.Handled = true;
+        e.Handled = _gesture.Wheel(e.GetPosition(this), e.KeyModifiers, e.Delta.Y);
     }
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
@@ -984,26 +958,13 @@ public partial class OverlayWindow : Window
             return;
         }
 
-        if (_moving is { } carried)
+        if (_gesture.Release(e.GetPosition(this)))
         {
-            DropCarried();
-            AnnotationMoved?.Invoke(this, (carried, x - _moveFromX, y - _moveFromY));
-
             return;
         }
 
         if (_mode == OverlayMode.Drawing)
         {
-            var (toolX, toolY) = _selection.ClampPoint(x, y);
-            var annotation = _tool?.End(toolX, toolY);
-            _tool = null;
-            Surface.ShowPreview(null);
-
-            if (annotation is not null)
-            {
-                AnnotationDrawn?.Invoke(this, annotation);
-            }
-
             return;
         }
 
@@ -1025,7 +986,7 @@ public partial class OverlayWindow : Window
     {
         // Ctrl over a stamped glyph picks it up, whatever tool is armed. The
         // cursor is the only place that says so.
-        if (modifiers.HasFlag(KeyModifiers.Control) && _document?.MovableAt(x, y) is not null)
+        if (_gesture.WouldCarry(x, y, modifiers))
         {
             Cursor = Move;
             return;
@@ -1100,12 +1061,7 @@ public partial class OverlayWindow : Window
             // and only then the overlay itself.
             // Before the rest of the ladder: a glyph in mid-air is the most
             // recent thing started, so it is the first thing Esc takes back.
-            case Key.Escape when _moving is { } dropped:
-                DropCarried();
-
-                // Nowhere is a legal destination, and reporting it as a move
-                // gets every monitor redrawn by the one place that can do it.
-                AnnotationMoved?.Invoke(this, (dropped, 0, 0));
+            case Key.Escape when _gesture.CancelCarry():
                 break;
 
             case Key.Escape when StyleCard.IsVisible || EmojiCard.IsVisible:
