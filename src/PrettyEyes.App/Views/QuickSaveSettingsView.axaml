@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PrettyEyes.App.Views.QuickSaveSettingsView"
+             Width="380">
+  <StackPanel Spacing="12">
+    <!-- Says what it does, because the name reads like a place to pick a folder
+         for the save dialog, and it is not: nothing here changes Ctrl+S. -->
+    <TextBlock Text="Каждый скопированный скриншот сразу ложится файлом в папку, без диалога и уведомлений. Буфер обмена работает как раньше."
+               Foreground="{StaticResource TextFaint}" FontSize="11" TextWrapping="Wrap"/>
+    <CheckBox x:Name="Autosave" Content="Сохранять скриншоты в папку"/>
+
+    <StackPanel x:Name="AutosaveOptions" Spacing="12" Opacity="0.4" IsEnabled="False">
+      <StackPanel Spacing="8">
+        <TextBlock Text="Папка" Foreground="{StaticResource Text}"/>
+        <Grid ColumnDefinitions="*,8,Auto">
+          <TextBox x:Name="SaveFolder" Grid.Column="0" Classes="field" IsReadOnly="True"
+                   Watermark="не выбрана"/>
+          <Button x:Name="PickFolder" Grid.Column="2" Classes="ghost" Content="Выбрать"/>
+        </Grid>
+      </StackPanel>
+
+      <StackPanel Spacing="8">
+        <TextBlock Text="Имя файла" Foreground="{StaticResource Text}"/>
+        <TextBox x:Name="SaveTemplate" Classes="field"/>
+        <TextBlock x:Name="SaveExample" Foreground="{StaticResource TextFaint}" FontSize="11"/>
+      </StackPanel>
+    </StackPanel>
+  </StackPanel>
+</UserControl>

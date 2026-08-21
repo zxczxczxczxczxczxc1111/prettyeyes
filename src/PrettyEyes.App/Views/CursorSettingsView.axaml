@@ -1,0 +1,12 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PrettyEyes.App.Views.CursorSettingsView"
+             Width="300">
+  <StackPanel Spacing="10">
+    <TextBlock Text="Вид указателя при выделении. Светлеет на тёмном и темнеет на светлом."
+               Foreground="{StaticResource TextFaint}" FontSize="11" TextWrapping="Wrap"/>
+    <!-- Filled from code: the shapes are the same strings the cursors
+         themselves are drawn from. -->
+    <StackPanel x:Name="CursorRow" Orientation="Horizontal" Spacing="8"/>
+  </StackPanel>
+</UserControl>

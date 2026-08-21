@@ -1,0 +1,24 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PrettyEyes.App.Views.MagnifierSettingsView"
+             Width="300">
+  <StackPanel Spacing="10">
+    <TextBlock Text="Увеличение под курсором, пока идёт выделение"
+               Foreground="{StaticResource TextFaint}" FontSize="11" TextWrapping="Wrap"/>
+
+    <!-- One row, three states, exactly one on: off, on, on with the pixel grid.
+         A grid checkbox nested under a magnifier checkbox said the same thing
+         in two controls, one of which spent most of its life greyed out. -->
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <Button x:Name="MagnifierOff" Classes="toolpick" ToolTip.Tip="Без лупы">
+        <Path Data="M7,2.5 A4.5,4.5 0 1 0 7.01,2.5 M10.3,10.3 L13.5,13.5 M3.2,10.8 L10.8,3.2"/>
+      </Button>
+      <Button x:Name="MagnifierPlain" Classes="toolpick" ToolTip.Tip="Лупа">
+        <Path Data="M7,2.5 A4.5,4.5 0 1 0 7.01,2.5 M10.3,10.3 L13.5,13.5"/>
+      </Button>
+      <Button x:Name="MagnifierWithGrid" Classes="toolpick" ToolTip.Tip="Лупа с сеткой пикселей">
+        <Path Data="M7,2.5 A4.5,4.5 0 1 0 7.01,2.5 M10.3,10.3 L13.5,13.5 M4.5,5.5 H9.5 M4.5,8.5 H9.5 M5.5,4.5 V9.5 M8.5,4.5 V9.5"/>
+      </Button>
+    </StackPanel>
+  </StackPanel>
+</UserControl>

@@ -50,6 +50,15 @@ public partial class SettingsWindow : Window
     /// general move of the other sections.
     /// </summary>
     private readonly PinSettingsView _pinSettings = new();
+
+    /// <summary>
+    /// The old sections, each now behind its own icon. Built once and reused:
+    /// the modal hands its content back on close, and a control cannot have two
+    /// parents.
+    /// </summary>
+    private readonly MagnifierSettingsView _magnifierSettings = new();
+    private readonly CursorSettingsView _cursorSettings = new();
+    private readonly QuickSaveSettingsView _quickSaveSettings = new();
     private bool _loading;
 
     /// <summary>
@@ -65,6 +74,17 @@ public partial class SettingsWindow : Window
         CloseButton.Click += (_, _) => Close();
 
         _pinSettings.Changed += (_, change) => Store(change(_settings));
+        _magnifierSettings.Changed += (_, change) =>
+        {
+            Store(change(_settings));
+            ShowToolRow();
+        };
+
+        _cursorSettings.Changed += (_, change) => Store(change(_settings));
+
+        _quickSaveSettings.Changed += (_, change) => StoreSave(change);
+        _quickSaveSettings.Failed += (_, text) => ShowFailure(text);
+        _quickSaveSettings.Toggled += (_, _) => ShowToolRow();
         _pinSettings.HotkeyChanged += (_, typed) => Apply(typed.Action, typed.Hotkey);
 
         _stylePopup.StyleChanged += (_, change) =>
@@ -126,19 +146,10 @@ public partial class SettingsWindow : Window
         RegionHotkey.Value = settings.Hotkey;
         FullScreenHotkey.Value = settings.FullScreenHotkey;
         Autostart.IsChecked = autostart.IsEnabled;
-        ShowMagnifierRow();
-
-        var save = settings.Save ?? SaveOptions.Default;
-        Autosave.IsChecked = save.Enabled;
-        SaveFolder.Text = save.Folder;
-        SaveTemplate.Text = save.Template;
-        ShowAutosaveState(save.Enabled);
-        ShowExample();
 
         _tools = new ToolVisibility(settings.Tools);
         _styles = new ToolStyles(settings.ToolStyles ?? []);
         BuildToolRow();
-        BuildCursorRow();
 
         CheckUpdates.IsChecked = settings.CheckUpdates;
         CurrentVersion.Text = $"установлена {UpdateService.Current}";
@@ -156,12 +167,6 @@ public partial class SettingsWindow : Window
         RegionHotkey.HotkeyChanged += (_, hotkey) => Apply(HotkeyAction.Region, hotkey);
         FullScreenHotkey.HotkeyChanged += (_, hotkey) => Apply(HotkeyAction.FullScreen, hotkey);
         Autostart.IsCheckedChanged += OnAutostartChanged;
-        MagnifierOff.Click += (_, _) => ApplyMagnifier(shown: false, grid: _settings.MagnifierGrid);
-        MagnifierPlain.Click += (_, _) => ApplyMagnifier(shown: true, grid: false);
-        MagnifierWithGrid.Click += (_, _) => ApplyMagnifier(shown: true, grid: true);
-        Autosave.IsCheckedChanged += OnAutosaveChanged;
-        SaveTemplate.TextChanged += OnTemplateChanged;
-        PickFolder.Click += OnPickFolder;
         CheckUpdates.IsCheckedChanged += OnCheckUpdatesChanged;
         CheckNow.Click += (_, _) => _ = updates.CheckAsync(manual: true);
         OpenReleases.Click += (_, _) => OpenPage(GitHubUpdateSource.ReleasesPage);
@@ -183,72 +188,6 @@ public partial class SettingsWindow : Window
         }
     }
 
-    /// <summary>
-    /// One button per cursor shape, drawn from the same outline the cursor
-    /// itself is drawn from.
-    /// </summary>
-    private void BuildCursorRow()
-    {
-        CursorRow.Children.Clear();
-
-        foreach (var style in Crosshair.All)
-        {
-            var button = new Button
-            {
-                Tag = style,
-                Content = new Avalonia.Controls.Shapes.Path
-                {
-                    Data = Avalonia.Media.Geometry.Parse(Crosshair.Icon(style)),
-                },
-            };
-
-            button.Classes.Add("toolpick");
-            ToolTip.SetTip(button, CursorName(style));
-            button.Click += OnCursorPicked;
-
-            CursorRow.Children.Add(button);
-        }
-
-        ShowCursorRow();
-    }
-
-    private void ShowCursorRow()
-    {
-        foreach (var child in CursorRow.Children)
-        {
-            if (child is not Button button || button.Tag is not CursorStyle style)
-            {
-                continue;
-            }
-
-            button.Classes.Remove("active");
-
-            if (style == _settings.Cursor)
-            {
-                button.Classes.Add("active");
-            }
-        }
-    }
-
-    private void OnCursorPicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        if (_loading || sender is not Button button || button.Tag is not CursorStyle style)
-        {
-            return;
-        }
-
-        Store(_settings with { Cursor = style });
-        ShowCursorRow();
-    }
-
-    private static string CursorName(CursorStyle style) => style switch
-    {
-        CursorStyle.Cross => "Крест",
-        CursorStyle.Gap => "Крест с просветом",
-        CursorStyle.Dot => "Точка",
-        CursorStyle.Scope => "Прицел",
-        _ => "Обычный указатель",
-    };
 
     /// <summary>
     /// One checkbox per tool, named the way the toolbar tooltip names it.
@@ -436,6 +375,30 @@ public partial class SettingsWindow : Window
             return;
         }
 
+        if (feature.Id == FeatureId.Magnifier)
+        {
+            _magnifierSettings.Load(_settings);
+            Modal.Show(_magnifierSettings, FeatureName(feature.Id));
+
+            return;
+        }
+
+        if (feature.Id == FeatureId.Cursor)
+        {
+            _cursorSettings.Load(_settings);
+            Modal.Show(_cursorSettings, FeatureName(feature.Id));
+
+            return;
+        }
+
+        if (feature.Id == FeatureId.QuickSave)
+        {
+            _quickSaveSettings.Load(_settings.Save ?? SaveOptions.Default);
+            Modal.Show(_quickSaveSettings, FeatureName(feature.Id));
+
+            return;
+        }
+
         if (feature.Tool is not { } tool)
         {
             return;
@@ -501,13 +464,11 @@ public partial class SettingsWindow : Window
         {
             case FeatureId.Magnifier:
                 Store(_settings with { ShowMagnifier = !_settings.ShowMagnifier });
-                ShowMagnifierRow();
                 break;
 
             case FeatureId.QuickSave:
                 var enabled = !(_settings.Save ?? SaveOptions.Default).Enabled;
-                Autosave.IsChecked = enabled;
-                ShowAutosaveState(enabled);
+                _quickSaveSettings.ShowEnabled(enabled);
                 StoreSave(save => save with { Enabled = enabled });
                 break;
 
@@ -799,114 +760,7 @@ public partial class SettingsWindow : Window
         _ => _pinSettings.Field(action),
     };
 
-    /// <summary>
-    /// Off, on, on with the grid. Turning it off keeps whatever grid choice was
-    /// made: coming back should land where it was left, not on a default.
-    /// </summary>
-    private void ApplyMagnifier(bool shown, bool grid)
-    {
-        if (_loading)
-        {
-            return;
-        }
 
-        Store(_settings with { ShowMagnifier = shown, MagnifierGrid = grid });
-        ShowMagnifierRow();
-    }
-
-    private void ShowMagnifierRow()
-    {
-        foreach (var (button, on) in new[]
-        {
-            (MagnifierOff, !_settings.ShowMagnifier),
-            (MagnifierPlain, _settings.ShowMagnifier && !_settings.MagnifierGrid),
-            (MagnifierWithGrid, _settings.ShowMagnifier && _settings.MagnifierGrid),
-        })
-        {
-            button.Classes.Remove("active");
-
-            if (on)
-            {
-                button.Classes.Add("active");
-            }
-        }
-    }
-
-    /// <summary>
-    /// Switched off, the group stays where it is, greyed out. Hiding it would
-    /// mean looking for a setting that is not on the screen.
-    /// </summary>
-    private void ShowAutosaveState(bool enabled)
-    {
-        AutosaveOptions.IsEnabled = enabled;
-        AutosaveOptions.Opacity = enabled ? 1 : 0.4;
-    }
-
-    private void ShowExample() =>
-        SaveExample.Text = "например: " + FileNameTemplate.Format(SaveTemplate.Text ?? string.Empty, DateTimeOffset.Now);
-
-    private void OnAutosaveChanged(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        if (_loading)
-        {
-            return;
-        }
-
-        var enabled = Autosave.IsChecked == true;
-        ShowAutosaveState(enabled);
-        StoreSave(save => save with { Enabled = enabled });
-    }
-
-    private void OnTemplateChanged(object? sender, Avalonia.Controls.TextChangedEventArgs e)
-    {
-        ShowExample();
-
-        if (_loading)
-        {
-            return;
-        }
-
-        StoreSave(save => save with { Template = SaveTemplate.Text ?? string.Empty });
-    }
-
-    /// <summary>
-    /// The folder is checked the moment it is picked, not when a screenshot is
-    /// waiting on it: a disconnected network drive answers slowly, and that is
-    /// not a delay to discover mid-capture.
-    /// </summary>
-    private async void OnPickFolder(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-    {
-        try
-        {
-            var picked = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-            {
-                Title = "Куда сохранять скриншоты",
-                AllowMultiple = false,
-            });
-
-            var folder = picked.FirstOrDefault()?.TryGetLocalPath();
-
-            if (string.IsNullOrWhiteSpace(folder))
-            {
-                return;
-            }
-
-            if (!FolderSink.CanWrite(folder))
-            {
-                ShowFailure("В эту папку нельзя писать. Выбери другую.");
-                return;
-            }
-
-            SaveFolder.Text = folder;
-            HideMessage();
-            StoreSave(save => save with { Folder = folder });
-        }
-        catch (Exception error)
-        {
-            Log.Default.Error("не удалось выбрать папку", error);
-            ShowFailure("Не удалось открыть выбор папки.");
-        }
-    }
 
     /// <summary>
     /// The three ways a screenshot can leave the application.
