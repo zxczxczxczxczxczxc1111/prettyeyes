@@ -13,6 +13,10 @@ namespace PrettyEyes.Core.Text;
 /// while the caret is still blinking, long before anything is committed to the
 /// document. Two implementations of "where does this line end" would disagree
 /// on the first sentence somebody types.
+///
+/// Everything here works in offsets into the original string and never rewrites
+/// it. Normalising line endings first would be simpler and would put the caret
+/// one character off after every break pasted from a Windows editor.
 /// </summary>
 public static class TextLayout
 {
@@ -41,27 +45,55 @@ public static class TextLayout
     /// </summary>
     public static IReadOnlyList<string> Wrap(string text, SKFont font, int? maxWidth)
     {
+        var segments = Segments(text, font, maxWidth);
+        var lines = new List<string>(segments.Count);
+
+        foreach (var segment in segments)
+        {
+            lines.Add(segment.Text);
+        }
+
+        return lines;
+    }
+
+    /// <summary>
+    /// The same lines, each carrying the offset it starts at. Characters eaten
+    /// by a break - the newline itself, the space a wrap happened at - belong to
+    /// no segment, which is exactly what makes the offsets add up.
+    /// </summary>
+    public static IReadOnlyList<TextSegment> Segments(string text, SKFont font, int? maxWidth)
+    {
         if (string.IsNullOrEmpty(text))
         {
             return [];
         }
 
-        var lines = new List<string>();
+        var segments = new List<TextSegment>();
+        var paragraph = 0;
 
-        // Trailing \r would otherwise be measured as a glyph and quietly widen
-        // every line pasted from a Windows editor.
-        foreach (var paragraph in text.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
+        while (true)
         {
-            if (maxWidth is not > 0)
+            var end = paragraph;
+
+            while (end < text.Length && text[end] != '\n' && text[end] != '\r')
             {
-                lines.Add(paragraph);
-                continue;
+                end++;
             }
 
-            WrapParagraph(paragraph, font, maxWidth.Value, lines);
-        }
+            WrapParagraph(text, paragraph, end, font, maxWidth, segments);
 
-        return lines;
+            if (end >= text.Length)
+            {
+                return segments;
+            }
+
+            // \r\n is one break, not two empty lines.
+            //
+            // A text ending in a break still has one more line after it, and
+            // that is where the caret sits once Enter is pressed. It falls out
+            // of the loop on its own: the next pass wraps an empty range.
+            paragraph = end + (text[end] == '\r' && end + 1 < text.Length && text[end + 1] == '\n' ? 2 : 1);
+        }
     }
 
     /// <summary>
@@ -70,11 +102,6 @@ public static class TextLayout
     /// </summary>
     public static CaptureRect Measure(IReadOnlyList<string> lines, SKFont font, int padding)
     {
-        if (lines.Count == 0)
-        {
-            return CaptureRect.Empty;
-        }
-
         var width = 0f;
 
         foreach (var line in lines)
@@ -82,77 +109,204 @@ public static class TextLayout
             width = Math.Max(width, font.MeasureText(line));
         }
 
+        return Box(width, lines.Count, font, padding);
+    }
+
+    /// <inheritdoc cref="Measure(IReadOnlyList{string}, SKFont, int)"/>
+    public static CaptureRect Measure(IReadOnlyList<TextSegment> segments, SKFont font, int padding)
+    {
+        var width = 0f;
+
+        foreach (var segment in segments)
+        {
+            width = Math.Max(width, font.MeasureText(segment.Text));
+        }
+
+        return Box(width, segments.Count, font, padding);
+    }
+
+    /// <summary>
+    /// Where the caret goes for a position in the text, relative to the
+    /// placement point.
+    /// </summary>
+    public static TextCaret CaretAt(IReadOnlyList<TextSegment> segments, int index, SKFont font, int padding)
+    {
+        var line = 0;
+
+        // The last line that starts at or before the index. A position sitting
+        // exactly on a break belongs to the line before it, which is where the
+        // caret was when the break was typed.
+        for (var i = 0; i < segments.Count; i++)
+        {
+            if (segments[i].Start <= index)
+            {
+                line = i;
+            }
+        }
+
+        var offset = segments.Count == 0
+            ? 0
+            : Math.Clamp(index - segments[line].Start, 0, segments[line].Text.Length);
+
+        var x = offset == 0 ? 0f : font.MeasureText(segments[line].Text.AsSpan(0, offset));
+
+        return new TextCaret(
+            padding + (int)Math.Round(x),
+            padding + (int)Math.Round(line * font.Spacing),
+            font.Spacing);
+    }
+
+    /// <summary>
+    /// Which position in the text a point lands on. Coordinates are relative to
+    /// the placement point, same as the caret.
+    /// </summary>
+    public static int IndexAt(IReadOnlyList<TextSegment> segments, int x, int y, SKFont font, int padding)
+    {
+        if (segments.Count == 0)
+        {
+            return 0;
+        }
+
+        var line = Math.Clamp((int)Math.Floor((y - padding) / font.Spacing), 0, segments.Count - 1);
+        var segment = segments[line];
+        var local = x - padding;
+
+        if (local <= 0)
+        {
+            return segment.Start;
+        }
+
+        var offset = segment.Text.Length;
+        var previous = 0f;
+
+        for (var i = 1; i <= segment.Text.Length; i++)
+        {
+            var width = font.MeasureText(segment.Text.AsSpan(0, i));
+
+            if (width > local)
+            {
+                // Whichever gap between characters is nearer: aiming at the left
+                // half of a letter has to put the caret before it.
+                offset = local - previous > width - local ? i : i - 1;
+                break;
+            }
+
+            previous = width;
+        }
+
+        return segment.Start + offset;
+    }
+
+    private static CaptureRect Box(float width, int lines, SKFont font, int padding)
+    {
+        if (lines == 0)
+        {
+            return CaptureRect.Empty;
+        }
+
         // Spacing, not the glyph box: two lines of the same text must be twice
         // as tall as one, whether or not anybody typed a descender.
-        var height = font.Spacing * lines.Count;
-
         return new CaptureRect(
             0,
             0,
             (int)Math.Ceiling(width) + (padding * 2),
-            (int)Math.Ceiling(height) + (padding * 2));
+            (int)Math.Ceiling(font.Spacing * lines) + (padding * 2));
     }
 
-    private static void WrapParagraph(string paragraph, SKFont font, int maxWidth, List<string> lines)
+    private static void WrapParagraph(
+        string text,
+        int start,
+        int end,
+        SKFont font,
+        int? maxWidth,
+        List<TextSegment> segments)
     {
-        if (paragraph.Length == 0)
+        if (maxWidth is not > 0)
         {
-            lines.Add(string.Empty);
+            segments.Add(new TextSegment(text[start..end], start));
             return;
         }
 
-        var current = string.Empty;
+        var limit = maxWidth.Value;
+        var lineStart = start;
+        var fitted = start;
+        var i = start;
 
-        foreach (var word in paragraph.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        while (i < end)
         {
-            var candidate = current.Length == 0 ? word : current + " " + word;
+            var wordStart = i;
 
-            if (font.MeasureText(candidate) <= maxWidth)
+            while (wordStart < end && text[wordStart] == ' ')
             {
-                current = candidate;
+                wordStart++;
+            }
+
+            var wordEnd = wordStart;
+
+            while (wordEnd < end && text[wordEnd] != ' ')
+            {
+                wordEnd++;
+            }
+
+            if (wordEnd == wordStart)
+            {
+                // Nothing left but spaces. They stay on the last line.
+                break;
+            }
+
+            if (Width(text, lineStart, wordEnd, font) <= limit)
+            {
+                fitted = wordEnd;
+                i = wordEnd;
                 continue;
             }
 
-            if (current.Length > 0)
+            if (fitted > lineStart)
             {
-                lines.Add(current);
-                current = string.Empty;
+                segments.Add(new TextSegment(text[lineStart..fitted], lineStart));
+                lineStart = wordStart;
+                fitted = wordStart;
+
+                if (Width(text, lineStart, wordEnd, font) <= limit)
+                {
+                    fitted = wordEnd;
+                    i = wordEnd;
+                    continue;
+                }
             }
 
-            current = font.MeasureText(word) <= maxWidth
-                ? word
-                : BreakWord(word, font, maxWidth, lines);
+            lineStart = BreakWord(text, lineStart, wordEnd, font, limit, segments);
+            fitted = lineStart;
+            i = wordEnd;
         }
 
-        // A paragraph made of nothing but spaces still occupies a line, because
-        // the caret is sitting on it.
-        lines.Add(current);
+        segments.Add(new TextSegment(text[lineStart..end], lineStart));
     }
 
     /// <summary>
-    /// Chops a word that does not fit on a line of its own, emitting every full
-    /// chunk and answering with the leftover that starts the next line.
+    /// Chops a run that does not fit on a line of its own, emitting every full
+    /// chunk and answering with the offset the leftover starts at.
     /// </summary>
-    private static string BreakWord(string word, SKFont font, int maxWidth, List<string> lines)
+    private static int BreakWord(string text, int start, int end, SKFont font, int limit, List<TextSegment> segments)
     {
-        var chunk = string.Empty;
+        var chunk = start;
 
-        foreach (var glyph in word)
+        for (var i = start + 1; i < end; i++)
         {
-            var candidate = chunk + glyph;
-
-            // One character always goes through even when it is wider than the
-            // limit: the alternative is an empty chunk and an endless loop.
-            if (chunk.Length > 0 && font.MeasureText(candidate) > maxWidth)
+            if (Width(text, chunk, i + 1, font) <= limit)
             {
-                lines.Add(chunk);
-                chunk = glyph.ToString();
                 continue;
             }
 
-            chunk = candidate;
+            // One character always goes through even when it is wider than the
+            // limit: the alternative is an empty chunk and an endless loop.
+            segments.Add(new TextSegment(text[chunk..i], chunk));
+            chunk = i;
         }
 
         return chunk;
     }
+
+    private static float Width(string text, int start, int end, SKFont font) =>
+        end <= start ? 0f : font.MeasureText(text.AsSpan(start, end - start));
 }
