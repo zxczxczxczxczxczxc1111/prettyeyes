@@ -28,6 +28,46 @@ public class DocumentTests
     }
 
     [Fact]
+    public void Replace_swaps_one_annotation_for_another_in_place()
+    {
+        using var document = NewDocument();
+        var first = new FakeAnnotation();
+        var second = new FakeAnnotation();
+        var third = new FakeAnnotation();
+        document.Add(first);
+        document.Add(second);
+
+        Assert.True(document.Replace(first, third));
+        Assert.Equal([third, second], document.Annotations);
+    }
+
+    [Fact]
+    public void Undo_after_a_replacement_takes_one_press_and_not_two()
+    {
+        using var document = NewDocument();
+        var before = new FakeAnnotation();
+        document.Add(before);
+
+        document.Replace(before, new FakeAnnotation());
+
+        // Editing a label is one change to the user. Remove plus add would be
+        // two, and the second Ctrl+Z would eat the label entirely.
+        document.Undo();
+
+        Assert.Equal([before], document.Annotations);
+    }
+
+    [Fact]
+    public void Replacing_something_that_is_not_there_changes_nothing()
+    {
+        using var document = NewDocument();
+        document.Add(new FakeAnnotation());
+
+        Assert.False(document.Replace(new FakeAnnotation(), new FakeAnnotation()));
+        Assert.Single(document.Annotations);
+    }
+
+    [Fact]
     public void Remove_takes_the_annotation_out()
     {
         using var document = NewDocument();

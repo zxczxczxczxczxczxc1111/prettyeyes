@@ -9,4 +9,10 @@ public enum OverlayMode
     Selecting,
     Adjusting,
     Drawing,
+
+    /// <summary>
+    /// A caret is up in this window. The pointer moves the caret and picks
+    /// characters instead of drawing, and the keyboard belongs to the text.
+    /// </summary>
+    Typing,
 }

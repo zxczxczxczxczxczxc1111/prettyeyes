@@ -103,6 +103,33 @@ public sealed class Document : IDisposable
     }
 
     /// <summary>
+    /// Swaps one annotation for another without changing its place in the
+    /// stack, as one undoable change. Editing a label is one thing the user
+    /// did; a remove followed by an add would cost two presses of Ctrl+Z, and
+    /// the second one would eat the label instead of putting the old text back.
+    /// </summary>
+    public bool Replace(IAnnotation annotation, IAnnotation replacement)
+    {
+        var index = _annotations.IndexOf(annotation);
+
+        if (index < 0)
+        {
+            return false;
+        }
+
+        Remember();
+        _annotations[index] = replacement;
+        _snapshot = null;
+
+        if (ReferenceEquals(_detached, annotation))
+        {
+            _detached = null;
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Puts an annotation somewhere else, keeping its place in the stack: a
     /// glyph that jumps in front of the arrow it was behind has moved in a way
     /// nobody asked for. Does nothing if it is not in the list.

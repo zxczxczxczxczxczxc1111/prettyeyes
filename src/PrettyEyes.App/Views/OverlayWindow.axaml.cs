@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Threading;
+using PrettyEyes.Core.Annotations;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Rendering;
@@ -25,6 +26,13 @@ public partial class OverlayWindow : Window
     private const int MagnifierSize = 132;
     private const int MagnifierGap = 24;
 
+    /// <summary>
+    /// Smaller than this in either direction and a text drag was a click. A
+    /// hand does not hold still on a mouse button, and every click would
+    /// otherwise produce a label two pixels wide.
+    /// </summary>
+    private const int TextBoxReach = 12;
+
     /// <summary>Arrow keys nudge by one pixel, with Shift by ten.</summary>
     private const int NudgeStep = 1;
     private const int NudgeStepFast = 10;
@@ -37,6 +45,7 @@ public partial class OverlayWindow : Window
     private static readonly Cursor WestEast = new(StandardCursorType.SizeWestEast);
     private static readonly Cursor NorthSouth = new(StandardCursorType.SizeNorthSouth);
     private static readonly Cursor Move = new(StandardCursorType.SizeAll);
+    private static readonly Cursor Caret = new(StandardCursorType.Ibeam);
 
     private CaptureRect _monitorBounds;
 
@@ -76,6 +85,14 @@ public partial class OverlayWindow : Window
 
     /// <summary>What a second double click puts back. Null once it has.</summary>
     private CaptureRect? _restore;
+
+    /// <summary>Dragging over a label to pick characters, not to draw.</summary>
+    private bool _pickingText;
+
+    /// <summary>Dragging out the box a new label will wrap inside.</summary>
+    private bool _placingText;
+    private int _textAnchorX;
+    private int _textAnchorY;
     private OverlayMode _mode = OverlayMode.Selecting;
     private Size? _toolbarSize;
     private bool _magnifierWanted = true;
@@ -122,6 +139,78 @@ public partial class OverlayWindow : Window
     /// no tool is active yet, which keeps the window free of tool state.
     /// </summary>
     public Func<ITool?>? ToolFactory { get; set; }
+
+    /// <summary>
+    /// Whether a caret is up anywhere in this capture. Asked before any key is
+    /// looked at, and deliberately not "in this window": clicking the toolbar
+    /// moves the keyboard to the window the toolbar is in, which on two
+    /// monitors is not the window the caret is in.
+    /// </summary>
+    public Func<bool>? TypingActive { get; set; }
+
+    /// <summary>
+    /// The armed tool is the text one. It places a caret rather than drawing,
+    /// so the pointer path skips ToolFactory entirely.
+    /// </summary>
+    public bool TextToolArmed { get; set; }
+
+    /// <summary>A key arrived while a caret was up. The session reads it.</summary>
+    public event EventHandler<KeyEventArgs>? TextKeyPressed;
+
+    /// <summary>Characters, already composed by the input method.</summary>
+    public event EventHandler<string>? TextEntered;
+
+    /// <summary>
+    /// A press while a caret is up. True means the session took it - the caret
+    /// moved, a selection started - and the window keeps the gesture. False
+    /// means the press landed outside and has already committed the label.
+    /// </summary>
+    public Func<int, int, int, bool>? TextPointerPressed { get; set; }
+
+    /// <summary>
+    /// A place for a new label. Null width is a click, where the label grows
+    /// with the text; a number is a dragged box the text wraps inside.
+    /// </summary>
+    public event EventHandler<(int X, int Y, int? MaxWidth)>? TextPlaced;
+
+    /// <summary>The pointer is picking characters with the button held.</summary>
+    public event EventHandler<(int X, int Y)>? TextSelectionDragged;
+
+    /// <summary>
+    /// The box for a new label, as it stands mid-drag. The session draws it,
+    /// because the colour it is drawn in is the text style and that lives there.
+    /// </summary>
+    public event EventHandler<CaptureRect>? TextBoxDragged;
+
+    /// <summary>Double click on a finished label: back into it.</summary>
+    public event EventHandler<TextAnnotation>? TextEditRequested;
+
+    /// <summary>
+    /// The label being typed, drawn above the document like any other preview.
+    /// Nothing here reaches the screenshot until the session commits it.
+    /// </summary>
+    public void ShowTextPreview(IAnnotation? preview) => Surface.ShowPreview(preview);
+
+    /// <summary>
+    /// Whether this is the window the caret is in. Switching it off drops back
+    /// to editing the selection; the session says SetToolActive right after,
+    /// because whether a tool is armed is its business and not this window's.
+    /// </summary>
+    public void SetTyping(bool typing)
+    {
+        _mode = typing
+            ? OverlayMode.Typing
+            : _selection.IsEmpty ? OverlayMode.Selecting : OverlayMode.Adjusting;
+
+        if (typing)
+        {
+            HideMagnifier();
+        }
+        else
+        {
+            Surface.ShowPreview(null);
+        }
+    }
 
     /// <summary>
     /// Places the window over one monitor. Show() comes first on purpose: the
@@ -298,7 +387,7 @@ public partial class OverlayWindow : Window
         // which would otherwise keep the magnifier it drew a moment ago.
         PointerSeen?.Invoke(this, EventArgs.Empty);
 
-        if (!_magnifierWanted || _mode == OverlayMode.Drawing || OverToolbar(x, y))
+        if (!_magnifierWanted || _mode is OverlayMode.Drawing or OverlayMode.Typing || OverToolbar(x, y))
         {
             HideMagnifier();
             return;
@@ -403,6 +492,8 @@ public partial class OverlayWindow : Window
         _mode = OverlayMode.Selecting;
         _grip = SelectionGrip.None;
         _dragging = false;
+        _pickingText = false;
+        _placingText = false;
         _tool = null;
         _toolbarSize = null;
 
@@ -631,6 +722,29 @@ public partial class OverlayWindow : Window
 
         var (x, y) = ToVirtualPixels(e.GetPosition(this));
 
+        // A caret is up somewhere. Either this press belongs to it, or it is
+        // the press that finishes the label - and in both cases it is the only
+        // thing this press does.
+        if (TypingActive?.Invoke() == true)
+        {
+            if (TextPointerPressed?.Invoke(x, y, e.ClickCount) == true)
+            {
+                _dragging = true;
+                _pickingText = true;
+                e.Pointer.Capture(this);
+            }
+
+            return;
+        }
+
+        // Back into a finished label. Checked before the double-click-selects-
+        // the-monitor rule can see it, which is why that rule sits below.
+        if (TextToolArmed && e.ClickCount == 2 && _document?.MovableAt(x, y) is TextAnnotation label)
+        {
+            TextEditRequested?.Invoke(this, label);
+            return;
+        }
+
         // What the selection was before this click started changing it. The
         // first click of a double click already wipes it, so by the time the
         // second one arrives the only witness left is this field.
@@ -694,6 +808,18 @@ public partial class OverlayWindow : Window
         if (_mode == OverlayMode.Drawing)
         {
             var (toolX, toolY) = _selection.ClampPoint(x, y);
+
+            // The text tool has no gesture to build a shape out of: the press
+            // and the release together only say where the caret goes.
+            if (TextToolArmed)
+            {
+                _placingText = true;
+                _textAnchorX = toolX;
+                _textAnchorY = toolY;
+
+                return;
+            }
+
             _tool = ToolFactory?.Invoke();
             _tool?.Begin(toolX, toolY);
             return;
@@ -743,12 +869,31 @@ public partial class OverlayWindow : Window
             return;
         }
 
+        if (_pickingText)
+        {
+            TextSelectionDragged?.Invoke(this, (x, y));
+            _lastX = x;
+            _lastY = y;
+
+            return;
+        }
+
         UpdateMagnifier(x, y);
 
         switch (_mode)
         {
             case OverlayMode.Drawing:
                 var (toolX, toolY) = _selection.ClampPoint(x, y);
+
+                if (_placingText)
+                {
+                    TextBoxDragged?.Invoke(
+                        this,
+                        CaptureRect.FromPoints(_textAnchorX, _textAnchorY, toolX, toolY));
+
+                    break;
+                }
+
                 Surface.ShowPreview(_tool?.Preview(toolX, toolY));
                 break;
 
@@ -805,6 +950,31 @@ public partial class OverlayWindow : Window
 
         var (x, y) = ToVirtualPixels(e.GetPosition(this));
 
+        if (_pickingText)
+        {
+            _pickingText = false;
+            return;
+        }
+
+        if (_placingText)
+        {
+            _placingText = false;
+
+            var (endX, endY) = _selection.ClampPoint(x, y);
+            var box = CaptureRect.FromPoints(_textAnchorX, _textAnchorY, endX, endY);
+
+            // A drag too small to have been meant as a box is a click. Without
+            // the slack every click becomes a two-pixel-wide label.
+            if (box.Width < TextBoxReach || box.Height < TextBoxReach)
+            {
+                TextPlaced?.Invoke(this, (_textAnchorX, _textAnchorY, null));
+                return;
+            }
+
+            TextPlaced?.Invoke(this, (box.X, box.Y, box.Width));
+            return;
+        }
+
         if (_moving is { } carried)
         {
             DropCarried();
@@ -852,6 +1022,12 @@ public partial class OverlayWindow : Window
             return;
         }
 
+        if (_mode == OverlayMode.Typing)
+        {
+            Cursor = Caret;
+            return;
+        }
+
         if (_mode == OverlayMode.Drawing)
         {
             Cursor = Aim(x, y);
@@ -883,6 +1059,19 @@ public partial class OverlayWindow : Window
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
+        // Before base, and before everything else. Enter has to mean a new line
+        // rather than a copy while a caret is up, and base.OnKeyDown gets the
+        // built-in handling in first if it is called first.
+        if (TypingActive?.Invoke() == true)
+        {
+            TextKeyPressed?.Invoke(this, e);
+
+            if (e.Handled)
+            {
+                return;
+            }
+        }
+
         base.OnKeyDown(e);
 
         var control = e.KeyModifiers.HasFlag(KeyModifiers.Control);
@@ -938,6 +1127,23 @@ public partial class OverlayWindow : Window
                 Nudge(e.Key, e.KeyModifiers.HasFlag(KeyModifiers.Shift));
                 break;
         }
+    }
+
+    /// <summary>
+    /// Characters, as the input method finally decided them. The first handler
+    /// of its kind in this project: nothing here ever wanted typing before.
+    /// </summary>
+    protected override void OnTextInput(TextInputEventArgs e)
+    {
+        if (TypingActive?.Invoke() == true && !string.IsNullOrEmpty(e.Text))
+        {
+            TextEntered?.Invoke(this, e.Text);
+            e.Handled = true;
+
+            return;
+        }
+
+        base.OnTextInput(e);
     }
 
     /// <summary>

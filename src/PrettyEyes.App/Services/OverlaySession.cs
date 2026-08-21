@@ -1,9 +1,14 @@
+using Avalonia.Input;
+using Avalonia.Input.Platform;
+using Avalonia.Threading;
 using PrettyEyes.App.Views;
+using PrettyEyes.Core.Annotations;
 using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Core.Rendering;
+using PrettyEyes.Core.Text;
 using PrettyEyes.Core.Tools;
 using CaptureRect = PrettyEyes.Core.Geometry.CaptureRect;
 
@@ -80,11 +85,24 @@ public sealed class OverlaySession
             window.ToolbarControl.SetActive(_activeTool);
             window.ToolbarControl.ShowStyles(_styles);
             window.ToolbarControl.ShowTools(new ToolVisibility(_services.Settings.Tools));
-            window.ToolFactory = () => _activeTool is null ? null : CreateTool(_activeTool.Value);
+            // Text is armed like any other tool but builds nothing: its whole
+            // gesture is deciding where the caret goes.
+            window.ToolFactory = () =>
+                _activeTool is null or ToolKind.Text ? null : CreateTool(_activeTool.Value);
             window.ToolbarControl.ToolPicked += OnToolPicked;
             window.ToolbarControl.UndoClicked += OnUndoRequested;
             window.ToolbarControl.CopyClicked += OnCopyClicked;
             window.ToolbarControl.SaveClicked += OnSaveRequested;
+
+            window.TypingActive = () => _typing is not null;
+            window.TextPointerPressed = OnTextPointerPressed;
+            window.TextKeyPressed += OnTextKeyPressed;
+            window.TextEntered += OnTextEntered;
+            window.TextPlaced += OnTextPlaced;
+            window.TextSelectionDragged += OnTextSelectionDragged;
+            window.TextBoxDragged += OnTextBoxDragged;
+            window.TextEditRequested += OnTextEditRequested;
+            window.Deactivated += OnWindowDeactivated;
 
             window.PointerSeen += OnPointerSeen;
             window.ColourRequested += OnColourRequested;
@@ -123,6 +141,15 @@ public sealed class OverlaySession
         window.ToolbarControl.UndoClicked -= OnUndoRequested;
         window.ToolbarControl.CopyClicked -= OnCopyClicked;
         window.ToolbarControl.SaveClicked -= OnSaveRequested;
+        window.TypingActive = null;
+        window.TextPointerPressed = null;
+        window.TextKeyPressed -= OnTextKeyPressed;
+        window.TextEntered -= OnTextEntered;
+        window.TextPlaced -= OnTextPlaced;
+        window.TextSelectionDragged -= OnTextSelectionDragged;
+        window.TextBoxDragged -= OnTextBoxDragged;
+        window.TextEditRequested -= OnTextEditRequested;
+        window.Deactivated -= OnWindowDeactivated;
         window.PointerSeen -= OnPointerSeen;
         window.ColourRequested -= OnColourRequested;
     }
@@ -381,6 +408,11 @@ public sealed class OverlaySession
             return;
         }
 
+        // Picking another tool finishes whatever is being typed. Leaving the
+        // caret up while the arrow is armed means the next keystroke goes
+        // somewhere the user is no longer looking.
+        CommitText();
+
         _activeTool = kind;
 
         // Only the visible toolbar raised this, but the others have to agree:
@@ -388,6 +420,7 @@ public sealed class OverlaySession
         foreach (var window in _windows)
         {
             window.ToolbarControl.SetActive(kind);
+            window.TextToolArmed = kind == ToolKind.Text;
             window.SetToolActive(kind is not null);
         }
     }
@@ -403,6 +436,8 @@ public sealed class OverlaySession
             return;
         }
 
+        CancelText();
+
         _activeTool = null;
         _toolbarShown = false;
         Document.Selection = CaptureRect.Empty;
@@ -411,6 +446,7 @@ public sealed class OverlaySession
         foreach (var window in _windows)
         {
             window.ToolbarControl.SetActive(null);
+            window.TextToolArmed = false;
             window.SetToolActive(active: false);
             window.ResetSelection();
             window.HideToolbar();
@@ -561,6 +597,461 @@ public sealed class OverlaySession
         }
     }
 
+    /// <summary>
+    /// Half of the caret blink. The number Windows itself uses, so a caret in
+    /// the overlay does not beat against every other caret on the screen.
+    /// </summary>
+    private static readonly TimeSpan Blink = TimeSpan.FromMilliseconds(530);
+
+    /// <summary>The label being typed right now, or null. At most one.</summary>
+    private TextEditing? _typing;
+
+    private DispatcherTimer? _blink;
+
+    /// <summary>
+    /// A place was picked for a new label: a click, or a box dragged out. The
+    /// click case still wraps, at the right edge of the region - a line running
+    /// off the monitor is not a label.
+    /// </summary>
+    private void OnTextPlaced(object? sender, (int X, int Y, int? MaxWidth) placed)
+    {
+        if (sender is not OverlayWindow window || Document is null)
+        {
+            return;
+        }
+
+        var style = _styles.For(ToolKind.Text);
+        var padding = style.TextPadding;
+
+        if (placed.MaxWidth is { } width)
+        {
+            BeginText(window, placed.X, placed.Y, Math.Max(1, width - (padding * 2)), original: null);
+            return;
+        }
+
+        // Placed by the glyphs rather than by the box: the text starts where
+        // the pointer was, and the plate grows around it.
+        BeginText(
+            window,
+            placed.X - padding,
+            placed.Y - padding,
+            Math.Max(1, Document.Selection.Right - placed.X - padding),
+            original: null);
+    }
+
+    /// <summary>Double click on a finished label puts the caret back into it.</summary>
+    private void OnTextEditRequested(object? sender, TextAnnotation label)
+    {
+        if (sender is OverlayWindow window)
+        {
+            BeginText(window, label.Bounds.X, label.Bounds.Y, label.MaxWidth, label);
+        }
+    }
+
+    private void BeginText(OverlayWindow window, int x, int y, int? maxWidth, TextAnnotation? original)
+    {
+        // One caret at a time. Starting a second label finishes the first, the
+        // same as clicking anywhere else would.
+        CommitText();
+
+        _typing = new TextEditing
+        {
+            Window = window,
+            Editor = new TextEditor(original?.Text ?? string.Empty),
+            X = x,
+            Y = y,
+            MaxWidth = maxWidth,
+            Style = original?.Style ?? _styles.For(ToolKind.Text),
+            Original = original,
+        };
+
+        if (original is not null && Document is not null)
+        {
+            // Lifted off the picture while it is edited, exactly like a glyph
+            // being dragged: otherwise the old text shows through the new one.
+            Document.Detached = original;
+        }
+
+        foreach (var window_ in _windows)
+        {
+            window_.SetTyping(ReferenceEquals(window_, window));
+        }
+
+        _blink ??= new DispatcherTimer { Interval = Blink };
+        _blink.Tick -= OnBlink;
+        _blink.Tick += OnBlink;
+
+        RestartBlink();
+        Redraw();
+    }
+
+    private void OnBlink(object? sender, EventArgs e)
+    {
+        if (_typing is not { } typing)
+        {
+            return;
+        }
+
+        typing.CaretOn = !typing.CaretOn;
+        RefreshText();
+    }
+
+    /// <summary>
+    /// Solid again and counting from zero. A caret that keeps blinking through
+    /// a burst of typing hides itself exactly when it is being watched.
+    /// </summary>
+    private void RestartBlink()
+    {
+        if (_typing is not { } typing || _blink is null)
+        {
+            return;
+        }
+
+        typing.CaretOn = true;
+        _blink.Stop();
+        _blink.Start();
+        RefreshText();
+    }
+
+    /// <summary>
+    /// Draws the label as it stands, on the window holding the caret and on no
+    /// other. The neighbours get null, or a label typed on one monitor would be
+    /// painted at the same coordinates on the next one.
+    /// </summary>
+    private void RefreshText()
+    {
+        if (_typing is not { } typing)
+        {
+            foreach (var window in _windows)
+            {
+                window.ShowTextPreview(null);
+            }
+
+            return;
+        }
+
+        var preview = new TextPreview(typing.Label, typing.Editor, typing.CaretOn);
+
+        foreach (var window in _windows)
+        {
+            window.ShowTextPreview(ReferenceEquals(window, typing.Window) ? preview : null);
+        }
+    }
+
+    /// <summary>
+    /// The box for a new label while it is still being dragged out. Drawn in
+    /// the colour the text will be, so the two read as the same thing.
+    /// </summary>
+    private void OnTextBoxDragged(object? sender, CaptureRect box)
+    {
+        if (sender is not OverlayWindow window)
+        {
+            return;
+        }
+
+        window.ShowTextPreview(box.IsEmpty
+            ? null
+            : new RectangleAnnotation(box, _styles.For(ToolKind.Text).Color, 1f));
+    }
+
+    /// <summary>
+    /// A press while a caret is up. Inside the label it moves the caret and
+    /// starts picking characters; anywhere else - including another monitor -
+    /// it finishes the label and does nothing more.
+    /// </summary>
+    private bool OnTextPointerPressed(int x, int y, int clickCount)
+    {
+        if (_typing is not { } typing)
+        {
+            return false;
+        }
+
+        var label = typing.Label;
+        var box = label.Bounds.IsEmpty
+            ? new TextPreview(label, typing.Editor, caretOn: false).Bounds
+            : label.Bounds;
+
+        if (!box.Contains(x, y))
+        {
+            CommitText();
+            return false;
+        }
+
+        if (clickCount >= 2)
+        {
+            typing.Editor.SelectAll();
+        }
+        else
+        {
+            typing.Editor.MoveTo(IndexAt(typing, x, y), extend: false);
+        }
+
+        RestartBlink();
+
+        return true;
+    }
+
+    private void OnTextSelectionDragged(object? sender, (int X, int Y) at)
+    {
+        if (_typing is not { } typing)
+        {
+            return;
+        }
+
+        typing.Editor.MoveTo(IndexAt(typing, at.X, at.Y), extend: true);
+        RestartBlink();
+    }
+
+    private static int IndexAt(TextEditing typing, int x, int y)
+    {
+        var label = typing.Label;
+
+        using var font = TextLayout.FontFor(typing.Style);
+
+        return TextLayout.IndexAt(
+            label.Segments,
+            x - typing.X,
+            y - typing.Y,
+            font,
+            typing.Style.TextPadding);
+    }
+
+    /// <summary>
+    /// Every key while a caret is up, including the ones this window would
+    /// otherwise treat as shortcuts. Enter is a new line and not a copy, C is a
+    /// letter and not a colour pick, and the only way to be sure of that is to
+    /// swallow the lot.
+    /// </summary>
+    private void OnTextKeyPressed(object? sender, KeyEventArgs e)
+    {
+        if (_typing is not { } typing)
+        {
+            return;
+        }
+
+        var control = e.KeyModifiers.HasFlag(KeyModifiers.Control);
+        var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+        var editor = typing.Editor;
+        var label = typing.Label;
+
+        using var font = TextLayout.FontFor(typing.Style);
+        var padding = typing.Style.TextPadding;
+
+        e.Handled = true;
+
+        switch (e.Key)
+        {
+            case Key.Escape:
+                CancelText();
+                return;
+
+            case Key.Enter or Key.Return when control:
+                CommitText();
+                return;
+
+            case Key.Enter or Key.Return:
+                editor.Insert("\n");
+                break;
+
+            case Key.Back:
+                editor.Backspace();
+                break;
+
+            case Key.Delete:
+                editor.Delete();
+                break;
+
+            case Key.Left:
+                editor.MoveBy(-1, shift);
+                break;
+
+            case Key.Right:
+                editor.MoveBy(1, shift);
+                break;
+
+            case Key.Up:
+                editor.MoveTo(TextLayout.Above(label.Segments, editor.Caret, font, padding), shift);
+                break;
+
+            case Key.Down:
+                editor.MoveTo(TextLayout.Below(label.Segments, editor.Caret, font, padding), shift);
+                break;
+
+            case Key.Home:
+                editor.MoveTo(TextLayout.LineStart(label.Segments, editor.Caret), shift);
+                break;
+
+            case Key.End:
+                editor.MoveTo(TextLayout.LineEnd(label.Segments, editor.Caret), shift);
+                break;
+
+            case Key.A when control:
+                editor.SelectAll();
+                break;
+
+            case Key.Z when control:
+                // Only this label's own typing. With nothing left to take back
+                // it stops here rather than reaching into the document: undoing
+                // a shape drawn before the label was started is not what the
+                // key means while the caret is blinking.
+                editor.Undo();
+                break;
+
+            case Key.V when control:
+                PasteAsync();
+                return;
+        }
+
+        RestartBlink();
+    }
+
+    private void OnTextEntered(object? sender, string text)
+    {
+        if (_typing is not { } typing)
+        {
+            return;
+        }
+
+        using var font = TextLayout.FontFor(typing.Style);
+
+        typing.Editor.Insert(TextEditor.Sanitize(text, font));
+        RestartBlink();
+    }
+
+    /// <summary>
+    /// Clipboard text, cleaned the same way typed text is. Async because the
+    /// clipboard is, and swallowed on failure because a clipboard that refuses
+    /// to answer must not take the label with it.
+    /// </summary>
+    private async void PasteAsync()
+    {
+        try
+        {
+            if (await _services.Host.Clipboard!.TryGetTextAsync() is not { Length: > 0 } text)
+            {
+                return;
+            }
+
+            if (_typing is not { } typing)
+            {
+                return;
+            }
+
+            using var font = TextLayout.FontFor(typing.Style);
+
+            typing.Editor.Insert(TextEditor.Sanitize(text, font));
+            RestartBlink();
+        }
+        catch (Exception error)
+        {
+            Log.Default.Error("не удалось вставить текст из буфера", error);
+        }
+    }
+
+    /// <summary>
+    /// Finishes the label. An empty one is never created, and an existing one
+    /// emptied out is removed: deleting the text is how a label is deleted.
+    /// </summary>
+    private void CommitText()
+    {
+        if (_typing is not { } typing)
+        {
+            return;
+        }
+
+        _typing = null;
+        StopTyping();
+
+        var text = typing.Editor.Text;
+
+        if (typing.Original is { } original)
+        {
+            if (text.Length == 0)
+            {
+                Document?.Remove(original);
+            }
+            else if (original.Text != text)
+            {
+                // One change, one undo. Remove plus add would cost two presses
+                // and the second would eat the label.
+                Document?.Replace(original, typing.Label);
+            }
+            else if (Document is not null)
+            {
+                Document.Detached = null;
+            }
+        }
+        else if (text.Length > 0)
+        {
+            Document?.Add(typing.Label);
+        }
+
+        Redraw();
+    }
+
+    /// <summary>
+    /// Escape: the label goes away and an edited one goes back to what it said
+    /// before, which is what it still says - the original was never touched.
+    /// </summary>
+    private void CancelText()
+    {
+        if (_typing is null)
+        {
+            return;
+        }
+
+        _typing = null;
+        StopTyping();
+
+        if (Document is not null)
+        {
+            Document.Detached = null;
+        }
+
+        Redraw();
+    }
+
+    private void StopTyping()
+    {
+        _blink?.Stop();
+
+        foreach (var window in _windows)
+        {
+            window.ShowTextPreview(null);
+            window.SetTyping(false);
+            window.SetToolActive(_activeTool is not null);
+        }
+    }
+
+    /// <summary>
+    /// The capture lost the keyboard altogether: alt-tab, another application,
+    /// anything. The label is finished rather than lost.
+    ///
+    /// Posted, because a click on another monitor of this same capture
+    /// deactivates one overlay and activates another, and in between them
+    /// nothing of ours is active. Asking a beat later is asking about a state
+    /// that has settled.
+    /// </summary>
+    private void OnWindowDeactivated(object? sender, EventArgs e)
+    {
+        if (_typing is null || _closed)
+        {
+            return;
+        }
+
+        Dispatcher.UIThread.Post(
+            () =>
+            {
+                if (_typing is null || _closed || _windows.Any(window => window.IsActive))
+                {
+                    return;
+                }
+
+                CommitText();
+            },
+            DispatcherPriority.Background);
+    }
+
     private ITool CreateTool(ToolKind kind) => kind switch
     {
         ToolKind.Blur => new BlurTool(),
@@ -604,7 +1095,13 @@ public sealed class OverlaySession
             return;
         }
 
+        // Before the flag: a label half typed when the overlay is dismissed is
+        // a label the user meant to keep, and the screenshot is rendered from
+        // the document rather than from the preview.
+        CommitText();
+
         _closed = true;
+        _blink?.Stop();
 
         foreach (var window in _windows)
         {
