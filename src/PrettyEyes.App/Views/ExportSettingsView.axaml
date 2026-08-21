@@ -1,0 +1,49 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="PrettyEyes.App.Views.ExportSettingsView"
+             Width="380">
+  <StackPanel Spacing="12">
+
+          <!-- Three results to choose from, not five parameters to tune. The
+               parameters are still here, one click down. -->
+          <StackPanel x:Name="PresetRow" Orientation="Horizontal" Spacing="6"/>
+
+          <TextBlock x:Name="PresetHint" Foreground="{StaticResource TextFaint}" FontSize="11"
+                     TextWrapping="Wrap" IsVisible="False"/>
+
+          <Button x:Name="ExportAdvanced" Classes="ghost" Content="Настроить"
+                  HorizontalAlignment="Left"/>
+
+          <StackPanel x:Name="ExportOptions" Spacing="12" Opacity="0.4" IsEnabled="False" IsVisible="False">
+            <StackPanel Spacing="8">
+              <TextBlock Text="Поля" Foreground="{StaticResource Text}"/>
+              <StackPanel x:Name="PaddingRow" Orientation="Horizontal" Spacing="6"/>
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+              <TextBlock Text="Фон" Foreground="{StaticResource Text}"/>
+              <StackPanel x:Name="BackgroundRow" Orientation="Horizontal" Spacing="6"/>
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+              <TextBlock Text="Скругление" Foreground="{StaticResource Text}"/>
+              <StackPanel x:Name="RadiusRow" Orientation="Horizontal" Spacing="6"/>
+            </StackPanel>
+
+            <CheckBox x:Name="ExportShadow" Content="Тень"/>
+            <CheckBox x:Name="ExportGrain" Content="Зерно"/>
+            <CheckBox x:Name="ExportSheen" Content="Свет"/>
+
+            <!-- Drawn by the same code that writes the file: a preview that
+                 lies is worse than no preview. -->
+            <Border Background="{StaticResource Bg}"
+                    BorderBrush="{StaticResource Border}"
+                    BorderThickness="1"
+                    CornerRadius="{StaticResource RField}"
+                    Padding="8"
+                    HorizontalAlignment="Left">
+              <Image x:Name="ExportPreview" Width="176" Height="110"/>
+            </Border>
+          </StackPanel>
+  </StackPanel>
+</UserControl>
