@@ -35,7 +35,14 @@ public partial class SettingsWindow : Window
 
     private AppSettings _settings = AppSettings.Default;
     private ToolVisibility _tools = new();
+    private ToolStyles _styles = new();
     private ExportStyle _export = ExportStyle.None;
+
+    /// <summary>
+    /// One instance, reused: the card is the overlay's own control, and building
+    /// a fresh one per right click would rebuild the whole palette each time.
+    /// </summary>
+    private readonly ToolStylePopup _stylePopup = new();
     private bool _loading;
 
     /// <summary>
@@ -49,6 +56,23 @@ public partial class SettingsWindow : Window
         // The window has no system frame, so dragging is ours to implement.
         TitleBar.PointerPressed += (_, e) => BeginMoveDrag(e);
         CloseButton.Click += (_, _) => Close();
+
+        _stylePopup.StyleChanged += (_, change) =>
+        {
+            _styles.Set(change.Kind, change.Style);
+            Store(_settings with { ToolStyles = new Dictionary<ToolKind, ToolStyle>(_styles.Stored) });
+        };
+
+        // Esc closes the sheet first and the window second: the other order
+        // would throw away the window while a card is still open on it.
+        KeyDown += (_, e) =>
+        {
+            if (e.Key == Avalonia.Input.Key.Escape && Modal.IsOpen)
+            {
+                Modal.Close();
+                e.Handled = true;
+            }
+        };
 
         // Rounded corners come from the compositor, not from a transparent
         // window: see WindowCorners.
@@ -102,6 +126,7 @@ public partial class SettingsWindow : Window
         ShowExample();
 
         _tools = new ToolVisibility(settings.Tools);
+        _styles = new ToolStyles(settings.ToolStyles ?? []);
         BuildToolRow();
         BuildCursorRow();
 
@@ -230,12 +255,12 @@ public partial class SettingsWindow : Window
             if (feature.Group == FeatureGroup.DrawingTool)
             {
                 button.Click += OnToolToggled;
-                ToolRow.Children.Add(button);
+                ToolRow.Children.Add(WithCorner(button, feature));
             }
             else
             {
                 button.Click += OnFeatureToggled;
-                FeatureRow.Children.Add(button);
+                FeatureRow.Children.Add(WithCorner(button, feature));
             }
         }
 
@@ -243,47 +268,98 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>
-    /// One square in either row. The corner is the whole point of the mark: a
-    /// feature with settings has to look different before the right button is
-    /// pressed, because an invisible button nobody presses is not an affordance.
-    /// Blur is the one square without it.
+    /// One square in either row: the toggle itself, and over its bottom right
+    /// corner a second, tiny button that opens the settings of that feature.
+    ///
+    /// The corner is the whole point of the mark. The right mouse button opens
+    /// the same thing, but a button nobody can see is not an affordance, and
+    /// the keyboard has to be able to get there too - which a right click
+    /// cannot offer at all.
     /// </summary>
-    private static Button NewFeatureButton(ConfigurableFeature feature)
+    private Button NewFeatureButton(ConfigurableFeature feature)
     {
-        var icon = new Avalonia.Controls.Shapes.Path
-        {
-            Data = Avalonia.Media.Geometry.Parse(FeatureIcon(feature.Id)),
-        };
-
-        var content = new Panel();
-        content.Children.Add(icon);
-
-        if (feature.HasSettings)
-        {
-            content.Children.Add(new Avalonia.Controls.Shapes.Path
-            {
-                Data = Avalonia.Media.Geometry.Parse("M0,6 L6,6 L6,0 Z"),
-                Width = 6,
-                Height = 6,
-                Stretch = Avalonia.Media.Stretch.None,
-                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-                VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom,
-                Margin = new Thickness(0, 0, 3, 3),
-                Fill = Avalonia.Media.Brushes.Gray,
-                Stroke = null,
-            });
-        }
-
         var button = new Button
         {
             Tag = feature,
-            Content = content,
+            Content = new Avalonia.Controls.Shapes.Path
+            {
+                Data = Avalonia.Media.Geometry.Parse(FeatureIcon(feature.Id)),
+            },
         };
 
         button.Classes.Add("toolpick");
         ToolTip.SetTip(button, FeatureName(feature.Id));
 
+        if (feature.HasSettings)
+        {
+            button.AddHandler(
+                PointerPressedEvent,
+                (_, e) =>
+                {
+                    if (e.GetCurrentPoint(button).Properties.IsRightButtonPressed)
+                    {
+                        OpenFeatureSettings(feature);
+                        e.Handled = true;
+                    }
+                },
+                Avalonia.Interactivity.RoutingStrategies.Tunnel);
+        }
+
         return button;
+    }
+
+    /// <summary>
+    /// The square and its corner, stacked. Two overlapping controls rather than
+    /// one: a corner drawn inside the button would be a picture of a button,
+    /// and clicking it would toggle the feature off instead of opening it.
+    /// </summary>
+    private Control WithCorner(Button square, ConfigurableFeature feature)
+    {
+        if (!feature.HasSettings)
+        {
+            return square;
+        }
+
+        var corner = new Button
+        {
+            Content = new Avalonia.Controls.Shapes.Path
+            {
+                Data = Avalonia.Media.Geometry.Parse("M0,6 L6,6 L6,0 Z"),
+            },
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            VerticalAlignment = Avalonia.Layout.VerticalAlignment.Bottom,
+            Margin = new Thickness(0, 0, 2, 2),
+        };
+
+        corner.Classes.Add("corner");
+        ToolTip.SetTip(corner, "Настройки: " + FeatureName(feature.Id));
+        corner.Click += (_, e) =>
+        {
+            OpenFeatureSettings(feature);
+            e.Handled = true;
+        };
+
+        var stack = new Panel();
+        stack.Children.Add(square);
+        stack.Children.Add(corner);
+
+        return stack;
+    }
+
+    /// <summary>
+    /// What the right button, and the corner, open. Drawing tools get the same
+    /// colour and thickness card the overlay uses; the features get theirs when
+    /// their sections move in.
+    /// </summary>
+    private void OpenFeatureSettings(ConfigurableFeature feature)
+    {
+        if (feature.Tool is not { } tool)
+        {
+            return;
+        }
+
+        _stylePopup.Open(tool, _styles.For(tool));
+        Modal.Show(_stylePopup, FeatureName(feature.Id));
     }
 
     /// <summary>Which of them are on, right now.</summary>
@@ -291,7 +367,12 @@ public partial class SettingsWindow : Window
     {
         foreach (var child in ToolRow.Children.Concat(FeatureRow.Children))
         {
-            if (child is not Button button || button.Tag is not ConfigurableFeature feature)
+            // The square is either the child itself or the first thing in the
+            // little stack that also holds its corner.
+            var button = child as Button
+                ?? (child as Panel)?.Children.OfType<Button>().FirstOrDefault();
+
+            if (button?.Tag is not ConfigurableFeature feature)
             {
                 continue;
             }

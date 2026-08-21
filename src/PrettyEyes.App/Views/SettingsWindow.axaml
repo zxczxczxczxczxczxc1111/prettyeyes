@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:controls="using:PrettyEyes.App.Controls"
+        xmlns:views="using:PrettyEyes.App.Views"
         x:Class="PrettyEyes.App.Views.SettingsWindow"
         Title="prettyeyes"
         Icon="/Assets/prettyeyes.ico"
@@ -225,6 +226,10 @@
       <Image Source="/Assets/logo.png" Height="96" Opacity="0.85"
              Margin="32" IsHitTestVisible="False"
              HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+
+      <!-- Last child of the panel, so it covers everything above it including
+           the mark. Hidden until something asks for it. -->
+      <views:SettingsModal x:Name="Modal"/>
     </Panel>
   </Border>
 </Window>

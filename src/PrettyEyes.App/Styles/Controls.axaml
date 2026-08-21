@@ -178,6 +178,45 @@
     <Setter Property="VerticalAlignment" Value="Center"/>
   </Style>
 
+  <!-- The modal card: the same surface and hairline as the settings window
+       itself, one step lighter so it reads as lying on top rather than as a
+       hole cut in it. -->
+  <Style Selector="Border.modalcard">
+    <Setter Property="Background" Value="{StaticResource Surface}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RField}"/>
+  </Style>
+
+  <Style Selector="TextBlock.modaltitle">
+    <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+  </Style>
+
+  <!-- The corner that says "there is something behind the right button here".
+       Dim by default; the square lighting up on hover is the invitation. -->
+  <Style Selector=":is(Button).corner">
+    <Setter Property="Width" Value="12"/>
+    <Setter Property="Height" Value="12"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="Background" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Foreground" Value="{StaticResource TextFaint}"/>
+  </Style>
+
+  <Style Selector=":is(Button).corner:pointerover">
+    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+  </Style>
+
+  <Style Selector=":is(Button).corner Path">
+    <Setter Property="Fill" Value="{Binding $parent[Button].Foreground}"/>
+    <Setter Property="Stroke" Value="{x:Null}"/>
+    <Setter Property="Width" Value="6"/>
+    <Setter Property="Height" Value="6"/>
+    <Setter Property="Stretch" Value="None"/>
+    <Setter Property="HorizontalAlignment" Value="Right"/>
+    <Setter Property="VerticalAlignment" Value="Bottom"/>
+  </Style>
+
   <!-- A text field that looks like the hotkey field next to it: same fill,
        same hairline, same radius. The default Avalonia box brings its own
        light theme with it. -->
