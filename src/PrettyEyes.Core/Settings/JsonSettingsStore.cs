@@ -10,7 +10,13 @@ namespace PrettyEyes.Core.Settings;
 /// </summary>
 public sealed class JsonSettingsStore : ISettingsStore
 {
-    private static readonly JsonSerializerOptions Options = new() { WriteIndented = true };
+    // Converters must be handed over here. Touch the collection after the first
+    // serialize and STJ throws, because the options froze and told nobody.
+    private static readonly JsonSerializerOptions Options = new()
+    {
+        WriteIndented = true,
+        Converters = { new ToolKindKeyConverter() },
+    };
 
     private readonly string _path;
 
