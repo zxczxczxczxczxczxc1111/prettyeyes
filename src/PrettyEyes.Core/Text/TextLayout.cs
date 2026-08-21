@@ -131,18 +131,9 @@ public static class TextLayout
     /// </summary>
     public static TextCaret CaretAt(IReadOnlyList<TextSegment> segments, int index, SKFont font, int padding)
     {
-        var line = 0;
-
-        // The last line that starts at or before the index. A position sitting
-        // exactly on a break belongs to the line before it, which is where the
-        // caret was when the break was typed.
-        for (var i = 0; i < segments.Count; i++)
-        {
-            if (segments[i].Start <= index)
-            {
-                line = i;
-            }
-        }
+        // A position sitting exactly on a break belongs to the line before it,
+        // which is where the caret was when the break was typed.
+        var line = LineOf(segments, index);
 
         var offset = segments.Count == 0
             ? 0
@@ -195,6 +186,68 @@ public static class TextLayout
         }
 
         return segment.Start + offset;
+    }
+
+    /// <summary>Start of the drawn line a position sits on. What Home means.</summary>
+    public static int LineStart(IReadOnlyList<TextSegment> segments, int index) =>
+        segments.Count == 0 ? 0 : segments[LineOf(segments, index)].Start;
+
+    /// <summary>End of the drawn line a position sits on. What End means.</summary>
+    public static int LineEnd(IReadOnlyList<TextSegment> segments, int index) =>
+        segments.Count == 0 ? 0 : segments[LineOf(segments, index)].End;
+
+    /// <summary>
+    /// The same place on the line above, or the very start of the text when
+    /// there is no line above. Vertical movement is a question about pixels,
+    /// not about offsets: the columns of two lines have nothing in common.
+    /// </summary>
+    public static int Above(IReadOnlyList<TextSegment> segments, int index, SKFont font, int padding)
+    {
+        if (segments.Count == 0 || LineOf(segments, index) == 0)
+        {
+            return 0;
+        }
+
+        var caret = CaretAt(segments, index, font, padding);
+
+        return IndexAt(segments, caret.X, caret.Y - 1, font, padding);
+    }
+
+    /// <summary>The same place on the line below, or the very end of the text.</summary>
+    public static int Below(IReadOnlyList<TextSegment> segments, int index, SKFont font, int padding)
+    {
+        if (segments.Count == 0)
+        {
+            return 0;
+        }
+
+        if (LineOf(segments, index) == segments.Count - 1)
+        {
+            return segments[^1].End;
+        }
+
+        var caret = CaretAt(segments, index, font, padding);
+
+        return IndexAt(segments, caret.X, (int)Math.Ceiling(caret.Y + caret.Height) + 1, font, padding);
+    }
+
+    /// <summary>
+    /// Which drawn line a position belongs to: the last one starting at or
+    /// before it, same rule the caret uses.
+    /// </summary>
+    private static int LineOf(IReadOnlyList<TextSegment> segments, int index)
+    {
+        var line = 0;
+
+        for (var i = 0; i < segments.Count; i++)
+        {
+            if (segments[i].Start <= index)
+            {
+                line = i;
+            }
+        }
+
+        return line;
     }
 
     private static CaptureRect Box(float width, int lines, SKFont font, int padding)
