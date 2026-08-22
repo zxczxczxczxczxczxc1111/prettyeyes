@@ -5,7 +5,7 @@
         x:Class="PrettyEyes.App.Views.SettingsWindow"
         Title="prettyeyes"
         Icon="/Assets/prettyeyes.ico"
-        Width="880" Height="920"
+        Width="880" Height="640"
         CanResize="False"
         SystemDecorations="None"
         Background="{StaticResource Bg}"
@@ -124,13 +124,16 @@
            last thing on this window that should catch the eye.
 
            It sits over the whole card rather than in the scrolling content, so
-           the 32 px below it is the same 32 px as to its right. Inside the
-           content the bottom gap was whatever the settings happened not to fill,
-           which read as crooked. The file itself is cropped to the ink for the
-           same reason. -->
-      <Image Source="/Assets/logo.png" Height="96" Opacity="0.85"
-             Margin="32" IsHitTestVisible="False"
-             HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+           the gap around it does not depend on how much the settings happened
+           to fill. At the top right rather than the bottom: once the
+           sections moved into their cards the page grew short, and a mark left
+           at the bottom read as forgotten rather than as a signature. Up here
+           it sits beside the first line of the right column, where the eye
+           already is. The file itself is cropped to the ink for the same
+           reason. -->
+      <Image Source="/Assets/logo.png" Height="72" Opacity="0.85"
+             Margin="0,58,28,0" IsHitTestVisible="False"
+             HorizontalAlignment="Right" VerticalAlignment="Top"/>
 
       <!-- Last child of the panel, so it covers everything above it including
            the mark. Hidden until something asks for it. -->
