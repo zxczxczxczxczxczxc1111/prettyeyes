@@ -559,6 +559,29 @@ public partial class PinnedWindow : Window, IPinned
     /// <summary>Puts this pin back above everything else.</summary>
     public void KeepOnTop() => WindowOrder.KeepOnTop(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
 
+    /// <summary>
+    /// Gives up the top of the pile, or takes it back.
+    ///
+    /// Said through Avalonia rather than through SetWindowPos, so that what the
+    /// framework believes about this window and what Windows does with it stay
+    /// the same thing. The pin does not hide and does not move: it just stops
+    /// being in front of an application that owns the whole screen.
+    /// </summary>
+    public void FloatAbove(bool above)
+    {
+        if (Topmost == above)
+        {
+            return;
+        }
+
+        Topmost = above;
+
+        if (above)
+        {
+            KeepOnTop();
+        }
+    }
+
     private void Haul(PointerPressedEventArgs e)
     {
         _hauling = true;

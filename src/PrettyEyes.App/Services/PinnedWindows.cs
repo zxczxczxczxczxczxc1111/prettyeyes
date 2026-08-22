@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Threading;
 using PrettyEyes.App.Views;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Pinning;
@@ -9,6 +10,7 @@ using PrettyEyes.Core.Rendering;
 using PrettyEyes.Core.Settings;
 using PrettyEyes.Core.Stats;
 using PrettyEyes.Core.Tools;
+using PrettyEyes.Platform.Windows;
 using SkiaSharp;
 using CaptureRect = PrettyEyes.Core.Geometry.CaptureRect;
 
@@ -29,6 +31,22 @@ public sealed class PinnedWindows
     private const int Nudge = 24;
 
     private readonly PinRegistry _registry = new();
+
+    /// <summary>
+    /// How often the pins ask whether somebody else has taken over a whole
+    /// screen. A second is far below the time it takes a person to alt-tab into
+    /// a game, and the question is three system calls.
+    ///
+    /// Asked on a timer rather than on a foreground event on purpose: an
+    /// application can go full screen without ever changing which window is in
+    /// front, and alt-enter in a game does exactly that.
+    /// </summary>
+    private static readonly TimeSpan Watch = TimeSpan.FromSeconds(1);
+
+    private DispatcherTimer? _watch;
+
+    /// <summary>True while the pins have stepped aside for a fullscreen window.</summary>
+    private bool _yielded;
 
     /// <summary>
     /// Late-bound the same way the folder sink is: the settings record is
@@ -76,12 +94,29 @@ public sealed class PinnedWindows
             {
                 _registry.Remove(pinned);
             }
+
+            // Nothing left to keep out of anybody's way, so nothing left to ask
+            // about once a second either.
+            if (_registry.Count == 0)
+            {
+                _watch?.Stop();
+                _watch = null;
+                _yielded = false;
+            }
         };
 
         window.CopyRequested += async (sender, _) => await SendAsync(sender, _services?.Clipboard);
         window.SaveRequested += async (sender, _) => await SendAsync(sender, _services?.File);
 
         window.RememberEmoji(settings.RecentEmoji ?? []);
+
+        // A pin born while a game is already in front is born out of the way.
+        if (_yielded)
+        {
+            window.FloatAbove(false);
+        }
+
+        WatchTheForeground();
         window.EmojiPicked += (sender, choice) => Remember(sender, choice);
 
         _registry.Add(window);
@@ -226,6 +261,43 @@ public sealed class PinnedWindows
         }
     }
 
+    /// <summary>
+    /// Watches for an application taking a whole screen, and steps the pins
+    /// aside while one has. Runs only while there is a pin to step aside.
+    /// </summary>
+    private void WatchTheForeground()
+    {
+        if (_watch is not null)
+        {
+            return;
+        }
+
+        _watch = new DispatcherTimer { Interval = Watch };
+
+        _watch.Tick += (_, _) =>
+        {
+            var covered = ForegroundWindow.CoversAScreen();
+
+            if (covered == _yielded)
+            {
+                return;
+            }
+
+            _yielded = covered;
+
+            foreach (var window in Windows())
+            {
+                window.FloatAbove(!covered);
+            }
+
+            Log.Default.Info(covered
+                ? "закреплённые уступили полноэкранному окну"
+                : "закреплённые вернулись поверх окон");
+        };
+
+        _watch.Start();
+    }
+
     public void HideAll()
     {
         foreach (var window in Windows())
@@ -244,7 +316,13 @@ public sealed class PinnedWindows
             // back from the tray, and a pin was once found sitting behind
             // everything with its topmost flag gone. Saying it again here costs
             // one system call and closes the whole class of that.
-            window.KeepOnTop();
+            //
+            // Unless it stepped aside for a fullscreen window, in which case
+            // being behind is the point and saying this would undo it.
+            if (!_yielded)
+            {
+                window.KeepOnTop();
+            }
         }
     }
 
