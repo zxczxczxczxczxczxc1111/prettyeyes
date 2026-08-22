@@ -44,6 +44,15 @@ public sealed class OverlaySession
 
     public Document? Document { get; private set; }
 
+    /// <summary>
+    /// One of our windows has the keyboard.
+    ///
+    /// False means the overlay is still on screen and still frozen, but Escape
+    /// now goes to whatever the person clicked instead. Nothing here can close
+    /// it, and until this was asked about, nothing did.
+    /// </summary>
+    public bool Listening => _windows.Any(window => window.IsActive);
+
     public void Start(CaptureResult capture)
     {
         using var scope = Log.Default.Scope("overlay");
@@ -1083,6 +1092,11 @@ public sealed class OverlaySession
                 {
                     return;
                 }
+
+                // Written down because the overlay staying up without the
+                // keyboard is the state the hotkey used to get stuck in, and
+                // the log is how we find out it still happens.
+                Log.Default.Info("оверлей потерял клавиатуру");
 
                 CommitText();
             },

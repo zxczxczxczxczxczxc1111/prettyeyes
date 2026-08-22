@@ -6,6 +6,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using PrettyEyes.App.Services;
 using PrettyEyes.App.Views;
+using PrettyEyes.Core.Capture;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Platform;
@@ -154,9 +155,20 @@ public partial class App : Application
 
         if (_session is not null)
         {
-            // The overlay is already up: the hotkey means "let me pick again".
-            _session.Restart();
-            return;
+            if (CaptureIntent.Decide(overlayOpen: true, overlayListening: _session.Listening)
+                == CaptureRequest.Restart)
+            {
+                // The overlay is up and listening: the hotkey means "let me
+                // pick again", and the frozen screen is still worth keeping.
+                _session.Restart();
+                return;
+            }
+
+            // Up, but deaf. Escape cannot reach it, so nothing was ever going
+            // to close it, and every press used to restart a window nobody
+            // could see. Closed here, and the capture below starts over.
+            Log.Default.Info("оверлей без клавиатуры закрыт, снимок берётся заново");
+            _session.Close();
         }
 
         CaptureResult capture;
