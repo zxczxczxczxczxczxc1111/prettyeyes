@@ -168,6 +168,15 @@ public partial class SettingsWindow : Window
 
         RegionHotkey.HotkeyChanged += (_, hotkey) => Apply(HotkeyAction.Region, hotkey);
         FullScreenHotkey.HotkeyChanged += (_, hotkey) => Apply(HotkeyAction.FullScreen, hotkey);
+
+        // What the key costs elsewhere, and why one could not be taken. Both
+        // used to be silence: the field simply did not react, which reads as
+        // broken rather than as refused.
+        foreach (var box in new[] { RegionHotkey, FullScreenHotkey })
+        {
+            box.Warned += (_, cost) => ShowCost(cost);
+            box.Refused += (_, why) => ShowWarning(why);
+        }
         Autostart.IsCheckedChanged += OnAutostartChanged;
         CheckUpdates.IsCheckedChanged += OnCheckUpdatesChanged;
         CheckNow.Click += (_, _) => _ = updates.CheckAsync(manual: true);
@@ -826,6 +835,23 @@ public partial class SettingsWindow : Window
             Log.Default.Info("не удалось сохранить настройки");
             ShowFailure("Настройки применены, но не сохранились.");
         }
+    }
+
+    /// <summary>
+    /// A combination was taken and it costs something. Not a refusal and not a
+    /// question: the choice is the user's, this only says what it bought.
+    /// </summary>
+    private void ShowCost(string? cost)
+    {
+        if (cost is null)
+        {
+            HideMessage();
+            _pinSettings.Warn(null);
+
+            return;
+        }
+
+        ShowWarning(cost);
     }
 
     private void ShowWarning(string text) => Show(text, "Warn");

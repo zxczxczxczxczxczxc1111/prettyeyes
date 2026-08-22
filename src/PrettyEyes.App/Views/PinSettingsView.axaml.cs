@@ -42,6 +42,12 @@ public partial class PinSettingsView : UserControl
             this,
             settings => settings with { HidePinnedOnCapture = HideOnCapture.IsChecked == true });
 
+        foreach (var box in new[] { PinHotkey, HidePinnedHotkey, ShowPinnedHotkey })
+        {
+            box.Warned += (_, cost) => Warn(cost);
+            box.Refused += (_, why) => Warn(why);
+        }
+
         PinHotkey.HotkeyChanged += (_, hotkey) => HotkeyChanged?.Invoke(this, (HotkeyAction.Pin, hotkey));
         HidePinnedHotkey.HotkeyChanged += (_, hotkey) =>
             HotkeyChanged?.Invoke(this, (HotkeyAction.HidePinned, hotkey));

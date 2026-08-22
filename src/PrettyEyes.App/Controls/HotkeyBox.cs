@@ -13,6 +13,15 @@ public sealed class HotkeyBox : Button
 {
     private HotkeyDefinition _value = HotkeyDefinition.Default;
 
+    /// <summary>
+    /// What a bare key costs the rest of the system, or null when nothing.
+    /// A warning, not a question: the choice has already been made and taken.
+    /// </summary>
+    public event EventHandler<string?>? Warned;
+
+    /// <summary>Why a key could not be taken at all.</summary>
+    public event EventHandler<string>? Refused;
+
     /// <summary>The key a key-down already bound, so its release is ignored.</summary>
     private Key _bound = Key.None;
 
@@ -79,7 +88,7 @@ public sealed class HotkeyBox : Button
             parts.Add("Win");
         }
 
-        parts.Add(KeyName(hotkey.VirtualKey));
+        parts.Add(KeyNames.Describe(hotkey.VirtualKey));
 
         return string.Join(" + ", parts);
     }
@@ -173,22 +182,17 @@ public sealed class HotkeyBox : Button
         if (virtualKey is null)
         {
             // Avalonia has no public Key-to-VK mapping, so the table below is
-            // ours; anything outside it has no Win32 key to register.
+            // ours; anything outside it has no Win32 key to register. This is
+            // now the only reason a key is refused here.
             e.Handled = true;
-            return false;
-        }
+            Refused?.Invoke(this, "Такую клавишу система не отдаёт.");
 
-        // A bare letter or digit would eat that key everywhere in the system,
-        // so a combination without modifiers is only allowed for keys nobody
-        // types text with.
-        if (modifiers == HotkeyModifiers.None && !StandsAlone(e.Key))
-        {
-            e.Handled = true;
             return false;
         }
 
         Value = new HotkeyDefinition(modifiers, virtualKey.Value);
         HotkeyChanged?.Invoke(this, Value);
+        Warned?.Invoke(this, Cost(modifiers, e.Key));
         e.Handled = true;
 
         return true;
@@ -272,11 +276,16 @@ public sealed class HotkeyBox : Button
     };
 
     /// <summary>
-    /// Keys that mean nothing while typing, so binding them bare costs the user
-    /// nothing. Everything else - letters, digits, punctuation, Space, Enter -
-    /// needs a modifier, otherwise the key disappears from the whole system.
+    /// Keys nobody types with. Binding one of these bare costs nothing, so
+    /// nothing is said about it.
+    ///
+    /// This used to be the list of what was <b>allowed</b> bare, and everything
+    /// else was refused outright. It is now the list of what passes in silence:
+    /// any key at all can be assigned, and the ones that cost something say so
+    /// instead of being forbidden. Which key is worth having is the user's
+    /// call, not ours.
     /// </summary>
-    private static bool StandsAlone(Key key) => key
+    private static bool Quiet(Key key) => key
         is Key.PrintScreen or Key.Print or Key.Pause or Key.Scroll or Key.Insert
         or Key.Help or Key.Apps or Key.BrowserBack or Key.BrowserForward
         or Key.BrowserRefresh or Key.BrowserStop or Key.BrowserSearch
@@ -285,76 +294,45 @@ public sealed class HotkeyBox : Button
         or Key.MediaPreviousTrack or Key.MediaStop or Key.MediaPlayPause
         || key is >= Key.F1 and <= Key.F24;
 
+    /// <summary>
+    /// What taking this combination costs everywhere else. A global hotkey is
+    /// taken from the whole system, so a bare letter stops typing that letter.
+    /// With a modifier nothing is lost: Ctrl+P was never a character.
+    /// </summary>
+    private static string? Cost(HotkeyModifiers modifiers, Key key)
+    {
+        if (modifiers != HotkeyModifiers.None || Quiet(key))
+        {
+            return null;
+        }
+
+        var name = KeyNames.Describe(ToVirtualKey(key) ?? 0);
+
+        return Types(key)
+            ? $"Клавиша {name} нужна для набора: теперь она не будет печататься нигде"
+            : $"Клавиша {name} перестанет работать в других программах";
+    }
+
+    /// <summary>
+    /// Keys that put a character on the screen. Losing one of these is a
+    /// different kind of loss than losing Delete: not one function, but the
+    /// ability to write.
+    /// </summary>
+    private static bool Types(Key key) => key
+        is >= Key.D0 and <= Key.D9
+        or >= Key.A and <= Key.Z
+        or >= Key.NumPad0 and <= Key.NumPad9
+        or Key.Space or Key.Return or Key.Tab or Key.Back
+        or Key.OemSemicolon or Key.OemPlus or Key.OemComma or Key.OemMinus
+        or Key.OemPeriod or Key.OemQuestion or Key.OemTilde or Key.OemOpenBrackets
+        or Key.OemPipe or Key.OemCloseBrackets or Key.OemQuotes or Key.Oem8
+        or Key.OemBackslash or Key.Multiply or Key.Add or Key.Subtract
+        or Key.Decimal or Key.Divide or Key.Separator;
+
     private static bool IsModifier(Key key) => key
         is Key.LeftCtrl or Key.RightCtrl
         or Key.LeftShift or Key.RightShift
         or Key.LeftAlt or Key.RightAlt
         or Key.LWin or Key.RWin;
 
-    /// <summary>Short labels, the way a keycap reads.</summary>
-    private static string KeyName(uint virtualKey) => virtualKey switch
-    {
-        0x08 => "Backspace",
-        0x09 => "Tab",
-        0x0C => "Clear",
-        0x0D => "Enter",
-        0x13 => "Pause",
-        0x14 => "CapsLock",
-        0x20 => "Space",
-        0x21 => "PgUp",
-        0x22 => "PgDn",
-        0x23 => "End",
-        0x24 => "Home",
-        0x25 => "Left",
-        0x26 => "Up",
-        0x27 => "Right",
-        0x28 => "Down",
-        0x29 => "Select",
-        0x2A => "Print",
-        0x2B => "Execute",
-        0x2C => "PrtScn",
-        0x2D => "Insert",
-        0x2E => "Delete",
-        0x2F => "Help",
-        0x5D => "Menu",
-        0x90 => "NumLock",
-        0x91 => "ScrollLock",
-        0x6A => "Num *",
-        0x6B => "Num +",
-        0x6C => "Num Sep",
-        0x6D => "Num -",
-        0x6E => "Num .",
-        0x6F => "Num /",
-        0xA6 => "Back",
-        0xA7 => "Forward",
-        0xA8 => "Refresh",
-        0xA9 => "Stop",
-        0xAA => "Search",
-        0xAB => "Favorites",
-        0xAC => "Browser",
-        0xAD => "Mute",
-        0xAE => "Vol -",
-        0xAF => "Vol +",
-        0xB0 => "Next",
-        0xB1 => "Prev",
-        0xB2 => "Stop",
-        0xB3 => "Play",
-        0xBA => ";",
-        0xBB => "=",
-        0xBC => ",",
-        0xBD => "-",
-        0xBE => ".",
-        0xBF => "/",
-        0xC0 => "`",
-        0xDB => "[",
-        0xDC => "\\",
-        0xDD => "]",
-        0xDE => "'",
-        0xDF => "Oem8",
-        0xE2 => "\\",
-        >= 0x30 and <= 0x5A => ((char)virtualKey).ToString(),
-        >= 0x60 and <= 0x69 => $"Num {virtualKey - 0x60}",
-        >= 0x70 and <= 0x87 => $"F{virtualKey - 0x6F}",
-        _ => $"0x{virtualKey:X2}",
-    };
 }
