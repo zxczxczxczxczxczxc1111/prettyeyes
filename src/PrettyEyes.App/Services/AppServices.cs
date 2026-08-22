@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Threading;
 using PrettyEyes.App.Controls;
 using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Platform;
@@ -108,6 +109,23 @@ public sealed class AppServices : IDisposable
     /// <summary>False when a combination was taken at startup.</summary>
     private Timer? _idle;
 
+    /// <summary>
+    /// True when nothing of ours is on screen: no overlay, no pinned window, no
+    /// settings, no menu. Set by the application, which is the only thing that
+    /// knows what is open.
+    /// </summary>
+    public Func<bool>? Quiet { get; set; }
+
+    private DispatcherTimer? _trim;
+
+    /// <summary>
+    /// How long after the last thing the user did the working set is handed
+    /// back. Long enough that a burst of screenshots is one trim rather than
+    /// twenty, short enough that somebody who takes a shot and then opens Task
+    /// Manager sees the small number rather than the big one.
+    /// </summary>
+    private static readonly TimeSpan TrimAfter = TimeSpan.FromSeconds(4);
+
     /// <summary>False when a combination was taken at startup.</summary>
     public bool RegionHotkeyRegistered { get; set; }
 
@@ -165,6 +183,52 @@ public sealed class AppServices : IDisposable
         {
             Log.Default.Info($"скриншот, шаг {step}: {milliseconds:F1} мс");
         }
+    }
+
+    /// <summary>
+    /// The work is over for now; start counting down to handing the working set
+    /// back. Called after a capture, after the settings close, after the menu
+    /// closes: every moment where the application has just become a tray icon
+    /// again.
+    ///
+    /// Restarted rather than queued, so a person clicking through ten
+    /// screenshots pays for this once, at the end, instead of on every shot.
+    /// </summary>
+    public void NudgeTrim()
+    {
+        _trim ??= BuildTrimTimer();
+        _trim.Stop();
+        _trim.Start();
+    }
+
+    private DispatcherTimer BuildTrimTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TrimAfter };
+
+        timer.Tick += (_, _) =>
+        {
+            // Not while a pin is on screen: its pixels would be faulted back in
+            // on the next repaint, and the person dragging it would pay for the
+            // tidier number with a stutter. A pinned screenshot costing memory
+            // is honest anyway - it is a picture somebody asked us to keep.
+            //
+            // The timer repeats, so returning here is how it asks again in four
+            // seconds. That is also how a pin being closed gets noticed without
+            // anybody having to tell us.
+            if (Quiet?.Invoke() == false)
+            {
+                return;
+            }
+
+            timer.Stop();
+
+            if (WorkingSet.Trim())
+            {
+                Log.Default.Info("рабочий набор возвращён системе (trim)");
+            }
+        };
+
+        return timer;
     }
 
     /// <summary>Last known settings; the settings window updates them.</summary>
@@ -348,6 +412,17 @@ public sealed class AppServices : IDisposable
                 // throwing them away while somebody is working means
                 // re-rasterising everything they look at next.
                 SKGraphics.PurgeAllCaches();
+
+                // And only after the purge, because trimming first would hand
+                // back pages the purge is about to make free anyway. This one
+                // frees nothing at all, it only changes what Task Manager
+                // reports; see WorkingSet for why that is worth a line of code.
+                if (WorkingSet.Trim())
+                {
+                    // The ASCII tail is not decoration: the measurement script runs in a
+                    // console that mangles Cyrillic, and it matches on "trim".
+                    Log.Default.Info("простой: рабочий набор возвращён системе (trim)");
+                }
             },
             null,
             TimeSpan.FromSeconds(30),
@@ -356,6 +431,7 @@ public sealed class AppServices : IDisposable
 
     public void Dispose()
     {
+        _trim?.Stop();
         _idle?.Dispose();
         Hotkeys.Dispose();
         Tray.Dispose();

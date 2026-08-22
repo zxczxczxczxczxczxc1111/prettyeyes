@@ -65,6 +65,12 @@ public partial class App : Application
             // and the coordinates no longer describe the same desktop.
             Services.WarmCapture();
 
+            // Everything the trim has to wait for. A pin on screen is the one
+            // that matters: its pixels are live, and taking them away means the
+            // next repaint fetches them back.
+            Services.Quiet = () =>
+                _session is null && _settings is null && _menu is null && Services.Pins.Count == 0;
+
             Services.Busy = () => _session is not null
                 ? "открыт оверлей"
                 : Services.Pins.AnyWithAnnotations
@@ -167,7 +173,11 @@ public partial class App : Application
         }
 
         _session = new OverlaySession(Services);
-        _session.Finished += (_, _) => _session = null;
+        _session.Finished += (_, _) =>
+        {
+            _session = null;
+            Services.NudgeTrim();
+        };
         _session.Start(capture);
     }
 
@@ -233,6 +243,10 @@ public partial class App : Application
             result == SinkResult.Sent
                 ? "Скриншот монитора скопирован в буфер."
                 : "Не удалось скопировать скриншот в буфер.");
+
+        // No overlay was ever opened here, so nothing else will say that the
+        // work is done.
+        Services.NudgeTrim();
     }
 
     /// <summary>
@@ -304,7 +318,11 @@ public partial class App : Application
                     break;
             }
         };
-        _menu.Closed += (_, _) => _menu = null;
+        _menu.Closed += (_, _) =>
+        {
+            _menu = null;
+            Services.NudgeTrim();
+        };
 
         _menu.ShowAt(x, y, monitor.Bounds, monitor.Scale);
     }
@@ -409,6 +427,7 @@ public partial class App : Application
             }
 
             _settings = null;
+            Services.NudgeTrim();
         };
 
         _settings.Show();

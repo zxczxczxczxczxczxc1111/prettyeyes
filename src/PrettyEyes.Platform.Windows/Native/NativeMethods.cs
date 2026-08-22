@@ -290,4 +290,17 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint affinity);
+
+    [DllImport("kernel32.dll")]
+    internal static extern IntPtr GetCurrentProcess();
+
+    /// <summary>
+    /// Both sizes as -1 mean "take away everything you can". Documented by
+    /// Microsoft as exactly that, and it is not a request the process can be
+    /// refused politely: the pages go to the standby list and come back on the
+    /// first touch, at the price of a soft fault each.
+    /// </summary>
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SetProcessWorkingSetSize(IntPtr process, IntPtr minimum, IntPtr maximum);
 }
