@@ -3,6 +3,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using PrettyEyes.App.Controls;
 using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Platform;
+using PrettyEyes.Core.Capture;
 using PrettyEyes.Core.Settings;
 using PrettyEyes.Core.Stats;
 using PrettyEyes.Platform.Windows;
@@ -125,14 +126,17 @@ public sealed class AppServices : IDisposable
     /// </summary>
     private static IScreenCapture CreateCapture(IMonitorEnumerator monitors)
     {
+        // The spares are wrapped rather than built: Windows.Graphics.Capture
+        // makes a Direct3D device and a thread in its constructor, and on a
+        // machine where duplication works it is never asked for a pixel.
         var painters = new List<IMonitorPainter> { new DuplicationPainter() };
 
         if (WgcScreenCapture.IsSupported)
         {
-            painters.Add(new WgcScreenCapture(ReportSlowStep));
+            painters.Add(new LazyPainter("Windows.Graphics.Capture", () => new WgcScreenCapture(ReportSlowStep)));
         }
 
-        painters.Add(new GdiScreenCapture());
+        painters.Add(new LazyPainter("GDI", () => new GdiScreenCapture()));
 
         return new DesktopCapture(monitors, painters, ReportSlowStep);
     }

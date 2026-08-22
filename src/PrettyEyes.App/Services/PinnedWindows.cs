@@ -208,6 +208,12 @@ public sealed class PinnedWindows
         foreach (var window in Windows())
         {
             window.Show();
+
+            // Showing a window that is already shown is how it is asked to come
+            // back from the tray, and a pin was once found sitting behind
+            // everything with its topmost flag gone. Saying it again here costs
+            // one system call and closes the whole class of that.
+            window.KeepOnTop();
         }
     }
 

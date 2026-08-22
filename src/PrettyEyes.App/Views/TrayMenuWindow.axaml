@@ -8,13 +8,16 @@
         Topmost="True"
         SizeToContent="WidthAndHeight"
         Background="{StaticResource Bg}">
+  <!-- MinWidth and not Width: the card used to be pinned at 190 pixels and
+       "Показать все закреплённые" simply did not fit, so the label was cut off
+       mid-word. The window already sizes itself to its content. -->
   <Border x:Name="Card"
           Background="{StaticResource SurfaceRaised}"
           BorderBrush="{StaticResource Border}"
           BorderThickness="1"
           Padding="6"
           Opacity="0"
-          Width="190">
+          MinWidth="190">
     <Border.RenderTransform>
       <TranslateTransform Y="6"/>
     </Border.RenderTransform>

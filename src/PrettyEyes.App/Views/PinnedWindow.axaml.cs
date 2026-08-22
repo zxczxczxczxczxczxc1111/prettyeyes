@@ -202,6 +202,10 @@ public partial class PinnedWindow : Window, IPinned
         // on top, so there is never anything to switch back to.
         WindowSwitcher.Hide(handle);
 
+        // Said again in Win32 terms, and said again after every show: see
+        // WindowOrder for the pin that was found hiding behind other windows.
+        WindowOrder.KeepOnTop(handle);
+
         SeeThrough(opacity);
     }
 
@@ -326,10 +330,14 @@ public partial class PinnedWindow : Window, IPinned
     {
         base.OnPointerPressed(e);
 
-        // The click that wakes the window up does nothing else. Without this
-        // the gesture that says "come here" leaves a stray arrow behind, or
-        // yanks the window off its place.
-        if (!IsActive)
+        // The click that wakes the window up draws nothing. Without this the
+        // gesture that says "come here" leaves a stray arrow behind or yanks
+        // the window off its place.
+        //
+        // Only drawing is held back, though. Swallowing the click whole meant
+        // the close cross and the toolbar needed two clicks each, and a pin
+        // that had lost focus felt like a pin that had stopped working.
+        if (!IsActive && _tool is not null)
         {
             e.Handled = true;
             return;
@@ -496,7 +504,16 @@ public partial class PinnedWindow : Window, IPinned
     {
         _asking = asking;
         ConfirmBar.IsVisible = asking;
+
+        // Everything but the question goes dim. Without it the window looks
+        // frozen rather than waiting: clicks on the picture, on the toolbar
+        // and on the close cross are all ignored while this is up, and there
+        // was nothing on screen saying why.
+        Scrim.IsVisible = asking;
     }
+
+    /// <summary>Puts this pin back above everything else.</summary>
+    public void KeepOnTop() => WindowOrder.KeepOnTop(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
 
     private void Haul(PointerPressedEventArgs e)
     {
