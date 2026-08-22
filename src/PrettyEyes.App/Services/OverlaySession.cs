@@ -8,6 +8,7 @@ using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Core.Rendering;
+using PrettyEyes.Core.Stats;
 using PrettyEyes.Core.Text;
 using PrettyEyes.Core.Tools;
 using CaptureRect = PrettyEyes.Core.Geometry.CaptureRect;
@@ -564,6 +565,13 @@ public sealed class OverlaySession
             switch (result)
             {
                 case SinkResult.Sent:
+                    // Told apart by which sink was handed in rather than by
+                    // what it is: quick save and the save dialog are both a
+                    // file to the person counting.
+                    _services.Shots.Record(ReferenceEquals(sink, _services.Clipboard)
+                        ? ShotTarget.Clipboard
+                        : ShotTarget.File);
+
                     if (closeOnSuccess)
                     {
                         Close();

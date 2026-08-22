@@ -10,6 +10,7 @@ using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Core.Rendering;
+using PrettyEyes.Core.Stats;
 
 namespace PrettyEyes.App;
 
@@ -220,6 +221,11 @@ public partial class App : Application
         if (Services.Settings.Save?.Ready == true)
         {
             await Services.Folder.SendAsync(image, CancellationToken.None);
+        }
+
+        if (result == SinkResult.Sent)
+        {
+            Services.Shots.Record(ShotTarget.Clipboard);
         }
 
         Services.Notifier.Notify(

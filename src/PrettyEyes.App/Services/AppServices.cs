@@ -4,6 +4,7 @@ using PrettyEyes.App.Controls;
 using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Core.Settings;
+using PrettyEyes.Core.Stats;
 using PrettyEyes.Platform.Windows;
 using PrettyEyes.Platform.Windows.Native;
 
@@ -31,6 +32,7 @@ public sealed class AppServices : IDisposable
         OverlayWindowPool overlayWindows,
         EmojiAtlas emoji,
         UpdateService updates,
+        ShotCounter shots,
         AppSettings settings)
     {
         Host = host;
@@ -48,6 +50,7 @@ public sealed class AppServices : IDisposable
         OverlayWindows = overlayWindows;
         Emoji = emoji;
         Updates = updates;
+        Shots = shots;
         Settings = settings;
     }
 
@@ -90,6 +93,9 @@ public sealed class AppServices : IDisposable
 
     /// <summary>Release checks and the installer handover.</summary>
     public UpdateService Updates { get; }
+
+    /// <summary>How many screenshots have been taken, and where they went.</summary>
+    public ShotCounter Shots { get; }
 
     /// <summary>
     /// Why an update must wait, or null when nothing is in the way. Set by the
@@ -243,6 +249,7 @@ public sealed class AppServices : IDisposable
             overlayWindows,
             emoji,
             updates,
+            new ShotCounter(new JsonStatsStore(JsonStatsStore.DefaultPath)),
             settings)
         {
             RegionHotkeyRegistered = regionRegistered,

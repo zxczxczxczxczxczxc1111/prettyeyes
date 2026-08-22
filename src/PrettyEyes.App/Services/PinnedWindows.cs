@@ -7,6 +7,7 @@ using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Core.Rendering;
 using PrettyEyes.Core.Settings;
+using PrettyEyes.Core.Stats;
 using PrettyEyes.Core.Tools;
 using SkiaSharp;
 using CaptureRect = PrettyEyes.Core.Geometry.CaptureRect;
@@ -64,6 +65,8 @@ public sealed class PinnedWindows
         // when it draws, and with zeroes it would quietly sample the wrong
         // pixels.
         var document = new Document(cropped, area);
+
+        _services?.Shots.Record(ShotTarget.Pin);
 
         var window = new PinnedWindow { Glyph = glyph };
 
