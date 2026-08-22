@@ -346,7 +346,7 @@ public partial class SettingsWindow : Window
                 () =>
                 {
                     _resetAsked = false;
-                    ResetSettings.Content = "Сбросить";
+                    ResetSettings.Content = "Настройки по умолчанию";
                 },
                 TimeSpan.FromSeconds(4));
 

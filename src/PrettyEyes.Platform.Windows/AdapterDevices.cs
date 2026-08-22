@@ -13,18 +13,18 @@ namespace PrettyEyes.Platform.Windows;
 /// drives it, which on a laptop with two graphics chips is not the adapter you
 /// would have picked.
 ///
-/// A device per monitor, not per adapter, even though one card usually drives
-/// every screen. Sharing one device means sharing its immediate context, and a
-/// Direct3D 11 immediate context belongs to one thread at a time while
-/// monitors are painted in parallel. The shared version crashed inside the row
-/// copy on the second capture and then hung outright once the lock around it
-/// was widened. A device costs tens of milliseconds once and some tens of
-/// megabytes; correctness costs less this way than cleverness.
+/// One device per adapter, which on a normal machine means one device for
+/// every screen. That is only safe because monitors are painted one after
+/// another: a Direct3D 11 immediate context belongs to one thread at a time,
+/// and an earlier version that painted in parallel on a shared device crashed
+/// inside the row copy on the second capture. Measured cost of going back to
+/// one device: 28 MB of private memory and seventeen threads saved, three and
+/// a half milliseconds per capture spent.
 /// </summary>
 internal sealed class AdapterDevices : IDisposable
 {
     private readonly object _gate = new();
-    private readonly Dictionary<IntPtr, Device> _devices = [];
+    private readonly Dictionary<long, Device> _devices = [];
     private readonly Dictionary<IntPtr, Target> _targets = [];
 
     private bool _disposed;
@@ -179,7 +179,9 @@ internal sealed class AdapterDevices : IDisposable
 
     private Device DeviceFor(IDXGIAdapter1 adapter, IntPtr monitor)
     {
-        if (_devices.TryGetValue(monitor, out var known))
+        var luid = adapter.Description1.Luid;
+
+        if (_devices.TryGetValue(luid, out var known))
         {
             adapter.Dispose();
 
@@ -207,7 +209,7 @@ internal sealed class AdapterDevices : IDisposable
         }
 
         var device = new Device(handle, context, adapter);
-        _devices[monitor] = device;
+        _devices[luid] = device;
 
         return device;
     }

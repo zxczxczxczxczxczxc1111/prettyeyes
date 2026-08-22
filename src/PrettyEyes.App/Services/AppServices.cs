@@ -237,6 +237,16 @@ public sealed class AppServices : IDisposable
             }
         }
 
+        var autostart = new RegistryAutostart();
+
+        // A dead autostart entry is silent: the checkbox says on, Windows starts
+        // nothing, and nobody finds out until they wonder why the tray is empty
+        // after a reboot. Found exactly like that on this machine.
+        if (autostart.Heal())
+        {
+            Log.Default.Info("автозапуск указывал в никуда, путь поправлен");
+        }
+
         built = new AppServices(
             host,
             monitors,
@@ -247,7 +257,7 @@ public sealed class AppServices : IDisposable
             notifier,
             hotkeys,
             settingsStore,
-            new RegistryAutostart(),
+            autostart,
             new Win32PointerLocation(),
             tray,
             overlayWindows,

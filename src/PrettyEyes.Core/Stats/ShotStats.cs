@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace PrettyEyes.Core.Stats;
 
 /// <summary>Where a screenshot ended up.</summary>
@@ -30,6 +32,11 @@ public sealed record ShotStats(int ToClipboard, int ToFile, int ToPin, IReadOnly
 
     public static ShotStats Empty { get; } = new(0, 0, 0, []);
 
+    /// <summary>
+    /// Not written to the file: it is the sum of the three above, and a stored
+    /// copy of it is one more thing that can disagree with them.
+    /// </summary>
+    [JsonIgnore]
     public int Total => ToClipboard + ToFile + ToPin;
 
     public ShotStats Record(ShotTarget target, DateOnly today)

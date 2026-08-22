@@ -59,20 +59,20 @@ public sealed class DesktopCapture : IScreenCapture, IDisposable
 
         try
         {
-            // In parallel because a monitor spends most of its capture waiting
-            // for a frame, and those waits are the same whether they happen one
-            // after another or at once. Painters are told in their own contract
-            // that this happens.
-            Parallel.ForEach(frame.Placements, placement =>
-                _chain.Paint(placement.Monitor, buffer + (nint)placement.Offset, frame.Stride));
-        }
-        catch (AggregateException error)
-        {
-            _buffers.Return(buffer, frame.Size);
-
-            // One monitor failing is the whole capture failing; the first
-            // reason is the useful one.
-            throw error.InnerException ?? error;
+            // One monitor after another, not at once.
+            //
+            // Painting in parallel used to save about four milliseconds and
+            // cost two Direct3D devices, seventeen threads and 28 MB of
+            // private memory, because every monitor needed a device of its
+            // own: a Direct3D immediate context belongs to one thread at a
+            // time, and sharing one across threads crashed inside the row copy.
+            // Sequential painting lets every screen share one device and makes
+            // that whole class of bug impossible. Measured: 16.6 ms per capture
+            // against 13, where the engine this replaced took 33 to 39.
+            foreach (var placement in frame.Placements)
+            {
+                _chain.Paint(placement.Monitor, buffer + (nint)placement.Offset, frame.Stride);
+            }
         }
         catch
         {

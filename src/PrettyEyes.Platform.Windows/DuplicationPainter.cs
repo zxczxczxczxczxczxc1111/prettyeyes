@@ -240,12 +240,11 @@ public sealed class DuplicationPainter : IMonitorPainter
 
         var staging = StagingFor(target, handle, description);
 
-        // The context belongs to this monitor alone, so this lock is never
-        // contended today. It stays because the alternative was learned the
-        // hard way: one shared device between two monitors painted in parallel
-        // crashed inside this very copy on the second capture, and widening the
-        // lock around it turned the crash into a hang. If anyone ever shares a
-        // context again, this is the line that has to hold.
+        // Monitors share one device and are painted one after another, so this
+        // lock is never contended today. It stays as a guard rail: the version
+        // that shared a device between monitors painted in parallel crashed
+        // inside this very copy on the second capture. If anyone ever brings
+        // parallel painting back, this is the line that has to hold.
         lock (target.Context)
         {
             target.Context.CopyResource(staging, texture);

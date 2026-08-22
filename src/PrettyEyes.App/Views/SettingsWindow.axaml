@@ -124,7 +124,7 @@
               <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Left">
                 <Button x:Name="OpenLog" Classes="ghost" Content="Журнал"/>
                 <Button x:Name="OpenShots" Classes="ghost" Content="Папка снимков"/>
-                <Button x:Name="ResetSettings" Classes="ghost" Content="Сбросить"/>
+                <Button x:Name="ResetSettings" Classes="ghost" Content="Настройки по умолчанию"/>
               </StackPanel>
             </StackPanel>
 

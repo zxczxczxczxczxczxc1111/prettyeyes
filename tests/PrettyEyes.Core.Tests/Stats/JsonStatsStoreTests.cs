@@ -52,6 +52,17 @@ public class JsonStatsStoreTests : IDisposable
     }
 
     [Fact]
+    public void The_total_is_not_written_down()
+    {
+        // It is the sum of the three counters, and a stored copy is one more
+        // thing that can disagree with them.
+        var store = new JsonStatsStore(Path_);
+        store.Save(ShotStats.Empty.Record(ShotTarget.File, new DateOnly(2026, 8, 22)));
+
+        Assert.DoesNotContain("Total", File.ReadAllText(Path_), StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Saving_creates_the_folder_it_needs()
     {
         Assert.True(new JsonStatsStore(Path_).Save(ShotStats.Empty));
