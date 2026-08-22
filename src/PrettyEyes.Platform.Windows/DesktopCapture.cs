@@ -23,7 +23,7 @@ public sealed class DesktopCapture : IScreenCapture, IDisposable
     private readonly Action<string, double>? _timing;
 
     private bool _disposed;
-    private bool _said;
+    private string _said = string.Empty;
 
     public DesktopCapture(
         IMonitorEnumerator monitors,
@@ -99,22 +99,26 @@ public sealed class DesktopCapture : IScreenCapture, IDisposable
     }
 
     /// <summary>
-    /// Says once who painted what.
+    /// Says who painted what, and says it again whenever that changes.
     ///
-    /// Worth a line because it is the first question to ask when somebody
-    /// reports the yellow border is back: a monitor quietly handed to the older
-    /// engine looks exactly like a working screenshot until you look at the
-    /// edge of the screen.
+    /// Once a run is not enough, and that was learned rather than guessed: a
+    /// monitor unplugged and plugged back in can quietly move to the older
+    /// engine, which looks exactly like a working application right up until
+    /// somebody notices the yellow border is back.
     /// </summary>
     private void Announce()
     {
-        if (_said)
+        var now = string.Join(", ", _chain.Assignments
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => $"{pair.Key}: {pair.Value}"));
+
+        if (now == _said)
         {
             return;
         }
 
-        _said = true;
-        Log.Default.Info("маляры: " + string.Join(", ", _chain.Assignments.Select(pair => $"{pair.Key}: {pair.Value}")));
+        _said = now;
+        Log.Default.Info("маляры: " + now);
     }
 
     private T Step<T>(string name, Func<T> body)
