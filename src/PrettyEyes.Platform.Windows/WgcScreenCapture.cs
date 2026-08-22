@@ -92,6 +92,9 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
     /// </summary>
     private static bool? _borderless;
 
+    /// <summary>The border was already reported once; it does not change.</summary>
+    private static bool _borderSaid;
+
     private static void AskForBorderless()
     {
         if (_borderless is not null)
@@ -497,10 +500,27 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
 
                     // The yellow capture border is a Windows 11 addition; older
                     // builds do not know the property and do not draw it either.
+                    //
+                    // Logged once, because the border came back in 1.3 and the
+                    // only thing the journal could say about it was that the
+                    // permission had been granted - which is a different
+                    // question from whether the property was ever set.
                     if (global::Windows.Foundation.Metadata.ApiInformation.IsPropertyPresent(
                             "Windows.Graphics.Capture.GraphicsCaptureSession", "IsBorderRequired"))
                     {
                         session.IsBorderRequired = false;
+
+                        if (!_borderSaid)
+                        {
+                            _borderSaid = true;
+                            Log.Default.Info(
+                                $"рамка захвата: свойство есть, поставил {session.IsBorderRequired}");
+                        }
+                    }
+                    else if (!_borderSaid)
+                    {
+                        _borderSaid = true;
+                        Log.Default.Info("рамка захвата: свойства IsBorderRequired нет");
                     }
 
                     session.StartCapture();
