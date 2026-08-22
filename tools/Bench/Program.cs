@@ -42,11 +42,11 @@ internal static class Program
         Console.WriteLine($"WGC поддерживается: {WgcScreenCapture.IsSupported}");
         Console.WriteLine();
 
-        var gdi = new GdiScreenCapture(monitors);
+        using var gdi = new DesktopCapture(monitors, [new GdiScreenCapture()]);
         Cold("GDI, первый вызов", () => gdi.CaptureAll().Image.Dispose());
         Measure("GDI CaptureAll", () => gdi.CaptureAll().Image.Dispose());
 
-        using var wgc = new WgcScreenCapture(monitors);
+        using var wgc = new DesktopCapture(monitors, [new WgcScreenCapture()]);
         Cold("WGC, первый вызов (с созданием D3D)", () => wgc.CaptureAll().Image.Dispose());
         Measure("WGC CaptureAll", () => wgc.CaptureAll().Image.Dispose());
 
@@ -64,15 +64,20 @@ internal static class Program
     {
         var samples = new Dictionary<string, List<double>>();
 
-        using var capture = new WgcScreenCapture(monitors, (name, ms) =>
-        {
-            if (!samples.TryGetValue(name, out var list))
-            {
-                samples[name] = list = [];
-            }
+        using var capture = new DesktopCapture(monitors, [new WgcScreenCapture(Note)], Note);
 
-            list.Add(ms);
-        });
+        void Note(string name, double ms)
+        {
+            lock (samples)
+            {
+                if (!samples.TryGetValue(name, out var list))
+                {
+                    samples[name] = list = [];
+                }
+
+                list.Add(ms);
+            }
+        }
 
         // The first call carries device warm-up; it is measured above, not here.
         capture.CaptureAll().Image.Dispose();

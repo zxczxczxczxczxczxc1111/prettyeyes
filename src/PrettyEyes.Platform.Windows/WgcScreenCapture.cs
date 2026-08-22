@@ -6,7 +6,6 @@ using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Platform.Windows.Native;
-using SkiaSharp;
 using WinRT;
 using Vortice.Direct3D;
 using Vortice.Direct3D11;
@@ -24,26 +23,28 @@ namespace PrettyEyes.Platform.Windows;
 /// look on screen instead of black. DRM-protected content stays black, which
 /// is the point of DRM and not fixable here.
 ///
-/// One capture item per monitor: the API has no virtual-desktop item, so the
-/// monitors are grabbed separately and written into one frame.
+/// One capture item per monitor, which is why this is a painter and not a
+/// whole capture: the API has no virtual-desktop item anyway.
 ///
-/// Items and frame pools are built once and kept: measured on two 2K monitors,
-/// building and tearing them down again cost about 40 ms of the 96 ms a capture
-/// took. Capture sessions are not kept forever, because a live session is what
-/// makes Windows draw the yellow border and light up the recording indicator.
+/// Capture items are built once and kept; frame pools and sessions are built
+/// per monitor per capture, because a session left running is a live screen
+/// recording. Starting one is also what makes Windows flash its yellow capture
+/// border, which is why this engine is no longer the first choice: measured on
+/// 22.08, the border showed on 24 captures out of 45 with every documented
+/// suppression in place.
 /// </summary>
-public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
+public sealed unsafe class WgcScreenCapture : IMonitorPainter
 {
+    public string Name => "Windows.Graphics.Capture";
+
     /// <summary>A frame normally arrives within a frame or two of the display.</summary>
     private static readonly TimeSpan FrameTimeout = TimeSpan.FromSeconds(2);
 
-    private readonly IMonitorEnumerator _monitors;
     private readonly ID3D11Device _device;
     private readonly ID3D11DeviceContext _context;
     private readonly IDirect3DDevice _winrtDevice;
     private readonly Dictionary<IntPtr, MonitorCapture> _captures = [];
     private readonly MtaWorker _worker = new();
-    private readonly FrameBuffers _buffers = new();
 
     /// <summary>
     /// Where the per-step timings go. Null in the application: the numbers are
@@ -54,9 +55,8 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
 
     private bool _disposed;
 
-    public WgcScreenCapture(IMonitorEnumerator monitors, Action<string, double>? timing = null)
+    public WgcScreenCapture(Action<string, double>? timing = null)
     {
-        _monitors = monitors;
         _timing = timing;
 
         // BgraSupport is required: the capture frames arrive as BGRA textures.
@@ -132,89 +132,34 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
     }
 
     /// <summary>
-    /// Runs on the worker thread, never on the caller's.
+    /// Paints one monitor, always on the worker thread and never on the
+    /// caller's.
     ///
     /// The application's UI thread is a single-threaded apartment, and every
     /// WinRT call made from there is marshalled. Measured on the same machine:
     /// 33 ms per capture from a multi-threaded apartment against 105-132 ms
     /// from the UI thread, for the same code and the same monitors.
     /// </summary>
-    public CaptureResult CaptureAll()
+    public void Paint(MonitorInfo monitor, IntPtr destination, int stride)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        return _worker.Run(CaptureOnWorker);
-    }
-
-    private CaptureResult CaptureOnWorker()
-    {
-        AskForBorderless();
-
-        var layout = _monitors.Enumerate();
-        var bounds = layout.VirtualBounds;
-
-        if (bounds.IsEmpty)
+        _worker.Run<int>(() =>
         {
-            throw new InvalidOperationException("Virtual desktop reported a non-positive size.");
-        }
+            AskForBorderless();
 
-        var handles = Win32MonitorEnumerator.Handles();
-
-        // One buffer for the whole desktop, handed over to Skia at the end and
-        // taken back here when the image dies.
-        var stride = bounds.Width * 4;
-        var size = (nuint)((long)stride * bounds.Height);
-
-        // Zeroed only when the monitors do not tile the virtual desktop
-        // exactly: on a plain side-by-side setup every byte is overwritten
-        // anyway, and clearing 28 MB is not free.
-        var covered = layout.Monitors.Sum(monitor => (long)monitor.Bounds.Width * monitor.Bounds.Height);
-        var frame = Step("alloc", () => _buffers.Rent(size, zeroed: covered < (long)bounds.Width * bounds.Height));
-
-        try
-        {
-            // In parallel because every monitor spends most of its capture
-            // waiting for a frame, and those waits are the same 16 ms whether
-            // they happen one after another or at once. The copy inside is
-            // serialised: a D3D11 device context is single-threaded.
-            Parallel.ForEach(layout.Monitors, monitor =>
+            // Looked up per monitor rather than cached: handles change when
+            // displays are plugged in, and EnumDisplayMonitors is cheap next to
+            // everything else here.
+            if (!Win32MonitorEnumerator.Handles().TryGetValue(monitor.DeviceId, out var handle))
             {
-                if (!handles.TryGetValue(monitor.DeviceId, out var handle))
-                {
-                    throw new InvalidOperationException($"No display handle for {monitor.DeviceId}.");
-                }
+                throw new InvalidOperationException($"No display handle for {monitor.DeviceId}.");
+            }
 
-                var offset = ((monitor.Bounds.Y - bounds.Y) * (long)stride)
-                    + ((monitor.Bounds.X - bounds.X) * 4L);
+            CaptureMonitor(handle, monitor.Bounds, destination, stride);
 
-                CaptureMonitor(handle, monitor.Bounds, frame + (nint)offset, stride);
-            });
-        }
-        catch (AggregateException error)
-        {
-            _buffers.Return(frame, size);
-
-            // One monitor failing is the whole capture failing; the first
-            // reason is the useful one.
-            throw error.InnerException ?? error;
-        }
-        catch
-        {
-            _buffers.Return(frame, size);
-            throw;
-        }
-
-        var info = new SKImageInfo(bounds.Width, bounds.Height, SKColorType.Bgra8888, SKAlphaType.Opaque);
-
-        // FromPixels over our own buffer, not FromPixelCopy: Skia hands the
-        // memory back through the release callback when the image dies. That is
-        // one 28 MB copy less on every capture.
-        using var pixmap = new SKPixmap(info, frame, stride);
-
-        var image = Step("image", () => SKImage.FromPixels(pixmap, (address, _) => _buffers.Return(address, size), null))
-            ?? throw new InvalidOperationException("Skia rejected the captured pixel buffer.");
-
-        return new CaptureResult(image, layout);
+            return 0;
+        });
     }
 
     public void Dispose()
@@ -227,7 +172,6 @@ public sealed unsafe class WgcScreenCapture : IScreenCapture, IDisposable
         _disposed = true;
 
         _worker.Dispose();
-        _buffers.Dispose();
 
         lock (_captures)
         {

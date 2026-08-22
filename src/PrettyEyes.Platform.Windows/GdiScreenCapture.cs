@@ -2,36 +2,28 @@ using System.Runtime.InteropServices;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Platform.Windows.Native;
-using SkiaSharp;
 
 namespace PrettyEyes.Platform.Windows;
 
 /// <summary>
-/// Captures the virtual desktop with GDI BitBlt.
-/// Known limitation: hardware-accelerated and DRM-protected windows come out
-/// black. Replaced by a Windows.Graphics.Capture implementation in phase 15.
+/// Paints a monitor with GDI BitBlt.
+///
+/// Last in the chain and kept for exactly that: it needs nothing at all from
+/// the system, so it works where Desktop Duplication is refused and where
+/// Windows.Graphics.Capture does not exist. Known limitation, and the reason
+/// it is last: hardware-accelerated and DRM-protected windows come out black.
+///
+/// Costs nothing while it sits unused - there is no device, no session, no
+/// thread here, only a device context borrowed for the length of one monitor.
 /// </summary>
-public sealed class GdiScreenCapture : IScreenCapture
+public sealed class GdiScreenCapture : IMonitorPainter
 {
-    private readonly IMonitorEnumerator _monitors;
+    public string Name => "GDI";
 
-    public GdiScreenCapture(IMonitorEnumerator monitors) => _monitors = monitors;
-
-    public CaptureResult CaptureAll()
+    public void Paint(MonitorInfo monitor, IntPtr destination, int stride)
     {
-        var layout = _monitors.Enumerate();
-        var bounds = layout.VirtualBounds;
+        var bounds = monitor.Bounds;
 
-        if (bounds.IsEmpty)
-        {
-            throw new InvalidOperationException("Virtual desktop reported a non-positive size.");
-        }
-
-        return new CaptureResult(Grab(bounds), layout);
-    }
-
-    private static SKImage Grab(CaptureRect bounds)
-    {
         // Screen DC of the whole virtual desktop; understands negative origins.
         var screenDc = NativeMethods.GetDC(IntPtr.Zero);
 
@@ -65,12 +57,12 @@ public sealed class GdiScreenCapture : IScreenCapture
             if (!copied)
             {
                 throw new InvalidOperationException(
-                    $"BitBlt failed while capturing the screen (win32 error {Marshal.GetLastWin32Error()}).");
+                    $"BitBlt failed while capturing {monitor.DeviceId} (win32 error {Marshal.GetLastWin32Error()}).");
             }
 
             NativeMethods.SelectObject(memoryDc, previous);
 
-            return ToSkImage(memoryDc, bitmap, bounds.Width, bounds.Height);
+            Pour(memoryDc, bitmap, bounds, destination, stride);
         }
         finally
         {
@@ -88,19 +80,27 @@ public sealed class GdiScreenCapture : IScreenCapture
         }
     }
 
-    private static SKImage ToSkImage(IntPtr dc, IntPtr bitmap, int width, int height)
+    /// <summary>
+    /// Nothing to release: this painter owns no device, no thread and no
+    /// session. Present because the chain disposes everyone the same way.
+    /// </summary>
+    public void Dispose()
+    {
+    }
+
+    private static void Pour(IntPtr dc, IntPtr bitmap, CaptureRect bounds, IntPtr destination, int stride)
     {
         var info = new NativeMethods.BitmapInfo();
         info.bmiHeader.biSize = Marshal.SizeOf<NativeMethods.BitmapInfoHeader>();
-        info.bmiHeader.biWidth = width;
+        info.bmiHeader.biWidth = bounds.Width;
         // Negative height gives a top-down bitmap, matching Skia's row order.
-        info.bmiHeader.biHeight = -height;
+        info.bmiHeader.biHeight = -bounds.Height;
         info.bmiHeader.biPlanes = 1;
         info.bmiHeader.biBitCount = 32;
         info.bmiHeader.biCompression = 0;
 
-        var buffer = new byte[width * height * 4];
-        var lines = NativeMethods.GetDIBits(dc, bitmap, 0, (uint)height, buffer, ref info, 0);
+        var buffer = new byte[bounds.Width * bounds.Height * 4];
+        var lines = NativeMethods.GetDIBits(dc, bitmap, 0, (uint)bounds.Height, buffer, ref info, 0);
 
         if (lines == 0)
         {
@@ -113,11 +113,14 @@ public sealed class GdiScreenCapture : IScreenCapture
             buffer[i] = 255;
         }
 
-        var imageInfo = new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Opaque);
+        // GetDIBits packs its rows tightly, the desktop buffer does not: a
+        // monitor sits inside a wider picture and every row lands stride bytes
+        // further on.
+        var rowBytes = bounds.Width * 4;
 
-        // FromPixelCopy, not InstallPixels: the latter leaves the image pointing
-        // at a managed array that the GC is free to move once unpinned.
-        return SKImage.FromPixelCopy(imageInfo, buffer)
-            ?? throw new InvalidOperationException("Skia rejected the captured pixel buffer.");
+        for (var row = 0; row < bounds.Height; row++)
+        {
+            Marshal.Copy(buffer, row * rowBytes, destination + (row * (nint)stride), rowBytes);
+        }
     }
 }

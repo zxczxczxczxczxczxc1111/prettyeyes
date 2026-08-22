@@ -103,14 +103,25 @@ public sealed class AppServices : IDisposable
     public bool FullScreenHotkeyRegistered { get; set; }
 
     /// <summary>
-    /// Windows.Graphics.Capture where the system has it, GDI otherwise. Only
-    /// the newer path sees hardware-accelerated windows; the older one is kept
-    /// because it needs nothing from the OS beyond BitBlt.
+    /// Painters in the order they are asked, one monitor at a time.
+    ///
+    /// Windows.Graphics.Capture first for now, because it is the only engine
+    /// here that sees hardware-accelerated windows. GDI last, because it needs
+    /// nothing from the system at all and gets video wrong.
     /// </summary>
-    private static IScreenCapture CreateCapture(IMonitorEnumerator monitors) =>
-        WgcScreenCapture.IsSupported
-            ? new WgcScreenCapture(monitors, ReportSlowStep)
-            : new GdiScreenCapture(monitors);
+    private static IScreenCapture CreateCapture(IMonitorEnumerator monitors)
+    {
+        var painters = new List<IMonitorPainter>();
+
+        if (WgcScreenCapture.IsSupported)
+        {
+            painters.Add(new WgcScreenCapture(ReportSlowStep));
+        }
+
+        painters.Add(new GdiScreenCapture());
+
+        return new DesktopCapture(monitors, painters, ReportSlowStep);
+    }
 
     /// <summary>
     /// Only the steps that took long enough to notice. A line per step per
