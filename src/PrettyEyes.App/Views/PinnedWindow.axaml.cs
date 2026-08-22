@@ -429,12 +429,12 @@ public partial class PinnedWindow : Window, IPinned
                 Toolbar.SetActive(null);
                 break;
 
-            // The end of the ladder. A pin with drawings of its own does not
-            // close on Escape at all: the key is pressed by reflex, and there
-            // is nowhere to get the drawings back from.
-            case Key.Escape when !HasOwnAnnotations:
-                Close();
-                break;
+            // And the ladder stops there. Escape does not close a pin at all.
+            //
+            // It used to, as the last rung. In use that turned out to be a
+            // trap: the key that puts the overlay away is pressed by reflex a
+            // moment after pinning, and it took the pin with it. Losing a
+            // window to a habit is worse than reaching for its cross.
 
             case Key.C when e.KeyModifiers.HasFlag(KeyModifiers.Control):
                 CopyRequested?.Invoke(this, EventArgs.Empty);
