@@ -213,15 +213,26 @@ public partial class SettingsWindow : Window
     {
         _services = services;
 
-        foreach (var line in StateLines(services))
+        foreach (var (text, detail) in StateLines(services))
         {
-            Health.Children.Add(new TextBlock
+            var line = new TextBlock
             {
-                Text = line,
+                Text = text,
                 FontSize = 12,
                 TextWrapping = TextWrapping.Wrap,
                 Foreground = (IBrush?)Application.Current?.FindResource("TextDim"),
-            });
+            };
+
+            if (detail is not null)
+            {
+                // The technical answer is one hover away and out of the way:
+                // the name of a capture API means nothing to the person using
+                // the application and everything to whoever gets asked about
+                // it later.
+                ToolTip.SetTip(line, detail);
+            }
+
+            Health.Children.Add(line);
         }
 
         OpenLog.Click += (_, _) => OpenPage(Log.DefaultPath);
@@ -236,46 +247,66 @@ public partial class SettingsWindow : Window
         };
     }
 
-    private static IEnumerable<string> StateLines(AppServices services)
+    /// <summary>
+    /// The lines under "Состояние", each with the technical detail that
+    /// belongs in a tooltip rather than on the page.
+    /// </summary>
+    private static IEnumerable<(string Text, string? Detail)> StateLines(AppServices services)
     {
-        if (services.Capture is DesktopCapture capture)
+        if (services.Capture is DesktopCapture capture && capture.Painters.Count > 0)
         {
-            var painters = capture.Painters;
-
-            if (painters.Count > 0)
-            {
-                // One line when every screen is taken the same way, which is
-                // the normal case. The per-monitor breakdown only earns its
-                // space when the screens disagree.
-                var engines = painters.Values.Distinct().ToArray();
-
-                yield return engines.Length == 1
-                    ? $"Захват: {engines[0]}"
-                    : "Захват: " + string.Join(", ", painters
-                        .OrderBy(pair => pair.Key, StringComparer.Ordinal)
-                        .Select(pair => $"{Short(pair.Key)} {pair.Value}"));
-            }
+            yield return CaptureHealth(capture.Painters);
 
             if (capture.LastMilliseconds > 0)
             {
-                yield return $"Последний снимок: {capture.LastMilliseconds:F0} мс";
+                yield return ($"Последний снимок: {capture.LastMilliseconds:F0} мс", null);
             }
         }
 
         var shots = services.Shots.Current;
 
         yield return shots.Total == 0
-            ? "Снимков пока нет"
-            : $"Снимков: {shots.Total}, за неделю {services.Shots.ThisWeek}";
+            ? ("Снимков пока нет", null)
+            : ($"Снимков: {shots.Total}, за неделю {services.Shots.ThisWeek}", null);
 
         if (shots.Total > 0)
         {
-            yield return $"Буфер {shots.ToClipboard}, файл {shots.ToFile}, закреплено {shots.ToPin}";
+            yield return ($"Буфер {shots.ToClipboard}, файл {shots.ToFile}, закреплено {shots.ToPin}", null);
         }
 
         yield return services.Settings.Save?.Ready == true
-            ? $"Быстрое сохранение: {services.Settings.Save.Folder}"
-            : "Быстрое сохранение выключено";
+            ? ($"Быстрое сохранение: {services.Settings.Save.Folder}", null)
+            : ("Быстрое сохранение выключено", null);
+    }
+
+    /// <summary>
+    /// Says what the person will notice, not which API took the picture.
+    ///
+    /// Nobody outside this repository knows what output duplication is, and
+    /// the line was written for its author rather than for its reader. What
+    /// matters to a reader is whether Windows will draw its yellow frame and
+    /// whether video will come out black, so that is what it says now.
+    /// </summary>
+    private static (string Text, string? Detail) CaptureHealth(IReadOnlyDictionary<string, string> painters)
+    {
+        var detail = string.Join(", ", painters
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => $"{Short(pair.Key)}: {pair.Value}"));
+
+        var plain = painters.Values.Where(name => name == "GDI").ToArray();
+        var system = painters.Values.Where(name => name.StartsWith("Windows.", StringComparison.Ordinal)).ToArray();
+
+        if (plain.Length > 0)
+        {
+            return ("Захват: запасной способ, видео и игры выйдут чёрными", detail);
+        }
+
+        if (system.Length > 0)
+        {
+            return ("Захват: запасной способ, по краю экрана бывает жёлтая рамка", detail);
+        }
+
+        return ("Захват: в порядке", detail);
     }
 
     /// <summary>

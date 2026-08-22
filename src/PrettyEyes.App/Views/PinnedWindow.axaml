@@ -49,7 +49,16 @@
 
     <Style Selector="Button.answer">
       <Setter Property="Height" Value="30"/>
+      <!-- Both answers the same width, so the pair reads as a pair rather than
+           as two buttons that happened to land next to each other. -->
+      <Setter Property="MinWidth" Value="96"/>
       <Setter Property="Padding" Value="12,0"/>
+      <!-- Avalonia puts button content in the top left corner unless told
+           otherwise, and a label sitting above the middle of a 30 pixel button
+           is exactly what "slightly crooked" looks like. The same two lines
+           were missing from the close cross once already. -->
+      <Setter Property="HorizontalContentAlignment" Value="Center"/>
+      <Setter Property="VerticalContentAlignment" Value="Center"/>
       <Setter Property="Background" Value="{StaticResource Fill}"/>
       <Setter Property="BorderThickness" Value="0"/>
       <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
