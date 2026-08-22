@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using PrettyEyes.Core.Capture;
 using PrettyEyes.Core.Diagnostics;
+using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Platform;
 using SkiaSharp;
 
@@ -68,7 +69,7 @@ public sealed class DesktopCapture : IScreenCapture, IDisposable
             throw;
         }
 
-        Announce();
+        Announce(layout);
 
         var info = new SKImageInfo(frame.Bounds.Width, frame.Bounds.Height, SKColorType.Bgra8888, SKAlphaType.Opaque);
 
@@ -106,8 +107,10 @@ public sealed class DesktopCapture : IScreenCapture, IDisposable
     /// engine, which looks exactly like a working application right up until
     /// somebody notices the yellow border is back.
     /// </summary>
-    private void Announce()
+    private void Announce(DesktopLayout layout)
     {
+        _chain.KeepOnly(layout.Monitors.Select(monitor => monitor.DeviceId));
+
         var now = string.Join(", ", _chain.Assignments
             .OrderBy(pair => pair.Key, StringComparer.Ordinal)
             .Select(pair => $"{pair.Key}: {pair.Value}"));

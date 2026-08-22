@@ -21,6 +21,14 @@ public sealed class PainterChain : IDisposable
 {
     private readonly IReadOnlyList<IMonitorPainter> _painters;
 
+    /// <summary>
+    /// Where the refusals are written down. Injected rather than taken from
+    /// Log.Default because the tests of this class run with fake painters and
+    /// fake monitors, and their chatter was landing in the real user's log
+    /// file, where it read like a broken installation.
+    /// </summary>
+    private readonly Log _log;
+
     /// <summary>Monitors a painter has refused, by painter name.</summary>
     private readonly ConcurrentDictionary<(string Painter, string Monitor, CaptureRect Bounds), bool> _refused = new();
 
@@ -28,8 +36,10 @@ public sealed class PainterChain : IDisposable
 
     private bool _disposed;
 
-    public PainterChain(IReadOnlyList<IMonitorPainter> painters)
+    public PainterChain(IReadOnlyList<IMonitorPainter> painters, Log? log = null)
     {
+        _log = log ?? Log.Default;
+
         if (painters.Count == 0)
         {
             throw new ArgumentException("A chain with no painters can capture nothing.", nameof(painters));
@@ -44,6 +54,21 @@ public sealed class PainterChain : IDisposable
     /// worth knowing.
     /// </summary>
     public IReadOnlyDictionary<string, string> Assignments => _assignments;
+
+    /// <summary>
+    /// Forgets monitors that are no longer there. Without this a screen that
+    /// was unplugged keeps showing up in the log line about who paints what,
+    /// which is the one line somebody will read when the border comes back.
+    /// </summary>
+    public void KeepOnly(IEnumerable<string> monitors)
+    {
+        var alive = monitors.ToHashSet(StringComparer.Ordinal);
+
+        foreach (var gone in _assignments.Keys.Where(id => !alive.Contains(id)).ToArray())
+        {
+            _assignments.TryRemove(gone, out _);
+        }
+    }
 
     public void Paint(MonitorInfo monitor, IntPtr destination, int stride)
     {
@@ -69,7 +94,7 @@ public sealed class PainterChain : IDisposable
             {
                 _refused[verdict] = true;
                 lastFailure ??= refusal;
-                Log.Default.Info(
+                _log.Info(
                     $"маляр {painter.Name} отказался от {monitor.DeviceId} насовсем: {refusal.Message}");
             }
             catch (Exception failure)
@@ -81,7 +106,7 @@ public sealed class PainterChain : IDisposable
                 // Logged every time and not once: a painter that quietly loses
                 // every second screenshot looks exactly like a working
                 // application until somebody counts.
-                Log.Default.Info(
+                _log.Info(
                     $"маляр {painter.Name} не смог {monitor.DeviceId} в этот раз: {failure.Message}");
             }
         }
