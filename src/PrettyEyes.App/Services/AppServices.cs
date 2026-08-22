@@ -105,6 +105,9 @@ public sealed class AppServices : IDisposable
     public Func<string?>? Busy { get; set; }
 
     /// <summary>False when a combination was taken at startup.</summary>
+    private Timer? _idle;
+
+    /// <summary>False when a combination was taken at startup.</summary>
     public bool RegionHotkeyRegistered { get; set; }
 
     public bool FullScreenHotkeyRegistered { get; set; }
@@ -273,6 +276,7 @@ public sealed class AppServices : IDisposable
         // After the record exists, because the pins ask it for the current
         // settings on every open rather than keeping a copy.
         built.Pins.Use(built);
+        built.WatchForIdle();
 
         return built;
     }
@@ -308,8 +312,29 @@ public sealed class AppServices : IDisposable
     /// Called on shutdown. The D3D11 device and the tray entry belong to us and
     /// should not wait for process teardown to be released.
     /// </summary>
+    /// <summary>
+    /// Asks the capture engine, every half minute, whether it has been left
+    /// alone long enough to let go of its devices. Half a minute rather than
+    /// three: the answer is a comparison of two timestamps, and waking up for
+    /// it costs nothing next to what it hands back.
+    /// </summary>
+    private void WatchForIdle()
+    {
+        if (Capture is not DesktopCapture capture)
+        {
+            return;
+        }
+
+        _idle = new Timer(
+            _ => capture.ReleaseIfIdle(DateTime.Now),
+            null,
+            TimeSpan.FromSeconds(30),
+            TimeSpan.FromSeconds(30));
+    }
+
     public void Dispose()
     {
+        _idle?.Dispose();
         Hotkeys.Dispose();
         Tray.Dispose();
         Emoji.Dispose();

@@ -74,6 +74,28 @@ public sealed unsafe class FrameBuffers : IDisposable
         NativeMemory.Free((void*)buffer);
     }
 
+    /// <summary>
+    /// Gives the spare buffer back to the system.
+    ///
+    /// Costs the next capture its page faults again (measured: 108 ms against
+    /// 15), which is the right trade after minutes of doing nothing and the
+    /// wrong one between two screenshots in a row.
+    /// </summary>
+    public void Drop()
+    {
+        lock (_gate)
+        {
+            if (_spare == IntPtr.Zero)
+            {
+                return;
+            }
+
+            NativeMemory.Free((void*)_spare);
+            _spare = IntPtr.Zero;
+            _spareSize = 0;
+        }
+    }
+
     public void Dispose()
     {
         lock (_gate)

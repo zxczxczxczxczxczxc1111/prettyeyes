@@ -29,4 +29,14 @@ public interface IMonitorPainter : IDisposable
     /// means bad luck this time.
     /// </summary>
     void Paint(MonitorInfo monitor, IntPtr destination, int stride);
+
+    /// <summary>
+    /// Lets go of everything expensive; the next Paint builds it again.
+    ///
+    /// Called after a long idle spell. Most painters hold nothing worth
+    /// releasing, which is why doing nothing is the default.
+    /// </summary>
+    void Release()
+    {
+    }
 }

@@ -115,6 +115,19 @@ public sealed class PainterChain : IDisposable
             $"No capture engine could paint monitor {monitor.DeviceId}.", lastFailure);
     }
 
+    /// <summary>
+    /// Tells every painter to let go of what it holds. The verdicts about which
+    /// monitor belongs to whom are kept: they are about the screens, not about
+    /// anything that was just released.
+    /// </summary>
+    public void Release()
+    {
+        foreach (var painter in _painters)
+        {
+            painter.Release();
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed)

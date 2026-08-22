@@ -56,6 +56,23 @@ public sealed class LazyPainter : IMonitorPainter
         real.Paint(monitor, destination, stride);
     }
 
+    /// <summary>
+    /// Throws away the engine behind this one. Unlike Dispose this is not the
+    /// end: the next capture builds it again.
+    /// </summary>
+    public void Release()
+    {
+        IMonitorPainter? built;
+
+        lock (_gate)
+        {
+            built = _real;
+            _real = null;
+        }
+
+        built?.Dispose();
+    }
+
     public void Dispose()
     {
         lock (_gate)
