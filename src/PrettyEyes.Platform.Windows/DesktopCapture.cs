@@ -140,11 +140,12 @@ public sealed class DesktopCapture : IScreenCapture, IDisposable
     /// screenshot that might come in an hour. The first capture after a
     /// release costs a fifth of a second; every one after it is back to 17 ms.
     /// </summary>
-    public void ReleaseIfIdle(DateTime now)
+    /// <returns>True when something was actually let go of.</returns>
+    public bool ReleaseIfIdle(DateTime now)
     {
         if (_disposed || !_watch.Due(now))
         {
-            return;
+            return false;
         }
 
         lock (_engine)
@@ -154,6 +155,8 @@ public sealed class DesktopCapture : IScreenCapture, IDisposable
         }
 
         Log.Default.Info("простой: движок захвата отпущен до следующего снимка");
+
+        return true;
     }
 
     public void Dispose()

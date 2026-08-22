@@ -7,6 +7,7 @@ using PrettyEyes.Core.Capture;
 using PrettyEyes.Core.Settings;
 using PrettyEyes.Core.Stats;
 using PrettyEyes.Platform.Windows;
+using SkiaSharp;
 using PrettyEyes.Platform.Windows.Native;
 
 namespace PrettyEyes.App.Services;
@@ -132,14 +133,23 @@ public sealed class AppServices : IDisposable
         // The spares are wrapped rather than built: Windows.Graphics.Capture
         // makes a Direct3D device and a thread in its constructor, and on a
         // machine where duplication works it is never asked for a pixel.
-        var painters = new List<IMonitorPainter> { new DuplicationPainter() };
-
-        if (WgcScreenCapture.IsSupported)
+        var painters = new List<IMonitorPainter>
         {
-            painters.Add(new LazyPainter("Windows.Graphics.Capture", () => new WgcScreenCapture(ReportSlowStep)));
-        }
+            new DuplicationPainter(),
 
-        painters.Add(new LazyPainter("GDI", () => new GdiScreenCapture()));
+            // Whether this machine has Windows.Graphics.Capture at all is asked
+            // inside the factory rather than here, and that is worth 25 MB:
+            // touching the type loads Microsoft.Windows.SDK.NET.dll, the WinRT
+            // projection, and it is the third largest module in the process.
+            // On a machine where duplication works it is never needed at all.
+            new LazyPainter(
+                "Windows.Graphics.Capture",
+                () => WgcScreenCapture.IsSupported
+                    ? new WgcScreenCapture(ReportSlowStep)
+                    : throw new NotSupportedException("This Windows build has no Windows.Graphics.Capture.")),
+
+            new LazyPainter("GDI", () => new GdiScreenCapture()),
+        };
 
         return new DesktopCapture(monitors, painters, ReportSlowStep);
     }
@@ -326,7 +336,19 @@ public sealed class AppServices : IDisposable
         }
 
         _idle = new Timer(
-            _ => capture.ReleaseIfIdle(DateTime.Now),
+            _ =>
+            {
+                if (!capture.ReleaseIfIdle(DateTime.Now))
+                {
+                    return;
+                }
+
+                // Only together with the release, never on the plain tick: these
+                // are the font and image caches the drawing code lives on, and
+                // throwing them away while somebody is working means
+                // re-rasterising everything they look at next.
+                SKGraphics.PurgeAllCaches();
+            },
             null,
             TimeSpan.FromSeconds(30),
             TimeSpan.FromSeconds(30));
