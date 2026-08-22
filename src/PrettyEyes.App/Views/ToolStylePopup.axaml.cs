@@ -26,9 +26,6 @@ public partial class ToolStylePopup : UserControl
     private ToolKind _kind = ToolKind.Arrow;
     private ToolStyle _style = ToolStyle.Default;
 
-    /// <summary>Showing a style rather than reacting to a choice.</summary>
-    private bool _loading;
-
     public ToolStylePopup()
     {
         InitializeComponent();
@@ -42,17 +39,15 @@ public partial class ToolStylePopup : UserControl
         MediumStep.Click += (_, _) => Pick(_style with { Size = StrokeSize.Medium });
         LargeStep.Click += (_, _) => Pick(_style with { Size = StrokeSize.Large });
 
-        // Null first, then whatever this machine has, alphabetically. The list
-        // is no longer curated: a dropdown can hold three hundred families
-        // where a column of buttons could not.
-        Fonts.ItemsSource = Families;
-        Fonts.SelectionChanged += (_, _) =>
+        // System font first, then whatever this machine has, alphabetically.
+        // The list is no longer curated: a scrolling list holds three hundred
+        // families where a column of buttons could not.
+        foreach (var family in Families)
         {
-            if (!_loading && Fonts.SelectedItem is string chosen)
-            {
-                Pick(_style with { FontFamily = chosen == SystemFont ? null : chosen });
-            }
-        };
+            FontRows.Children.Add(NewFontRow(family));
+        }
+
+        FontPick.Click += (_, _) => ShowFontList(!FontList.IsVisible);
 
         SmallerType.Click += (_, _) => Resize(-TextAnnotation.SizeStep);
         BiggerType.Click += (_, _) => Resize(TextAnnotation.SizeStep);
@@ -133,11 +128,22 @@ public partial class ToolStylePopup : UserControl
 
         TypeSize.Text = _style.FontSize.ToString(CultureInfo.InvariantCulture);
 
-        // Setting the selection raises SelectionChanged, and answering that
-        // would store the style we are only displaying.
-        _loading = true;
-        Fonts.SelectedItem = _style.FontFamily ?? SystemFont;
-        _loading = false;
+        FontName.Text = _style.FontFamily ?? SystemFont;
+
+        foreach (var child in FontRows.Children)
+        {
+            if (child is not Button row)
+            {
+                continue;
+            }
+
+            row.Classes.Remove(ActiveClass);
+
+            if ((row.Tag as string ?? SystemFont) == (_style.FontFamily ?? SystemFont))
+            {
+                row.Classes.Add(ActiveClass);
+            }
+        }
 
         Mark(PlateBackdrop, _style.TextBackdrop == TextBackdrop.Plate);
         Mark(OutlineBackdrop, _style.TextBackdrop == TextBackdrop.Outline);
@@ -171,6 +177,62 @@ public partial class ToolStylePopup : UserControl
         {
             FontSize = Math.Clamp(_style.FontSize + step, ToolStyle.MinFontSize, ToolStyle.MaxFontSize),
         });
+
+    /// <summary>
+    /// One line of the font list, drawn in its own family so the choice is a
+    /// look rather than a word.
+    /// </summary>
+    private Button NewFontRow(string family)
+    {
+        var button = new Button
+        {
+            Tag = family == SystemFont ? null : family,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            Padding = new Thickness(8, 0, 8, 0),
+            Content = new TextBlock
+            {
+                Text = family,
+                FontFamily = family == SystemFont ? FontFamily.Default : new FontFamily(family),
+            },
+        };
+
+        button.Classes.Add("step");
+        button.Click += (_, _) =>
+        {
+            ShowFontList(false);
+            Pick(_style with { FontFamily = button.Tag as string });
+        };
+
+        return button;
+    }
+
+    private void ShowFontList(bool shown)
+    {
+        FontList.IsVisible = shown;
+
+        if (shown)
+        {
+            BringChosenIntoView();
+        }
+    }
+
+    /// <summary>
+    /// Opens the list where the current font is, not at the top. Three hundred
+    /// families deep, "where am I" is otherwise unanswerable.
+    /// </summary>
+    private void BringChosenIntoView()
+    {
+        foreach (var child in FontRows.Children)
+        {
+            if (child is Button row && row.Classes.Contains(ActiveClass))
+            {
+                row.BringIntoView();
+
+                return;
+            }
+        }
+    }
 
     private void Pick(ToolStyle style)
     {

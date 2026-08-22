@@ -245,64 +245,11 @@
     <Setter Property="Background" Value="{StaticResource Fill}"/>
     <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
   </Style>
-  <!-- The project's first dropdown. It arrives from Fluent in a light theme
-       with its own fill, its own chevron and a white popup, so all three are
-       said again here in the app's own tokens. Written as a shared style
-       rather than a local one: the next section that needs a list should not
-       have to discover this again. -->
-  <Style Selector="ComboBox.field">
-    <Setter Property="Background" Value="{StaticResource Fill}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
-    <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
-    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
-    <Setter Property="Padding" Value="10,0"/>
-    <Setter Property="MinHeight" Value="28"/>
-    <Setter Property="VerticalContentAlignment" Value="Center"/>
-  </Style>
-
-  <Style Selector="ComboBox.field /template/ Border#Background">
-    <Setter Property="Background" Value="{StaticResource Fill}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
-  </Style>
-
-  <Style Selector="ComboBox.field:pointerover /template/ Border#Background">
-    <Setter Property="Background" Value="{StaticResource FillHover}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}"/>
-  </Style>
-
-  <Style Selector="ComboBox.field:focus /template/ Border#Background">
-    <Setter Property="BorderBrush" Value="{StaticResource Accent}"/>
-  </Style>
-
-  <!-- The chevron is a Path in the default template and keeps its own colour
-       otherwise: dark grey on dark grey. -->
-  <Style Selector="ComboBox.field /template/ Path#DropDownGlyph">
-    <Setter Property="Fill" Value="{StaticResource TextDim}"/>
-  </Style>
-
-  <!-- The list itself is a separate popup and inherits none of the above. -->
-  <Style Selector="ComboBox.field /template/ Border#PopupBorder">
-    <Setter Property="Background" Value="{StaticResource SurfaceRaised}"/>
-    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
-    <Setter Property="BorderThickness" Value="1"/>
-    <Setter Property="CornerRadius" Value="{StaticResource RField}"/>
-  </Style>
-
-  <Style Selector="ComboBoxItem">
-    <Setter Property="Foreground" Value="{StaticResource Text}"/>
-    <Setter Property="Padding" Value="10,6"/>
-    <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
-  </Style>
-
-  <Style Selector="ComboBoxItem:pointerover /template/ ContentPresenter">
-    <Setter Property="Background" Value="{StaticResource FillHover}"/>
-    <Setter Property="TextElement.Foreground" Value="{StaticResource TextStrong}"/>
-  </Style>
-
-  <Style Selector="ComboBoxItem:selected /template/ ContentPresenter">
-    <Setter Property="Background" Value="{StaticResource Fill}"/>
-    <Setter Property="TextElement.Foreground" Value="{StaticResource TextStrong}"/>
-  </Style>
+  <!-- There is deliberately no ComboBox style here, and no ComboBox in the
+       application. Its list opens as a window of its own, and inside the
+       overlay - a topmost transparent full-screen window - that sends the
+       template binding on IsDropDownOpen into a loop deep enough to kill the
+       process. The font list in the tool card is an ordinary panel in the same
+       visual tree for exactly this reason. -->
 
 </Styles>

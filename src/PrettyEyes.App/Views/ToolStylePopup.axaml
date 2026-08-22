@@ -100,8 +100,29 @@
            and backdrop side by side. The card used to run twice as tall as the
            others for no reason anybody could name. -->
       <StackPanel x:Name="TextRow" IsVisible="False" Spacing="8">
-        <ComboBox x:Name="Fonts" Classes="field" HorizontalAlignment="Stretch"
-                  MaxDropDownHeight="260"/>
+        <!-- Not a ComboBox, and that is not a matter of taste. Its list opens
+             as a window of its own, and inside the overlay - a topmost
+             transparent full-screen window - opening it sends the template
+             binding on IsDropDownOpen into a loop that eats the stack and
+             takes the whole application with it. Measured, with the trace.
+             This list lives in the same visual tree and has no popup at all. -->
+        <Button x:Name="FontPick" Classes="step" HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Stretch" Padding="10,0">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock x:Name="FontName" Grid.Column="0" VerticalAlignment="Center"/>
+            <Path Grid.Column="1" Data="M2,5 L6,9 L10,5"
+                  Stroke="{StaticResource TextDim}" StrokeThickness="1.4"
+                  VerticalAlignment="Center" Margin="8,0,0,0"/>
+          </Grid>
+        </Button>
+
+        <Border x:Name="FontList" IsVisible="False" MaxHeight="200"
+                Background="{StaticResource Fill}"
+                CornerRadius="{StaticResource RChip}">
+          <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <StackPanel x:Name="FontRows" Margin="2"/>
+          </ScrollViewer>
+        </Border>
 
         <TextBlock x:Name="FontMissing"
                    IsVisible="False"
