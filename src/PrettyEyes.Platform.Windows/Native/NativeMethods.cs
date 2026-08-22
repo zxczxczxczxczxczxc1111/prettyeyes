@@ -291,6 +291,13 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint affinity);
 
+    [DllImport("user32.dll")]
+    internal static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool SetForegroundWindow(IntPtr window);
+
     /// <summary>
     /// What the shell would do with a notification right now. The one answer we
     /// care about is "a Direct3D application owns the screen"; see FullScreenApp.

@@ -11,6 +11,7 @@ using PrettyEyes.Core.Rendering;
 using PrettyEyes.Core.Stats;
 using PrettyEyes.Core.Text;
 using PrettyEyes.Core.Tools;
+using PrettyEyes.Platform.Windows;
 using CaptureRect = PrettyEyes.Core.Geometry.CaptureRect;
 
 namespace PrettyEyes.App.Services;
@@ -32,6 +33,9 @@ public sealed class OverlaySession
     private string? _emoji;
     private bool _toolbarShown;
     private bool _closed;
+
+    /// <summary>Who had the keyboard before this capture started.</summary>
+    private IntPtr _cameFrom;
 
     public OverlaySession(AppServices services)
     {
@@ -56,6 +60,10 @@ public sealed class OverlaySession
     public void Start(CaptureResult capture)
     {
         using var scope = Log.Default.Scope("overlay");
+
+        // Taken before anything of ours is shown: in a moment we are the
+        // foreground, and by then this answer is us.
+        _cameFrom = WindowFocus.Current;
 
         _closed = false;
         _layout = capture.Layout;
@@ -1175,6 +1183,14 @@ public sealed class OverlaySession
         {
             return;
         }
+
+        // First, before a single pixel of ours goes away. The screen still
+        // shows the photograph taken before we took the keyboard, and in that
+        // photograph the window behind is drawn as the active one; letting it
+        // become active again underneath means there is nothing to see when the
+        // photograph lifts. Done the other way round it reads as a blink:
+        // bright photograph, dim reality, bright reality.
+        WindowFocus.Restore(_cameFrom);
 
         // Before the flag: a label half typed when the overlay is dismissed is
         // a label the user meant to keep, and the screenshot is rendered from
