@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Platform;
 
@@ -68,12 +69,20 @@ public sealed class PainterChain : IDisposable
             {
                 _refused[verdict] = true;
                 lastFailure ??= refusal;
+                Log.Default.Info(
+                    $"маляр {painter.Name} отказался от {monitor.DeviceId} насовсем: {refusal.Message}");
             }
             catch (Exception failure)
             {
                 // Later painters are more likely to have something to say about
                 // why the capture died, so the newest reason wins.
                 lastFailure = failure;
+
+                // Logged every time and not once: a painter that quietly loses
+                // every second screenshot looks exactly like a working
+                // application until somebody counts.
+                Log.Default.Info(
+                    $"маляр {painter.Name} не смог {monitor.DeviceId} в этот раз: {failure.Message}");
             }
         }
 

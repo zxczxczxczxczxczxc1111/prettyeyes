@@ -105,13 +105,21 @@ public sealed class AppServices : IDisposable
     /// <summary>
     /// Painters in the order they are asked, one monitor at a time.
     ///
-    /// Windows.Graphics.Capture first for now, because it is the only engine
-    /// here that sees hardware-accelerated windows. GDI last, because it needs
-    /// nothing from the system at all and gets video wrong.
+    /// Desktop Duplication first: it is the only engine here that Windows does
+    /// not draw a yellow capture border around, and on this machine it is also
+    /// twice as fast. Windows.Graphics.Capture second, for the monitors
+    /// duplication refuses: rotated screens and desktops in pixel formats we do
+    /// not read. GDI last, because it asks nothing of the system at all and
+    /// gets hardware-accelerated windows wrong.
+    ///
+    /// Nobody is asked whether they support this machine. A painter answers for
+    /// one monitor when it is handed one, which is the only question with a
+    /// useful answer: on a laptop with an external portrait screen the two
+    /// monitors get different answers.
     /// </summary>
     private static IScreenCapture CreateCapture(IMonitorEnumerator monitors)
     {
-        var painters = new List<IMonitorPainter>();
+        var painters = new List<IMonitorPainter> { new DuplicationPainter() };
 
         if (WgcScreenCapture.IsSupported)
         {
@@ -263,10 +271,14 @@ public sealed class AppServices : IDisposable
             using var scope = Log.Default.Scope("capture.warm");
             Capture.CaptureAll().Image.Dispose();
         }
-        catch (InvalidOperationException error)
+        catch (Exception error)
         {
             // A failed warm-up changes nothing: the real capture reports for
-            // itself, and this one nobody asked for.
+            // itself, and this one nobody asked for. Caught wide on purpose:
+            // the capture chain speaks in NotSupportedException and in whatever
+            // DXGI throws, and a warm-up that killed the application over a
+            // monitor it could not duplicate would be a fine way to make
+            // start-up worse than no warm-up at all.
             Log.Default.Error("прогрев захвата не удался", error);
         }
     });
