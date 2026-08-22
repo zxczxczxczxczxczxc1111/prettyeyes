@@ -272,14 +272,17 @@ public partial class OverlayWindow : Window
         Resize(monitor);
 
 
-        // Started a beat later, and that beat is the whole point. Setting a
-        // transitioned property does two things in this order: the property
-        // takes the new value, and the transition then walks it there from the
-        // old one. A frame drawn in between - and the first frame after Show
-        // lands exactly there - is drawn fully dimmed, after which the
-        // transition puts it back to nothing and fades it in properly. That is
-        // the flash: dark, undimmed, then dark again.
-        Dispatcher.UIThread.Post(() => Surface.VeilOpacity = 1, DispatcherPriority.Background);
+        // No fade at all, and no beat to wait for. This used to be posted a
+        // frame later to dodge a race: setting a transitioned property lets one
+        // frame through fully dimmed before the transition resets it to nothing
+        // and walks it back up, which showed as dark, undimmed, dark again.
+        //
+        // Filmed at 220 frames a second, that race no longer happens - but the
+        // fade itself does, and a 180 ms ramp over the whole screen is what
+        // gets reported as "the tabs blink". The screen behind is already
+        // frozen when this runs, so there is nothing the ramp adds: the dimmed
+        // frozen screen is simply what an open overlay looks like.
+        Surface.SnapOpacities(veil: 1, frame: 0);
     }
 
     /// <summary>
@@ -357,13 +360,18 @@ public partial class OverlayWindow : Window
     public void DropMagnifier() => HideMagnifier();
 
     /// <summary>
-    /// Starts the overlay disappearing. The veil and the frame walk down through
-    /// their own transitions; the window is hidden by the pool once they have.
+    /// Starts the overlay disappearing.
+    ///
+    /// The veil is not walked back down any more. Filmed, that walk is a
+    /// 120 ms ramp of the whole screen getting brighter, and it reads as the
+    /// same blink as the one on the way in - only now over a frozen picture of
+    /// a desktop nobody is looking at, because the moment Escape was pressed
+    /// the answer was "get out of the way". The window is dropped by the pool a
+    /// beat later either way.
     /// </summary>
     public void FadeOut()
     {
-        Surface.VeilOpacity = 0;
-        Surface.FrameOpacity = 0;
+        Surface.SnapOpacities(veil: 0, frame: 0);
         Surface.ShowPreview(null);
         HideMagnifier();
         HideToolbar();

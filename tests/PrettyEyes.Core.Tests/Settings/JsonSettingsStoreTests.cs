@@ -77,7 +77,12 @@ public class JsonSettingsStoreTests
 
         var settings = new JsonSettingsStore(path).Load();
 
-        Assert.Equal(HotkeyDefinition.Default, settings.Hotkey);
+        // What was written down is kept, whatever the current default happens
+        // to be: this file was saved by a build whose default was Ctrl+Shift+4,
+        // and a later build changing its mind must not move somebody's key.
+        Assert.Equal(new HotkeyDefinition(HotkeyModifiers.Control | HotkeyModifiers.Shift, 0x34), settings.Hotkey);
+
+        // The one that did not exist yet is the one that gets a default.
         Assert.Equal(HotkeyDefinition.DefaultFullScreen, settings.FullScreenHotkey);
     }
 

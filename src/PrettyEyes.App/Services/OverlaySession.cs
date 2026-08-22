@@ -1157,10 +1157,17 @@ public sealed class OverlaySession
     }
 
     /// <summary>
-    /// How long the overlay takes to disappear. Long enough to be a movement
-    /// rather than a cut, short enough that nobody waits for it.
+    /// How long the windows stay on screen after the overlay has emptied itself.
+    ///
+    /// It used to be 120 ms of fading, on the grounds that a cut reads as
+    /// abrupt. Filmed at 220 frames a second and looked at by the person using
+    /// it, that fade turned out to be the second half of what got reported as
+    /// "the tabs blink twice". What is left is the pool's own beat, which
+    /// exists for a different reason: a frame handed to the renderer a moment
+    /// ago may still be drawing, and freeing it underneath takes the process
+    /// down without so much as an exception.
     /// </summary>
-    private static readonly TimeSpan FadeOut = TimeSpan.FromMilliseconds(120);
+    private static readonly TimeSpan FadeOut = TimeSpan.Zero;
 
     public void Close()
     {
