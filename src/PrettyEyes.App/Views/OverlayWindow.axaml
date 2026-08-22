@@ -6,6 +6,7 @@
         SystemDecorations="None"
         Topmost="True"
         ShowInTaskbar="False"
+        ShowActivated="False"
         Background="Transparent"
         TransparencyLevelHint="Transparent"
         CanResize="False">
