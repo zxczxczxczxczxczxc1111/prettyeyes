@@ -58,13 +58,31 @@ Write-Host "--- foreground changes ---"
 foreach ($change in $changes) { Write-Host ($change.At + "  " + $change.What) }
 
 # The first entry is whatever was in front when the script started, so it is not
-# a change anybody caused.
+# a change anybody caused. Everything else is counted per capture rather than
+# per run: the first version of this script announced "more than two" after four
+# perfectly good cycles, which is a fine way to report a fix as a failure.
 $caused = [Math]::Max(0, $changes.Count - 1)
+$cycles = ($changes | Where-Object { $_.What -like "Avalonia-*" } | Measure-Object).Count
+$ours = ($changes | Where-Object { $_.What -like "Avalonia-*" } | ForEach-Object { ($_.What -split "  ")[0] } | Sort-Object -Unique)
 
 Write-Host ""
-Write-Host ("Changes caused during the run: " + $caused)
-if ($caused -le 2) {
-    Write-Host "Two or fewer: the overlay takes the foreground once and gives it back once." -ForegroundColor Green
+Write-Host ("Foreground changes: " + $caused + " over " + $cycles + " capture(s)")
+
+if ($cycles -eq 0) {
+    Write-Host "No capture happened. Press the hotkey while it is watching." -ForegroundColor Yellow
+    exit 0
+}
+
+Write-Host ("Our windows that took the foreground: " + $ours.Count)
+foreach ($window in $ours) { Write-Host ("  " + $window) }
+
+$each = [Math]::Round($caused / $cycles, 1)
+Write-Host ("Per capture: " + $each)
+
+if ($ours.Count -gt 1) {
+    Write-Host "More than one of our windows takes the foreground: that is one repaint per monitor." -ForegroundColor Yellow
+} elseif ($each -le 2.5) {
+    Write-Host "The overlay takes the foreground once and gives it back once. That is the floor." -ForegroundColor Green
 } else {
-    Write-Host "More than two: something is taking the foreground more often than it needs to." -ForegroundColor Yellow
+    Write-Host "More than two per capture: something takes the foreground more often than it needs to." -ForegroundColor Yellow
 }
