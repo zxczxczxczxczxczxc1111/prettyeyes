@@ -33,6 +33,9 @@ public partial class SettingsWindow : Window
     private IHotkeys? _hotkeys;
     private IAutostart? _autostart;
 
+    private AppServices? _services;
+    private bool _resetAsked;
+
     private AppSettings _settings = AppSettings.Default;
     private ToolVisibility _tools = new();
     private ToolStyles _styles = new();
@@ -60,6 +63,9 @@ public partial class SettingsWindow : Window
     private readonly CursorSettingsView _cursorSettings = new();
     private readonly QuickSaveSettingsView _quickSaveSettings = new();
     private readonly ExportSettingsView _exportSettings = new();
+
+    /// <summary>The list of shortcuts, built once and shown in the modal.</summary>
+    private readonly KeysView _keys = new();
     private bool _loading;
 
     /// <summary>
@@ -195,6 +201,134 @@ public partial class SettingsWindow : Window
         }
     }
 
+
+    /// <summary>
+    /// Fills the state block and wires the three buttons under it.
+    ///
+    /// Apart from Configure on purpose: everything here is read once and shown,
+    /// nothing here is a setting, and the argument list of Configure is long
+    /// enough already.
+    /// </summary>
+    public void ShowState(AppServices services)
+    {
+        _services = services;
+
+        foreach (var line in StateLines(services))
+        {
+            Health.Children.Add(new TextBlock
+            {
+                Text = line,
+                FontSize = 12,
+                TextWrapping = TextWrapping.Wrap,
+                Foreground = (IBrush?)Application.Current?.FindResource("TextDim"),
+            });
+        }
+
+        OpenLog.Click += (_, _) => OpenPage(Log.DefaultPath);
+        OpenShots.Click += (_, _) => OpenShotsFolder(services);
+        ResetSettings.Click += (_, _) => AskThenReset();
+        ShowKeys.Click += (_, _) =>
+        {
+            // Loaded on opening rather than once: hotkeys can be changed in
+            // the left column of this very window while the list sits here.
+            _keys.Load(_settings);
+            Modal.Show(_keys, "Сочетания клавиш");
+        };
+    }
+
+    private static IEnumerable<string> StateLines(AppServices services)
+    {
+        if (services.Capture is DesktopCapture capture)
+        {
+            var painters = capture.Painters;
+
+            if (painters.Count > 0)
+            {
+                // One line when every screen is taken the same way, which is
+                // the normal case. The per-monitor breakdown only earns its
+                // space when the screens disagree.
+                var engines = painters.Values.Distinct().ToArray();
+
+                yield return engines.Length == 1
+                    ? $"Захват: {engines[0]}"
+                    : "Захват: " + string.Join(", ", painters
+                        .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                        .Select(pair => $"{Short(pair.Key)} {pair.Value}"));
+            }
+
+            if (capture.LastMilliseconds > 0)
+            {
+                yield return $"Последний снимок: {capture.LastMilliseconds:F0} мс";
+            }
+        }
+
+        var shots = services.Shots.Current;
+
+        yield return shots.Total == 0
+            ? "Снимков пока нет"
+            : $"Снимков: {shots.Total}, за неделю {services.Shots.ThisWeek}";
+
+        if (shots.Total > 0)
+        {
+            yield return $"Буфер {shots.ToClipboard}, файл {shots.ToFile}, закреплено {shots.ToPin}";
+        }
+
+        yield return services.Settings.Save?.Ready == true
+            ? $"Быстрое сохранение: {services.Settings.Save.Folder}"
+            : "Быстрое сохранение выключено";
+    }
+
+    /// <summary>
+    /// A display arrives named as a path, with leading slashes and a dot. On
+    /// this line only the tail of that means anything to a person.
+    /// </summary>
+    private static string Short(string device) => device.Trim('\\', '.');
+
+    private void OpenShotsFolder(AppServices services)
+    {
+        var folder = services.Settings.Save?.Folder;
+
+        if (string.IsNullOrWhiteSpace(folder) || !Directory.Exists(folder))
+        {
+            ShowWarning("Папка не выбрана. Включи быстрое сохранение в настройках функции.");
+
+            return;
+        }
+
+        OpenPage(folder);
+    }
+
+    /// <summary>
+    /// Two clicks, not a dialog: the button itself asks, and forgets the
+    /// question if nobody answers. A modal sheet for one irreversible button
+    /// would be more ceremony than the button deserves, and a silent reset
+    /// would be worse than either.
+    /// </summary>
+    private void AskThenReset()
+    {
+        if (!_resetAsked)
+        {
+            _resetAsked = true;
+            ResetSettings.Content = "Точно сбросить?";
+
+            DispatcherTimer.RunOnce(
+                () =>
+                {
+                    _resetAsked = false;
+                    ResetSettings.Content = "Сбросить";
+                },
+                TimeSpan.FromSeconds(4));
+
+            return;
+        }
+
+        Store(AppSettings.Default);
+
+        // Closed rather than refilled: every field, checkbox and icon on this
+        // window was built from the old settings, and the window is rebuilt
+        // from scratch the next time it opens anyway.
+        Close();
+    }
 
     /// <summary>
     /// One checkbox per tool, named the way the toolbar tooltip names it.

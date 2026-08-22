@@ -110,8 +110,32 @@
 
             <Rectangle Height="1" Fill="{StaticResource Border}"/>
 
+            <!-- What the application is doing right now, in the plainest words
+                 it has. Here because the answer to "the yellow frame is back"
+                 or "the screenshot came out black" starts with which engine
+                 took it, and until now that lived only in the log file. -->
             <StackPanel Spacing="12">
-          </StackPanel>
+              <TextBlock Text="Состояние" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
+
+              <!-- Filled from code: the lines depend on how many monitors
+                   there are and on what has happened since start-up. -->
+              <StackPanel x:Name="Health" Spacing="6"/>
+
+              <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Left">
+                <Button x:Name="OpenLog" Classes="ghost" Content="Журнал"/>
+                <Button x:Name="OpenShots" Classes="ghost" Content="Папка снимков"/>
+                <Button x:Name="ResetSettings" Classes="ghost" Content="Сбросить"/>
+              </StackPanel>
+            </StackPanel>
+
+            <Rectangle Height="1" Fill="{StaticResource Border}"/>
+
+            <!-- The list of every shortcut, one click away and not on the page:
+                 the window is for changing things, and a table nobody reads
+                 twice would push the settings themselves down. -->
+            <StackPanel Spacing="8">
+              <Button x:Name="ShowKeys" Classes="ghost" Content="Все сочетания клавиш"/>
+            </StackPanel>
           </StackPanel>
 
           <TextBlock x:Name="Message" Grid.Row="1" Grid.ColumnSpan="3" Margin="0,20,0,0"

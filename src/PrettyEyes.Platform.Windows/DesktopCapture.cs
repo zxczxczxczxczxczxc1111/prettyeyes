@@ -36,10 +36,21 @@ public sealed class DesktopCapture : IScreenCapture, IDisposable
         _timing = timing;
     }
 
+    /// <summary>
+    /// Which engine painted which monitor last time, and how long the last
+    /// capture took. Shown in the settings window: a monitor quietly handed to
+    /// the older engine looks exactly like a working application until
+    /// somebody notices the yellow border is back.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> Painters => _chain.Assignments;
+
+    public double LastMilliseconds { get; private set; }
+
     public CaptureResult CaptureAll()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
+        var whole = Stopwatch.StartNew();
         var layout = _monitors.Enumerate();
         var frame = DesktopFrameLayout.For(layout);
 
@@ -82,6 +93,9 @@ public sealed class DesktopCapture : IScreenCapture, IDisposable
             "image",
             () => SKImage.FromPixels(pixmap, (address, _) => _buffers.Return(address, frame.Size), null))
             ?? throw new InvalidOperationException("Skia rejected the captured pixel buffer.");
+
+        whole.Stop();
+        LastMilliseconds = whole.Elapsed.TotalMilliseconds;
 
         return new CaptureResult(image, layout);
     }

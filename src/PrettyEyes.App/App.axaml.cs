@@ -387,6 +387,8 @@ public partial class App : Application
             Services.Updates,
             InstallUpdateAsync);
 
+        _settings.ShowState(Services);
+
         // Applied the moment it changes, not when the window shuts: the
         // settings window stays open while the next screenshot is taken.
         _settings.Changed += (_, settings) =>
