@@ -81,6 +81,9 @@ public sealed class PinnedWindows
         window.CopyRequested += async (sender, _) => await SendAsync(sender, _services?.Clipboard);
         window.SaveRequested += async (sender, _) => await SendAsync(sender, _services?.File);
 
+        window.RememberEmoji(settings.RecentEmoji ?? []);
+        window.EmojiPicked += (sender, choice) => Remember(sender, choice);
+
         _registry.Add(window);
 
         window.Open(
@@ -193,6 +196,34 @@ public sealed class PinnedWindows
         shown[ToolKind.Text] = false;
 
         return new ToolVisibility(shown);
+    }
+
+    /// <summary>
+    /// Keeps a glyph chosen on a pin: for the next stamp on this window, for
+    /// the next pin, and for the overlay, which reads the same setting.
+    /// </summary>
+    private void Remember(object? sender, EmojiChoice choice)
+    {
+        if (_services is null)
+        {
+            return;
+        }
+
+        var settings = _services.Settings with { Emoji = choice.Code, RecentEmoji = choice.Recent.ToList() };
+        _services.Settings = settings;
+
+        // The window was handed a function that resolves whatever the overlay
+        // had chosen at the moment it was pinned. Now it has its own answer.
+        if (sender is PinnedWindow pinned)
+        {
+            var emoji = _services.Emoji;
+            pinned.Glyph = () => emoji.Glyph(choice.Code);
+        }
+
+        if (!_services.SettingsStore.Save(settings))
+        {
+            Log.Default.Info("не удалось сохранить выбор эмодзи");
+        }
     }
 
     public void HideAll()

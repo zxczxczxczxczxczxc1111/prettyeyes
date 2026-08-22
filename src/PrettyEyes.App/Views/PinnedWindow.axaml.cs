@@ -14,6 +14,9 @@ using CaptureRect = PrettyEyes.Core.Geometry.CaptureRect;
 
 namespace PrettyEyes.App.Views;
 
+/// <summary>A glyph and the short history it came out of.</summary>
+public sealed record EmojiChoice(string Code, IReadOnlyList<string> Recent);
+
 /// <summary>
 /// One screenshot nailed above every other window.
 ///
@@ -124,7 +127,38 @@ public partial class PinnedWindow : Window, IPinned
 
         Toolbar.CopyClicked += (_, _) => CopyRequested?.Invoke(this, EventArgs.Empty);
         Toolbar.SaveClicked += (_, _) => SaveRequested?.Invoke(this, EventArgs.Empty);
-        Toolbar.StyleRequested += (_, kind) => StyleCard.Open(kind, _styles.For(kind));
+        Toolbar.StyleRequested += (_, kind) =>
+        {
+            // Emoji has a grid of glyphs where every other tool has a colour
+            // and a thickness. The overlay has always known that; this window
+            // did not, and answered a right click on the emoji with a
+            // thickness slider for a stamp that has no thickness.
+            if (kind == ToolKind.Emoji)
+            {
+                StyleCard.Close();
+                EmojiCard.Open();
+
+                return;
+            }
+
+            EmojiCard.Close();
+            StyleCard.Open(kind, _styles.For(kind));
+        };
+
+        EmojiCard.Picked += (sender, code) =>
+        {
+            EmojiCard.Close();
+
+            // Chosen means armed, the same as on the overlay: nobody picks a
+            // glyph in order to then press the tool that stamps it.
+            _tool = ToolKind.Emoji;
+            Toolbar.ShowGlyph(code);
+            Toolbar.SetActive(ToolKind.Emoji);
+
+            EmojiPicked?.Invoke(
+                this,
+                new EmojiChoice(code, (sender as EmojiPickerView)?.Recent.ToList() ?? []));
+        };
 
         StyleCard.StyleChanged += (_, change) =>
         {
@@ -145,6 +179,16 @@ public partial class PinnedWindow : Window, IPinned
 
     /// <summary>The chosen emoji, asked for at the moment one is stamped.</summary>
     public Func<SKImage?>? Glyph { get; set; }
+
+    /// <summary>
+    /// A glyph was chosen here. Raised rather than saved on the spot: this
+    /// window knows nothing about settings files, and the choice belongs to
+    /// the whole application rather than to one pin.
+    /// </summary>
+    public event EventHandler<EmojiChoice>? EmojiPicked;
+
+    /// <summary>The glyphs used lately, so the grid opens where it was left.</summary>
+    public void RememberEmoji(IReadOnlyList<string> recent) => EmojiCard.Restore(recent);
 
     /// <summary>Raised when the window is gone for good.</summary>
     public event EventHandler? Gone;
