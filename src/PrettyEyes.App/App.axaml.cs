@@ -199,6 +199,11 @@ public partial class App : Application
         var monitor = capture.Layout.MonitorAt(x, y) ?? capture.Layout.Monitors[0];
         document.Selection = monitor.Bounds;
 
+        // After the frame is taken, so the frame cannot end up in it, and
+        // before anything is written anywhere: the answer to "did that work"
+        // has to be instant, and the clipboard and the folder are not.
+        FlashWindow.On(monitor.Bounds);
+
         var style = Services.Settings.Export ?? ExportStyle.None;
 
         // Transparency is no longer flattened here. The clipboard writes PNG as

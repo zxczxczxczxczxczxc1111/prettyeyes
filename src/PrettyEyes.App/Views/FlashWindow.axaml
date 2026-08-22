@@ -1,0 +1,27 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="PrettyEyes.App.Views.FlashWindow"
+        SystemDecorations="None"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        CanResize="False">
+  <!-- A frame rather than a white flash: it says what was taken, not only that
+       something was. On the whole-monitor shot the boundary is the monitor
+       itself, so the frame is the answer to "what got copied" as well as to
+       "did anything happen". A flash would also be blinding at night, and this
+       key is pressed at night. -->
+  <Border x:Name="Frame"
+          BorderBrush="{StaticResource Accent}"
+          BorderThickness="4"
+          IsHitTestVisible="False"
+          Opacity="1">
+    <Border.Transitions>
+      <Transitions>
+        <DoubleTransition Property="Opacity" Duration="0:0:0.18" Easing="CubicEaseOut"/>
+      </Transitions>
+    </Border.Transitions>
+  </Border>
+</Window>

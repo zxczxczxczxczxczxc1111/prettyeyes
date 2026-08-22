@@ -254,6 +254,9 @@ internal static class NativeMethods
     /// <summary>A window with this style is composited with an alpha of its own.</summary>
     internal const long WS_EX_LAYERED = 0x00080000;
 
+    /// <summary>The mouse looks straight through a window with this style.</summary>
+    internal const long WS_EX_TRANSPARENT = 0x00000020;
+
     /// <summary>Which of the two arguments below actually mean anything.</summary>
     internal const uint LWA_ALPHA = 0x00000002;
 
