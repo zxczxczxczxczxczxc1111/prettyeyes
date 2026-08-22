@@ -60,6 +60,30 @@
     <Setter Property="TextElement.Foreground" Value="{StaticResource TextStrong}"/>
   </Style>
 
+  <!-- A button that does something, as opposed to the bare-text ghost that
+       closes a window. Everything else on the settings page is a filled shape:
+       the hotkey fields, the tool icons, the counter tiles. Left as plain
+       words, the actions read as unfinished next to them, so they get the same
+       surface, the same border and the same radius - quietly, because they are
+       still the least important thing on the page. -->
+  <Style Selector=":is(Button).action">
+    <Setter Property="Background" Value="{StaticResource SurfaceRaised}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RField}"/>
+    <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    <Setter Property="Padding" Value="12,6"/>
+  </Style>
+
+  <Style Selector=":is(Button).action:pointerover">
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}"/>
+  </Style>
+
+  <Style Selector=":is(Button).action:pointerover /template/ ContentPresenter">
+    <Setter Property="Background" Value="{StaticResource Fill}"/>
+    <Setter Property="TextElement.Foreground" Value="{StaticResource TextStrong}"/>
+  </Style>
+
   <!-- The window close glyph: small enough not to argue with the title. -->
   <Style Selector=":is(Button).close">
     <Setter Property="FontSize" Value="11"/>
@@ -181,6 +205,27 @@
   <!-- The modal card: the same surface and hairline as the settings window
        itself, one step lighter so it reads as lying on top rather than as a
        hole cut in it. -->
+  <!-- A counter and the word for what it counts. The number gets the size and
+       the brightest ink we have, the caption gets the faintest: nobody reads
+       "в буфер" twice, and everybody reads the number every time. -->
+  <Style Selector="Border.tile">
+    <Setter Property="Background" Value="{StaticResource SurfaceRaised}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RField}"/>
+    <Setter Property="Padding" Value="12,10"/>
+  </Style>
+
+  <Style Selector="Border.tile TextBlock.value">
+    <Setter Property="FontSize" Value="20"/>
+    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+  </Style>
+
+  <Style Selector="Border.tile TextBlock.caption">
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="Foreground" Value="{StaticResource TextFaint}"/>
+  </Style>
+
   <Style Selector="Border.modalcard">
     <Setter Property="Background" Value="{StaticResource Surface}"/>
     <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}"/>

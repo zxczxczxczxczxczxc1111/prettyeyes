@@ -39,7 +39,7 @@
              things up and closed again, so it can afford the room; a setting
              that has to be hunted for is worse than a wide window. -->
         <Grid Margin="32,8,32,32" ColumnDefinitions="400,32,400" RowDefinitions="Auto,Auto">
-          <StackPanel Grid.Column="0" Grid.Row="0" Spacing="20">
+          <StackPanel Grid.Column="0" Grid.Row="0" Spacing="30">
             <StackPanel Spacing="12">
               <TextBlock Text="Скриншот" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
 
@@ -53,13 +53,17 @@
                 <controls:HotkeyBox x:Name="FullScreenHotkey" Classes="field" HorizontalAlignment="Stretch"/>
               </StackPanel>
 
-            </StackPanel>
+              <!-- Beside the two combinations it lists, rather than alone at the
+                   bottom of the other column: down there it was a section with a
+                   divider and a single button in it. -->
+              <Button x:Name="ShowKeys" Classes="action" Content="Все сочетания клавиш"
+                      HorizontalAlignment="Left" Margin="0,4,0,0"/>
 
-            <Rectangle Height="1" Fill="{StaticResource Border}"/>
+            </StackPanel>
 
             <StackPanel Spacing="12">
               <TextBlock Text="Панель инструментов" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
-              <TextBlock Text="Выключенное не появится в панели при выделении. Наведи, чтобы прочитать название. Уголок значит, что у иконки есть свои настройки."
+              <TextBlock Text="Выключенное не появится в панели при выделении. Наведи, чтобы прочитать название. Уголок значит, что у иконки есть свои настройки: правый клик по ней, здесь или в самой панели."
                          Foreground="{StaticResource TextFaint}" FontSize="11" TextWrapping="Wrap"/>
               <!-- The same icons the toolbar draws, in the same order, so the
                    setting is read as a picture of the toolbar rather than as a
@@ -82,7 +86,7 @@
 
           </StackPanel>
 
-          <StackPanel Grid.Column="2" Grid.Row="0" Spacing="20">
+          <StackPanel Grid.Column="2" Grid.Row="0" Spacing="30">
             <StackPanel Spacing="12">
               <TextBlock Text="Система" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
               <CheckBox x:Name="Autostart" Content="Запускать вместе с Windows"/>
@@ -91,7 +95,7 @@
               <!-- The button and what it found, side by side: a status line
                    somewhere else on the window belongs to no control. -->
               <Grid ColumnDefinitions="Auto,12,*">
-                <Button x:Name="CheckNow" Grid.Column="0" Classes="ghost" Content="Проверить сейчас"/>
+                <Button x:Name="CheckNow" Grid.Column="0" Classes="action" Content="Проверить сейчас"/>
                 <TextBlock x:Name="UpdateStatus" Grid.Column="2" VerticalAlignment="Center"
                            FontSize="12" TextWrapping="Wrap"
                            Foreground="{StaticResource TextDim}"/>
@@ -101,40 +105,44 @@
                    whether or not an update is: reading the notes is also how
                    somebody decides they do not want it. -->
               <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Left">
-                <Button x:Name="InstallUpdate" Classes="ghost" IsVisible="False"/>
-                <Button x:Name="OpenReleases" Classes="ghost" Content="Что нового"/>
+                <Button x:Name="InstallUpdate" Classes="action" IsVisible="False"/>
+                <Button x:Name="OpenReleases" Classes="action" Content="Что нового"/>
               </StackPanel>
 
               <TextBlock x:Name="CurrentVersion" Foreground="{StaticResource TextFaint}" FontSize="11"/>
             </StackPanel>
 
-            <Rectangle Height="1" Fill="{StaticResource Border}"/>
-
-            <!-- What the application is doing right now, in the plainest words
-                 it has. Here because the answer to "the yellow frame is back"
-                 or "the screenshot came out black" starts with which engine
-                 took it, and until now that lived only in the log file. -->
+            <!-- How much has happened. Nothing here is wrong or right. -->
             <StackPanel Spacing="12">
-              <TextBlock Text="Состояние" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
+              <TextBlock Text="Снимки" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
+              <StackPanel x:Name="Counters" Spacing="8"/>
+            </StackPanel>
 
-              <!-- Filled from code: the lines depend on how many monitors
-                   there are and on what has happened since start-up. -->
-              <StackPanel x:Name="Health" Spacing="6"/>
+            <!-- What used to be a whole block called "Состояние" and mostly
+                 restated the obvious: an application that runs is working, and
+                 the folder it saves into has a button to it right here. What
+                 stayed is the number somebody might genuinely want to see, plus
+                 a line that appears only when the capture is NOT fine - the
+                 answer to "the yellow frame is back" has to live somewhere
+                 outside the log file. -->
+            <StackPanel Spacing="12">
+              <TextBlock Text="Скорость" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
+
+              <!-- Filled from code: what it says depends on what has happened
+                   since start-up. -->
+              <StackPanel x:Name="Health" Spacing="8"/>
 
               <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Left">
-                <Button x:Name="OpenLog" Classes="ghost" Content="Журнал"/>
-                <Button x:Name="OpenShots" Classes="ghost" Content="Папка снимков"/>
-                <Button x:Name="ResetSettings" Classes="ghost" Content="Настройки по умолчанию"/>
+                <Button x:Name="OpenLog" Classes="action" Content="Журнал"/>
+                <Button x:Name="OpenShots" Classes="action" Content="Папка снимков"/>
               </StackPanel>
             </StackPanel>
 
-            <Rectangle Height="1" Fill="{StaticResource Border}"/>
-
-            <!-- The list of every shortcut, one click away and not on the page:
-                 the window is for changing things, and a table nobody reads
-                 twice would push the settings themselves down. -->
+            <!-- On its own, away from the two that merely open a folder: this
+                 one throws away everything the person set up. -->
             <StackPanel Spacing="8">
-              <Button x:Name="ShowKeys" Classes="ghost" Content="Все сочетания клавиш"/>
+              <Button x:Name="ResetSettings" Classes="action" Content="Настройки по умолчанию"
+                      HorizontalAlignment="Left"/>
             </StackPanel>
           </StackPanel>
 

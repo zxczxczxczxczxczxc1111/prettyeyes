@@ -213,27 +213,12 @@ public partial class SettingsWindow : Window
     {
         _services = services;
 
-        foreach (var (text, detail) in StateLines(services))
+        foreach (var (label, value, detail) in StateRows(services))
         {
-            var line = new TextBlock
-            {
-                Text = text,
-                FontSize = 12,
-                TextWrapping = TextWrapping.Wrap,
-                Foreground = (IBrush?)Application.Current?.FindResource("TextDim"),
-            };
-
-            if (detail is not null)
-            {
-                // The technical answer is one hover away and out of the way:
-                // the name of a capture API means nothing to the person using
-                // the application and everything to whoever gets asked about
-                // it later.
-                ToolTip.SetTip(line, detail);
-            }
-
-            Health.Children.Add(line);
+            Health.Children.Add(Row(label, value, detail));
         }
+
+        ShowCounters(services);
 
         OpenLog.Click += (_, _) => OpenPage(Log.DefaultPath);
         OpenShots.Click += (_, _) => OpenShotsFolder(services);
@@ -248,46 +233,171 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>
-    /// The lines under "Состояние", each with the technical detail that
-    /// belongs in a tooltip rather than on the page.
+    /// One row of "Состояние": what it is on the left, what it says on the
+    /// right. A column of "label: value" sentences in one size and one colour
+    /// is a wall of text, and this block used to be exactly that.
     /// </summary>
-    private static IEnumerable<(string Text, string? Detail)> StateLines(AppServices services)
+    private static Control Row(string label, string value, string? detail)
     {
-        if (services.Capture is DesktopCapture capture && capture.Painters.Count > 0)
+        var grid = new Grid
         {
-            yield return CaptureHealth(capture.Painters);
+            // Fixed, so every value in the block starts at the same place. A
+            // column sized to its content would jump about with whatever the
+            // longest label happened to be. 130 is the longest label we have
+            // plus a hair; the middle column is the gutter.
+            ColumnDefinitions = new ColumnDefinitions("130,12,*"),
+        };
 
-            if (capture.LastMilliseconds > 0)
-            {
-                yield return ($"Последний снимок: {capture.LastMilliseconds:F0} мс", null);
-            }
+        var name = new TextBlock
+        {
+            Text = label,
+            FontSize = 12,
+            Foreground = (IBrush?)Application.Current?.FindResource("TextFaint"),
+        };
+
+        var said = new TextBlock
+        {
+            Text = value,
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = (IBrush?)Application.Current?.FindResource("Text"),
+        };
+
+        Grid.SetColumn(said, 2);
+
+        if (detail is not null)
+        {
+            // The technical answer is one hover away and out of the way: the
+            // name of a capture API means nothing to the person using the
+            // application and everything to whoever gets asked about it later.
+            ToolTip.SetTip(said, detail);
         }
 
-        var shots = services.Shots.Current;
+        grid.Children.Add(name);
+        grid.Children.Add(said);
 
-        yield return shots.Total == 0
-            ? ("Снимков пока нет", null)
-            : ($"Снимков: {shots.Total}, за неделю {services.Shots.ThisWeek}", null);
-
-        if (shots.Total > 0)
-        {
-            yield return ($"Буфер {shots.ToClipboard}, файл {shots.ToFile}, закреплено {shots.ToPin}", null);
-        }
-
-        yield return services.Settings.Save?.Ready == true
-            ? ($"Быстрое сохранение: {services.Settings.Save.Folder}", null)
-            : ("Быстрое сохранение выключено", null);
+        return grid;
     }
 
     /// <summary>
-    /// Says what the person will notice, not which API took the picture.
+    /// How long the last screenshot took, and a warning when the capture is not
+    /// the good one.
+    ///
+    /// "Захват: в порядке" was cut on purpose: an application somebody is
+    /// looking at is evidently running, and a line that says so on every open
+    /// is noise. A capture that quietly fell back to another engine is not
+    /// obvious at all, though, so that line stayed - and only that one.
+    /// </summary>
+    private static IEnumerable<(string Label, string Value, string? Detail)> StateRows(AppServices services)
+    {
+        if (services.Capture is not DesktopCapture capture || capture.Painters.Count == 0)
+        {
+            yield break;
+        }
+
+        var (label, value, detail) = CaptureHealth(capture.Painters);
+
+        if (value is not null)
+        {
+            yield return (label, value, detail);
+        }
+
+        yield return capture.LastMilliseconds > 0
+            // The engine that took it hangs off this line now: it is the answer
+            // to "why is it suddenly slow", and it belongs next to the number
+            // rather than on a line of its own.
+            ? ("Последний снимок", $"{capture.LastMilliseconds:F0} мс", detail)
+            : ("Последний снимок", "ещё не было", detail);
+    }
+
+    /// <summary>
+    /// The counters as tiles. Four numbers in a row are read at a glance; the
+    /// same four as "Буфер 40, файл 41, закреплено 29" read as a telegram, and
+    /// broke the rhythm of every line around them.
+    /// </summary>
+    private void ShowCounters(AppServices services)
+    {
+        Counters.Children.Clear();
+
+        var shots = services.Shots.Current;
+
+        if (shots.Total == 0)
+        {
+            // Empty state on purpose: four zeroes in four boxes look like a
+            // dashboard nobody has plugged in yet.
+            Counters.Children.Add(new TextBlock
+            {
+                Text = "Снимков пока нет",
+                FontSize = 12,
+                Foreground = (IBrush?)Application.Current?.FindResource("TextFaint"),
+            });
+
+            return;
+        }
+
+        // Equal columns rather than a horizontal stack: tiles sized to their
+        // own text come out ragged, and "всего" against "закреплено" is nearly
+        // double. The odd columns are the gaps.
+        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,8,*,8,*,8,*") };
+
+        var counters = new[]
+        {
+            ("всего", shots.Total),
+            ("в буфер", shots.ToClipboard),
+            ("в файл", shots.ToFile),
+            ("закреплено", shots.ToPin),
+        };
+
+        for (var index = 0; index < counters.Length; index++)
+        {
+            var (caption, count) = counters[index];
+            var tile = Tile(caption, count);
+
+            Grid.SetColumn(tile, index * 2);
+            row.Children.Add(tile);
+        }
+
+        Counters.Children.Add(row);
+
+        // Only when it says something the total does not. On an application
+        // younger than a week the two numbers are equal, and printing both was
+        // the same fact twice.
+        if (services.Shots.ThisWeek != shots.Total)
+        {
+            Counters.Children.Add(new TextBlock
+            {
+                Text = $"за неделю {services.Shots.ThisWeek}",
+                FontSize = 11,
+                Foreground = (IBrush?)Application.Current?.FindResource("TextFaint"),
+            });
+        }
+    }
+
+    private static Control Tile(string caption, int count) => new Border
+    {
+        Classes = { "tile" },
+        Child = new StackPanel
+        {
+            Spacing = 2,
+            Children =
+            {
+                new TextBlock { Classes = { "value" }, Text = count.ToString() },
+                new TextBlock { Classes = { "caption" }, Text = caption },
+            },
+        },
+    };
+
+    /// <summary>
+    /// Says what the person will notice, not which API took the picture, and
+    /// says nothing at all when there is nothing to notice.
     ///
     /// Nobody outside this repository knows what output duplication is, and
     /// the line was written for its author rather than for its reader. What
     /// matters to a reader is whether Windows will draw its yellow frame and
-    /// whether video will come out black, so that is what it says now.
+    /// whether video will come out black, so that is what it says now - and
+    /// only when one of the two is actually true.
     /// </summary>
-    private static (string Text, string? Detail) CaptureHealth(IReadOnlyDictionary<string, string> painters)
+    private static (string Label, string? Value, string? Detail) CaptureHealth(IReadOnlyDictionary<string, string> painters)
     {
         var detail = string.Join(", ", painters
             .OrderBy(pair => pair.Key, StringComparer.Ordinal)
@@ -298,15 +408,17 @@ public partial class SettingsWindow : Window
 
         if (plain.Length > 0)
         {
-            return ("Захват: запасной способ, видео и игры выйдут чёрными", detail);
+            return ("Захват", "запасной способ, видео и игры выйдут чёрными", detail);
         }
 
         if (system.Length > 0)
         {
-            return ("Захват: запасной способ, по краю экрана бывает жёлтая рамка", detail);
+            return ("Захват", "запасной способ, по краю экрана бывает жёлтая рамка", detail);
         }
 
-        return ("Захват: в порядке", detail);
+        // Nothing to report. The row is skipped entirely rather than
+        // reassuring somebody who was not worried.
+        return ("Захват", null, detail);
     }
 
     /// <summary>
