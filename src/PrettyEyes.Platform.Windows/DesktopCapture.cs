@@ -25,6 +25,7 @@ public sealed class DesktopCapture : IScreenCapture, IDisposable
 
     private bool _disposed;
     private string _said = string.Empty;
+    private int _taken;
 
     public DesktopCapture(
         IMonitorEnumerator monitors,
@@ -95,7 +96,16 @@ public sealed class DesktopCapture : IScreenCapture, IDisposable
             ?? throw new InvalidOperationException("Skia rejected the captured pixel buffer.");
 
         whole.Stop();
-        LastMilliseconds = whole.Elapsed.TotalMilliseconds;
+
+        // The first capture of a run is the warm-up: the code is being
+        // compiled, the devices woken, the outputs found, and it costs seven
+        // times what the ones after it cost. Showing that number as "the last
+        // screenshot" would tell the user the application is slow when it is
+        // not.
+        if (_taken++ > 0)
+        {
+            LastMilliseconds = whole.Elapsed.TotalMilliseconds;
+        }
 
         return new CaptureResult(image, layout);
     }
