@@ -33,12 +33,12 @@ public sealed class PinnedWindows
     private readonly PinRegistry _registry = new();
 
     /// <summary>
-    /// How often the pins ask whether somebody else has taken over a whole
-    /// screen. A second is far below the time it takes a person to alt-tab into
-    /// a game, and the question is three system calls.
+    /// How often the pins ask whether a game has taken the screen exclusively.
+    /// A second is far below the time it takes a person to alt-tab into a game,
+    /// and the question is one system call.
     ///
     /// Asked on a timer rather than on a foreground event on purpose: an
-    /// application can go full screen without ever changing which window is in
+    /// application takes the screen without ever changing which window is in
     /// front, and alt-enter in a game does exactly that.
     /// </summary>
     private static readonly TimeSpan Watch = TimeSpan.FromSeconds(1);
@@ -276,7 +276,7 @@ public sealed class PinnedWindows
 
         _watch.Tick += (_, _) =>
         {
-            var covered = ForegroundWindow.CoversAScreen();
+            var covered = FullScreenApp.TakesTheScreen();
 
             if (covered == _yielded)
             {
@@ -291,7 +291,7 @@ public sealed class PinnedWindows
             }
 
             Log.Default.Info(covered
-                ? "закреплённые уступили полноэкранному окну"
+                ? "закреплённые уступили монопольному полноэкранному режиму"
                 : "закреплённые вернулись поверх окон");
         };
 

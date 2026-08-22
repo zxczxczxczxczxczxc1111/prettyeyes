@@ -291,24 +291,12 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint affinity);
 
-    [DllImport("user32.dll")]
-    internal static extern IntPtr GetForegroundWindow();
-
-    [DllImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    internal static extern bool GetWindowRect(IntPtr window, out Rect rect);
-
-    [DllImport("user32.dll")]
-    internal static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
-
-    /// <summary>Nearest monitor, so a window half off the desktop still answers.</summary>
-    internal const uint MONITOR_DEFAULTTONEAREST = 2;
-
-    [DllImport("user32.dll")]
-    internal static extern IntPtr MonitorFromWindow(IntPtr window, uint flags);
-
-    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-    internal static extern int GetClassName(IntPtr window, System.Text.StringBuilder name, int count);
+    /// <summary>
+    /// What the shell would do with a notification right now. The one answer we
+    /// care about is "a Direct3D application owns the screen"; see FullScreenApp.
+    /// </summary>
+    [DllImport("shell32.dll")]
+    internal static extern int SHQueryUserNotificationState(out int state);
 
     [DllImport("kernel32.dll")]
     internal static extern IntPtr GetCurrentProcess();
