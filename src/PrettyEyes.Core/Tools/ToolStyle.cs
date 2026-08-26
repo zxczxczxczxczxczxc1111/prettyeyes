@@ -28,6 +28,11 @@ public enum TextBackdrop
 /// FontFamily is null for "whatever this machine calls its interface font":
 /// storing the resolved name would pin a screenshot to the machine it was
 /// taken on.
+///
+/// FreehandArrow is a mode of the arrow rather than a tool of its own: the
+/// toolbar stays eight buttons wide, the visibility settings keep meaning what
+/// they meant, and a file written before this field still opens as a straight
+/// arrow, which is what every version so far drew.
 /// </summary>
 public sealed record ToolStyle(
     uint Color,
@@ -35,7 +40,8 @@ public sealed record ToolStyle(
     string? FontFamily = null,
     int FontSize = ToolStyle.DefaultFontSize,
     TextBackdrop TextBackdrop = TextBackdrop.Plate,
-    int TextPadding = ToolStyle.DefaultTextPadding)
+    int TextPadding = ToolStyle.DefaultTextPadding,
+    bool FreehandArrow = false)
 {
     /// <summary>Where a label starts before the wheel touches it.</summary>
     public const int DefaultFontSize = 18;

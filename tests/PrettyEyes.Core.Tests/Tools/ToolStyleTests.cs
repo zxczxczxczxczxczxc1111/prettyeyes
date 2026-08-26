@@ -1,3 +1,4 @@
+using System.Text.Json;
 using PrettyEyes.Core.Annotations;
 using PrettyEyes.Core.Tools;
 using Xunit;
@@ -93,6 +94,23 @@ public class ToolStyleTests
     {
         Assert.Equal(8, Palette.All.Count);
         Assert.Equal(Palette.Carmine, Palette.All[0]);
+    }
+
+    [Fact]
+    public void A_style_written_before_the_arrow_had_modes_is_a_straight_arrow()
+    {
+        // Exactly what the released build writes: six properties and no mode at
+        // all. Read back, it has to mean the arrow everyone has been drawing,
+        // not a silently freehand one.
+        const string Released =
+            """{"Color":4278190080,"Size":1,"FontFamily":null,"FontSize":18,"TextBackdrop":0,"TextPadding":4}""";
+
+        var style = JsonSerializer.Deserialize<ToolStyle>(Released);
+
+        Assert.NotNull(style);
+        Assert.False(style!.FreehandArrow);
+        Assert.Equal(4278190080u, style.Color);
+        Assert.Equal(StrokeSize.Medium, style.Size);
     }
 
     private static CaptureRectangle Describe(PrettyEyes.Core.Model.IAnnotation annotation) =>

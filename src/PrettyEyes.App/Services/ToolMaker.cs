@@ -25,7 +25,7 @@ public static class ToolMaker
         ToolKind kind, ToolStyles styles, CaptureRect limit, Func<SKImage?> glyph) => kind switch
     {
         ToolKind.Blur => new BlurTool(),
-        ToolKind.Arrow => new ArrowTool(styles.For(kind)),
+        ToolKind.Arrow => Arrow(styles.For(kind)),
         ToolKind.Line => new LineTool(styles.For(kind)),
         ToolKind.Rectangle => new RectangleTool(styles.For(kind)),
         ToolKind.Pencil => new StrokeTool(styles.For(kind)),
@@ -35,4 +35,12 @@ public static class ToolMaker
             limit),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown tool."),
     };
+
+    /// <summary>
+    /// The only tool with a mood. Read here rather than in the toolbar: the
+    /// overlay and a pinned window both arm tools through this class, and a
+    /// check copied into both is a check one of them forgets.
+    /// </summary>
+    private static ITool Arrow(ToolStyle style) =>
+        style.FreehandArrow ? new FreehandArrowTool(style) : new ArrowTool(style);
 }
