@@ -161,7 +161,7 @@
            it sits beside the first line of the right column, where the eye
            already is. The file itself is cropped to the ink for the same
            reason. -->
-      <Image Source="/Assets/logo.png" Height="72" Opacity="0.85"
+      <Image x:Name="FlavourLogo" Height="72" Opacity="0.85"
              Margin="0,58,28,0" IsHitTestVisible="False"
              HorizontalAlignment="Right" VerticalAlignment="Top"/>
 

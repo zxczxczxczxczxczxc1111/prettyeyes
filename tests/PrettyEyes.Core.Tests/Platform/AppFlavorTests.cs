@@ -43,6 +43,7 @@ public class AppFlavorTests
         Assert.NotEqual(release.AppUserModelId, check.AppUserModelId);
         Assert.NotEqual(release.AutostartValueName, check.AutostartValueName);
         Assert.NotEqual(release.IconAsset, check.IconAsset);
+        Assert.NotEqual(release.LogoAsset, check.LogoAsset);
     }
 
     [Fact]

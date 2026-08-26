@@ -13,6 +13,8 @@ from PIL import Image
 sys.stdout.reconfigure(encoding="utf-8")
 
 SRC = r"src\PrettyEyes.App\Assets\prettyeyes.ico"
+LOGO_SRC = r"src\PrettyEyes.App\Assets\logo.png"
+LOGO_OUT = r"src\PrettyEyes.App\Assets\logo-check.png"
 OUT = [r"src\PrettyEyes.App\Assets\prettyeyes-check.ico", r"prettyeyes-check.ico"]
 SIZES = [(16, 16), (20, 20), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)]
 
@@ -45,6 +47,11 @@ def main():
     for path in OUT:
         frames[-1].save(path, format="ICO", sizes=SIZES, append_images=frames[:-1])
         print("written:", path)
+
+    # The settings window shows a big eye of its own, and it is a PNG rather
+    # than the icon: left alone, the check build wears a purple logo.
+    recolour(Image.open(LOGO_SRC).convert("RGBA")).save(LOGO_OUT)
+    print("written:", LOGO_OUT)
 
 
 if __name__ == "__main__":

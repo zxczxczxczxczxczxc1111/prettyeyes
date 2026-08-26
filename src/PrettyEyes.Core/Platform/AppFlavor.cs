@@ -16,6 +16,7 @@ public sealed record AppFlavor(
     string AppUserModelId,
     string AutostartValueName,
     string IconAsset,
+    string LogoAsset,
     bool UpdatesAllowed)
 {
     /// <summary>What the build script writes into the assembly.</summary>
@@ -30,6 +31,7 @@ public sealed record AppFlavor(
         AppUserModelId: "prettyeyes.app",
         AutostartValueName: "prettyeyes",
         IconAsset: "avares://PrettyEyes.App/Assets/prettyeyes.ico",
+        LogoAsset: "avares://PrettyEyes.App/Assets/logo.png",
         UpdatesAllowed: true);
 
     public static AppFlavor Check { get; } = new(
@@ -39,6 +41,7 @@ public sealed record AppFlavor(
         AppUserModelId: "prettyeyes.check",
         AutostartValueName: "prettyeyes-check",
         IconAsset: "avares://PrettyEyes.App/Assets/prettyeyes-check.ico",
+        LogoAsset: "avares://PrettyEyes.App/Assets/logo-check.png",
         UpdatesAllowed: false);
 
     /// <summary>What this running build is, decided once at start-up.</summary>

@@ -176,6 +176,7 @@ public partial class SettingsWindow : Window
         Icon = new WindowIcon(flavourIcon);
         Title = AppFlavor.Current.DisplayName;
         HeaderTitle.Text = AppFlavor.Current.DisplayName;
+        FlavourLogo.Source = new Bitmap(AssetLoader.Open(new Uri(AppFlavor.Current.LogoAsset)));
 
         CurrentVersion.Text = $"установлена {BuildLabel.Current}";
 
