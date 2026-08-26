@@ -18,6 +18,19 @@ namespace PrettyEyes.App;
 public partial class App : Application
 {
     private OverlaySession? _session;
+
+    /// <summary>
+    /// A whole-monitor shot is in flight.
+    ///
+    /// Windows repeats a held hotkey, and nothing here used to serialise the
+    /// repeats: every one of them takes a fresh whole-desktop frame, 28 MB on
+    /// two 2K monitors, renders it and writes it out. Held down, that piles up
+    /// faster than it drains and takes the machine with it - reported live
+    /// 26.08.2026, and it needed a reboot. The region hotkey never had this
+    /// problem: a second press with an overlay already up means "let me pick
+    /// again" and costs a Restart.
+    /// </summary>
+    private bool _shooting;
     private SettingsWindow? _settings;
     private TrayMenuWindow? _menu;
 
@@ -193,11 +206,30 @@ public partial class App : Application
         _session.Start(capture);
     }
 
+    private async Task CaptureMonitorAsync()
+    {
+        if (Services is null || _shooting)
+        {
+            return;
+        }
+
+        _shooting = true;
+
+        try
+        {
+            await ShootMonitorAsync();
+        }
+        finally
+        {
+            _shooting = false;
+        }
+    }
+
     /// <summary>
     /// Whole monitor under the cursor, straight to the clipboard. No overlay:
     /// the point of this hotkey is that nothing gets in the way.
     /// </summary>
-    private async Task CaptureMonitorAsync()
+    private async Task ShootMonitorAsync()
     {
         if (Services is null)
         {
