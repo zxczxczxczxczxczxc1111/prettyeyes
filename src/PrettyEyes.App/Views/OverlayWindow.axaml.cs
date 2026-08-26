@@ -108,7 +108,12 @@ public partial class OverlayWindow : Window
 
         _gesture = new DrawingGesture(
             ToVirtualPixels,
-            Surface.ShowPreview,
+            // Not straight onto this window's canvas. The gesture belongs to
+            // the window the press landed on, and that window covers one
+            // monitor: drawn locally, everything past the seam stayed invisible
+            // until the stroke was let go. The session hands it to every window
+            // the shape reaches, the way it already does for a text label.
+            preview => PreviewChanged?.Invoke(this, preview),
             () => _selection,
             () => _document,
             () => ToolFactory?.Invoke());
@@ -219,7 +224,18 @@ public partial class OverlayWindow : Window
     /// The label being typed, drawn above the document like any other preview.
     /// Nothing here reaches the screenshot until the session commits it.
     /// </summary>
-    public void ShowTextPreview(IAnnotation? preview) => Surface.ShowPreview(preview);
+    /// <summary>
+    /// The half-finished shape this window should be showing, as the session
+    /// decided. Null means the shape does not reach this monitor at all.
+    /// </summary>
+    public void ShowPreview(IAnnotation? preview) => Surface.ShowPreview(preview);
+
+    /// <summary>
+    /// A tool gesture has a new half-finished shape. Raised rather than drawn,
+    /// because a shape can straddle two monitors and this window is only one of
+    /// them.
+    /// </summary>
+    public event EventHandler<IAnnotation?>? PreviewChanged;
 
     /// <summary>
     /// Whether this is the window the caret is in. Switching it off drops back

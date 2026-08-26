@@ -97,6 +97,7 @@ public sealed class OverlaySession
             window.SelectionRestarted += OnSelectionRestarted;
             window.Cancelled += OnCancelled;
             window.UndoRequested += OnUndoRequested;
+            window.PreviewChanged += OnPreviewChanged;
             window.AnnotationDrawn += OnAnnotationDrawn;
             window.AnnotationMoved += OnAnnotationMoved;
             window.AnnotationResized += OnAnnotationResized;
@@ -169,6 +170,7 @@ public sealed class OverlaySession
         window.SelectionRestarted -= OnSelectionRestarted;
         window.Cancelled -= OnCancelled;
         window.UndoRequested -= OnUndoRequested;
+        window.PreviewChanged -= OnPreviewChanged;
         window.AnnotationDrawn -= OnAnnotationDrawn;
         window.AnnotationMoved -= OnAnnotationMoved;
         window.AnnotationResized -= OnAnnotationResized;
@@ -801,25 +803,35 @@ public sealed class OverlaySession
         {
             foreach (var window in _windows)
             {
-                window.ShowTextPreview(null);
+                window.ShowPreview(null);
             }
 
             return;
         }
 
-        ShowTextAcross(new TextPreview(typing.Label, typing.Editor, typing.CaretOn));
+        ShowPreviewAcross(new TextPreview(typing.Label, typing.Editor, typing.CaretOn));
     }
 
     /// <summary>
-    /// Puts a preview on every window whose monitor it reaches, not only on the
-    /// one holding the caret. Each canvas clips to its own monitor, so a label
-    /// straddling the boundary is drawn in halves by two windows - which is
-    /// exactly how a committed annotation already behaves.
-    ///
-    /// Found live: typing across the seam cut the label mid-word, and it only
-    /// became whole again on commit.
+    /// A tool gesture has a new half-finished shape. It belongs to the window
+    /// the press landed on, but not to that window's monitor alone.
     /// </summary>
-    private void ShowTextAcross(IAnnotation? preview)
+    private void OnPreviewChanged(object? sender, IAnnotation? preview) =>
+        ShowPreviewAcross(preview);
+
+    /// <summary>
+    /// Puts a preview on every window whose monitor it reaches, not only on the
+    /// one that owns the gesture. Each canvas clips to its own monitor, so a
+    /// shape straddling the boundary is drawn in halves by two windows - which
+    /// is exactly how a committed annotation already behaves.
+    ///
+    /// Found live twice, and the second time hurt more. First typing across the
+    /// seam cut the label mid-word; that was fixed here for the label alone,
+    /// while every drawing tool kept previewing into one window. A stroke that
+    /// crossed the seam simply vanished until it was let go, which reads as the
+    /// tool having stopped working.
+    /// </summary>
+    private void ShowPreviewAcross(IAnnotation? preview)
     {
         for (var i = 0; i < _windows.Count; i++)
         {
@@ -827,7 +839,7 @@ public sealed class OverlaySession
                 && _layout is not null
                 && !_layout.Monitors[i].Bounds.Intersect(preview.Bounds).IsEmpty;
 
-            _windows[i].ShowTextPreview(reaches ? preview : null);
+            _windows[i].ShowPreview(reaches ? preview : null);
         }
     }
 
@@ -839,7 +851,7 @@ public sealed class OverlaySession
     {
         // Dragged across the seam like anything else, so it goes through the
         // same door as the label preview.
-        ShowTextAcross(box.IsEmpty
+        ShowPreviewAcross(box.IsEmpty
             ? null
             : new RectangleAnnotation(box, _styles.For(ToolKind.Text).Color, 1f));
     }
@@ -1116,7 +1128,7 @@ public sealed class OverlaySession
 
         foreach (var window in _windows)
         {
-            window.ShowTextPreview(null);
+            window.ShowPreview(null);
             window.SetTyping(false);
             window.SetToolActive(_activeTool is not null);
         }
