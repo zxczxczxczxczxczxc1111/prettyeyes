@@ -5,7 +5,13 @@
     <!-- Follows PrettyEyes.Platform.Windows: a neutral TFM cannot reference it. -->
     <TargetFramework>net10.0-windows10.0.22621.0</TargetFramework>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <ApplicationIcon>Assets\prettyeyes.ico</ApplicationIcon>
+    <!-- The check build is the same code with a different identity. Anything
+         other than "check" leaves this a release build, so a typo in the flag
+         cannot produce a half-check binary. Declared above the icon lines
+         because conditions are evaluated in file order. -->
+    <BuildFlavor Condition="'$(BuildFlavor)' == ''">release</BuildFlavor>
+    <ApplicationIcon Condition="'$(BuildFlavor)' != 'check'">Assets\prettyeyes.ico</ApplicationIcon>
+    <ApplicationIcon Condition="'$(BuildFlavor)' == 'check'">Assets\prettyeyes-check.ico</ApplicationIcon>
     <!-- The pixel copy is a tight loop over 3.7 million pixels, and the quick
          JIT compiles it without optimisations the first few times: measured 61
          ms against 15 ms once the real compiler caught up. Nothing here starts
@@ -27,6 +33,14 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets/**"/>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The tray icon is pulled out of the executable itself, so the icon above
+         covers the tray, the taskbar and the installed programs list. It does
+         NOT cover the settings window, which loads its icon as an Avalonia
+         resource; that one is set from code. -->
+    <AssemblyMetadata Include="BuildFlavor" Value="$(BuildFlavor)" />
   </ItemGroup>
 
   <ItemGroup>
