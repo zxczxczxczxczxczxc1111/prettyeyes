@@ -31,11 +31,17 @@ public sealed class FreehandArrowTool : ITool
         _points.Add((x, y));
     }
 
-    public IAnnotation? Preview(int x, int y) => Build(x, y);
+    public IAnnotation? Preview(int x, int y) => Build(x, y, head: false);
 
-    public IAnnotation? End(int x, int y) => Build(x, y);
+    public IAnnotation? End(int x, int y) => Build(x, y, head: true);
 
-    private IAnnotation? Build(int x, int y)
+    /// <param name="head">
+    /// Whether the arrowhead goes on. It only ever does at the end of the
+    /// gesture: recomputed on every pointer move it spins on the spot while a
+    /// slow hand is still approaching, which is exactly when somebody is aiming
+    /// at something small.
+    /// </param>
+    private IAnnotation? Build(int x, int y, bool head)
     {
         if (_points.Count == 0)
         {
@@ -56,6 +62,6 @@ public sealed class FreehandArrowTool : ITool
         // blot this tool refuses to draw.
         return _points.Count < 2
             ? null
-            : new FreehandArrowAnnotation(_points, _style.Color, _style.StrokeWidth);
+            : new FreehandArrowAnnotation(_points, _style.Color, _style.StrokeWidth, head);
     }
 }

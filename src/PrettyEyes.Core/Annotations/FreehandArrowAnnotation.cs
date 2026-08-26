@@ -18,9 +18,20 @@ public sealed class FreehandArrowAnnotation : IAnnotation
     private readonly uint _color;
     private readonly float _strokeWidth;
 
+    /// <summary>
+    /// Whether this one is finished enough to wear a head.
+    ///
+    /// Named for permission rather than for fact: a head is drawn when this is
+    /// true <b>and</b> the gesture turned out to have a direction, so a
+    /// three-pixel stroke has the flag up and no head at all.
+    /// </summary>
+    public bool HeadAllowed { get; }
+
     public FreehandArrowAnnotation(
-        IReadOnlyList<(int X, int Y)> points, uint color, float strokeWidth)
+        IReadOnlyList<(int X, int Y)> points, uint color, float strokeWidth, bool headAllowed = true)
     {
+        HeadAllowed = headAllowed;
+
         _x = new int[points.Count];
         _y = new int[points.Count];
 
@@ -127,7 +138,7 @@ public sealed class FreehandArrowAnnotation : IAnnotation
 
         canvas.DrawPath(path, paint);
 
-        if (HeadAngle(_x, _y) is { } angle)
+        if (HeadAllowed && HeadAngle(_x, _y) is { } angle)
         {
             ArrowHead.Draw(canvas, paint, _x[^1], _y[^1], angle, _strokeWidth);
         }

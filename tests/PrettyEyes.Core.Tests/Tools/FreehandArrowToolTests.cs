@@ -53,6 +53,41 @@ public class FreehandArrowToolTests
     }
 
     [Fact]
+    public void The_head_waits_until_the_gesture_is_over()
+    {
+        // Recomputed on every pointer move, the head spins on the spot while a
+        // slow hand is still approaching the target. Drawing it once, at the
+        // end, is the whole fix for that.
+        var tool = new FreehandArrowTool();
+        tool.Begin(0, 0);
+
+        var midway = Assert.IsType<FreehandArrowAnnotation>(tool.Preview(60, 0));
+        var finished = Assert.IsType<FreehandArrowAnnotation>(tool.End(120, 0));
+
+        Assert.False(midway.HeadAllowed);
+        Assert.True(finished.HeadAllowed);
+    }
+
+    [Fact]
+    public void The_preview_and_the_finished_arrow_cover_the_same_ground()
+    {
+        // The padding must not follow the flag: tie it to "has a head" and the
+        // bounds jump on release, which the neighbouring monitor sees as a
+        // strip that never got repainted.
+        var drawing = new FreehandArrowTool();
+        drawing.Begin(0, 0);
+        drawing.Preview(60, 0);
+        var midway = drawing.Preview(120, 0)!;
+
+        var same = new FreehandArrowTool();
+        same.Begin(0, 0);
+        same.Preview(60, 0);
+        var finished = same.End(120, 0)!;
+
+        Assert.Equal(finished.Bounds, midway.Bounds);
+    }
+
+    [Fact]
     public void The_style_decides_the_width()
     {
         var thin = new FreehandArrowTool(ToolStyle.Default.WithWidth(2));
