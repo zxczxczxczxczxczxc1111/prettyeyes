@@ -33,14 +33,14 @@ public partial class FlashWindow : Window
         var window = new FlashWindow();
 
         window.Position = new PixelPoint(monitor.X, monitor.Y);
-        window.Width = monitor.Width;
-        window.Height = monitor.Height;
+        window.Fit(monitor);
 
         window.Show();
 
         // Again after Show: a window moved onto a monitor with a different
         // scale only learns the new scale once it is there.
         window.Position = new PixelPoint(monitor.X, monitor.Y);
+        window.Fit(monitor);
 
         var handle = window.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
 
@@ -57,5 +57,24 @@ public partial class FlashWindow : Window
         // climbing to a seventh of its brightness and was then told to go back.
         DispatcherTimer.RunOnce(() => window.Frame.Opacity = 0, Lit);
         DispatcherTimer.RunOnce(window.Close, Lit + Fade);
+    }
+
+    /// <summary>
+    /// One pixel short of the monitor, for the same reason OverlayWindow.Resize
+    /// is: a window covering a monitor exactly is a game as far as Windows is
+    /// concerned, and the shell reacts to it. Reported live 26.08.2026 as the
+    /// taskbar going black for the length of the flash, which is the same trap
+    /// the overlay was pulled out of and this window never was.
+    ///
+    /// In logical units, because that is what Width and Height are. Setting raw
+    /// pixels here worked only at 100%; anywhere above it the frame was drawn
+    /// larger than the monitor it was supposed to outline.
+    /// </summary>
+    private void Fit(CaptureRect monitor)
+    {
+        var scale = RenderScaling;
+
+        Width = monitor.Width / scale;
+        Height = (monitor.Height - 1) / scale;
     }
 }
