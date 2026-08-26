@@ -1,4 +1,4 @@
-using PrettyEyes.Core.Annotations;
+﻿using PrettyEyes.Core.Annotations;
 using Xunit;
 
 namespace PrettyEyes.Core.Tests.Annotations;
@@ -8,11 +8,10 @@ public class FreehandArrowAnnotationTests
     [Fact]
     public void The_head_points_the_way_the_line_arrived()
     {
-        // Straight to the right: the head has to face east, which is angle zero.
         int[] x = [0, 40, 80, 120];
         int[] y = [10, 10, 10, 10];
 
-        var angle = FreehandArrowAnnotation.HeadAngle(x, y, strokeWidth: 3f);
+        var angle = FreehandArrowAnnotation.HeadAngle(x, y);
 
         Assert.NotNull(angle);
         Assert.Equal(0, angle!.Value, precision: 3);
@@ -21,27 +20,65 @@ public class FreehandArrowAnnotationTests
     [Fact]
     public void A_shaking_hand_at_the_end_does_not_spin_the_head()
     {
-        // The last two points are a millimetre of tremor pointing north, and
-        // the segment between them is the whole direction a naive reading
-        // would use. The line arrived from the west and the head has to say so.
-        int[] x = [0, 40, 80, 120, 120];
-        int[] y = [10, 10, 10, 10, 8];
+        // The complaint itself: drawing slowly towards something small. Points
+        // land two pixels apart, which is as close together as the tool keeps
+        // them, and the hand wanders a pixel either way the whole time. On the
+        // old rule a thin line read its direction off four pixels of this and
+        // came out up to 45 degrees off.
+        var x = new List<int>();
+        var y = new List<int>();
 
-        var angle = FreehandArrowAnnotation.HeadAngle(x, y, strokeWidth: 3f);
+        for (var i = 0; i <= 60; i++)
+        {
+            x.Add(i * 2);
+            y.Add(i % 2 == 0 ? 1 : -1);
+        }
+
+        var angle = FreehandArrowAnnotation.HeadAngle(x, y);
 
         Assert.NotNull(angle);
-        Assert.True(Math.Abs(angle!.Value) < 0.35, $"голова смотрит в {angle.Value} рад");
+        Assert.True(Math.Abs(angle!.Value) < 0.12, $"голова смотрит в {angle.Value} рад");
     }
 
     [Fact]
-    public void A_stroke_shorter_than_the_head_gets_no_head()
+    public void One_big_slip_at_the_very_end_still_tilts_the_head_a_little()
     {
-        // Three pixels of movement is a dot, and a dot with an arrowhead on it
-        // is a blot: nothing in it says which way it points.
+        // Not a regression, a limit worth writing down. The line runs east and
+        // the hand slips eight pixels sideways on the last sample: the last
+        // segment alone points 76 degrees off, and that segment used to be the
+        // whole answer. Over a tail it comes to 20, because the tip is that
+        // stray point and the head is anchored to it. Only a flick does this;
+        // the slow drawing this change is about is the test above.
+        int[] x = [0, 20, 40, 60, 62];
+        int[] y = [0, 0, 0, 0, 8];
+
+        var angle = FreehandArrowAnnotation.HeadAngle(x, y);
+
+        Assert.NotNull(angle);
+        Assert.True(Math.Abs(angle!.Value) < 0.40, $"голова смотрит в {angle.Value} рад");
+    }
+
+    [Fact]
+    public void A_short_but_deliberate_arrow_still_gets_a_head()
+    {
+        // Twelve pixels is shorter than the tail and much shorter than a thick
+        // arrow's head. It is still an arrow somebody drew on purpose, and the
+        // old rule - no head unless the stroke beats four times the width -
+        // left a fat short arrow with no head at all.
+        int[] x = [0, 4, 8, 12];
+        int[] y = [0, 0, 0, 0];
+
+        Assert.NotNull(FreehandArrowAnnotation.HeadAngle(x, y));
+    }
+
+    [Fact]
+    public void A_stroke_too_short_to_have_a_direction_gets_no_head()
+    {
+        // Three pixels is a dot, and a dot with an arrowhead on it is a blot.
         int[] x = [0, 2, 3];
         int[] y = [0, 0, 1];
 
-        Assert.Null(FreehandArrowAnnotation.HeadAngle(x, y, strokeWidth: 3f));
+        Assert.Null(FreehandArrowAnnotation.HeadAngle(x, y));
     }
 
     [Fact]
@@ -50,12 +87,12 @@ public class FreehandArrowAnnotationTests
         // Reachable: the method is public so the angle can be checked without a
         // canvas, and a caller with an empty gesture would otherwise index off
         // the end of the array.
-        Assert.Null(FreehandArrowAnnotation.HeadAngle([], [], strokeWidth: 3f));
-        Assert.Null(FreehandArrowAnnotation.HeadAngle([5], [5], strokeWidth: 3f));
+        Assert.Null(FreehandArrowAnnotation.HeadAngle([], []));
+        Assert.Null(FreehandArrowAnnotation.HeadAngle([5], [5]));
 
         // Mismatched lengths mean somebody built the arrays wrong; answering
         // "no direction" beats indexing into the shorter one.
-        Assert.Null(FreehandArrowAnnotation.HeadAngle([0, 50], [0], strokeWidth: 3f));
+        Assert.Null(FreehandArrowAnnotation.HeadAngle([0, 50], [0]));
     }
 
     [Fact]

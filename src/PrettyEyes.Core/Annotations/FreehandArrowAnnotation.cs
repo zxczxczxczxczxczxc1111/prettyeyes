@@ -49,39 +49,67 @@ public sealed class FreehandArrowAnnotation : IAnnotation
     public CaptureRect Bounds { get; }
 
     /// <summary>
+    /// How far back the direction is measured.
+    ///
+    /// Fixed, and deliberately not tied to the stroke width: a hand shakes by
+    /// the same couple of pixels whether the line is a hairline or a band, and
+    /// the old rule of four times the width gave a thin arrow four pixels of
+    /// shaky input to decide on - up to 45 degrees off at the ninety-fifth
+    /// percentile. Twenty came out of measuring three ways of drawing:
+    /// straight, curving into the target, and slowing down to aim. Past
+    /// twenty-four a straight line keeps getting steadier while a curve starts
+    /// lagging, which points the head away from what the hand was aiming at.
+    /// </summary>
+    public const int TailLength = 20;
+
+    /// <summary>
+    /// How far the tip has to be from the far end of the tail before a head is
+    /// drawn at all. Below this the gesture is a dot, and a dot with an
+    /// arrowhead on it is a blot. Absolute rather than a multiple of the width,
+    /// because a fat arrow a hundred pixels long is still an arrow.
+    /// </summary>
+    public const int MinHeadStroke = 8;
+
+    /// <summary>
     /// Which way the head faces, or null when the gesture is too short to have
     /// a direction at all.
     ///
-    /// Deliberately not the angle of the last segment. The last two points are
-    /// a couple of pixels apart - that is the hand, not the intent - and a head
-    /// built on them spins on the spot. The direction is measured from the last
-    /// point that sits a whole head-length away from the tip, which is the same
-    /// distance the head itself occupies.
+    /// Not the angle of the last segment: the last samples of a slow stroke are
+    /// the hand rather than the intent, and at two pixels apart they decide
+    /// nothing worth following. Averaging the tail was measured and dropped -
+    /// against a slow tremor, which is how a hand actually shakes, it is no
+    /// better than this and worse over a short tail.
     /// </summary>
-    public static double? HeadAngle(IReadOnlyList<int> x, IReadOnlyList<int> y, float strokeWidth)
+    public static double? HeadAngle(IReadOnlyList<int> x, IReadOnlyList<int> y)
     {
         if (x.Count < 2 || x.Count != y.Count)
         {
             return null;
         }
 
-        var reach = ArrowHead.Length(strokeWidth);
         var tipX = x[^1];
         var tipY = y[^1];
+        var from = 0;
 
+        // Walk back until the tail is long enough, or until the stroke runs
+        // out - a short arrow uses all of itself rather than going without.
         for (var i = x.Count - 2; i >= 0; i--)
         {
-            var dx = tipX - x[i];
-            var dy = tipY - y[i];
+            from = i;
 
-            if ((dx * dx) + (dy * dy) >= reach * reach)
+            if (Distance(tipX - x[i], tipY - y[i]) >= TailLength)
             {
-                return Math.Atan2(dy, dx);
+                break;
             }
         }
 
-        return null;
+        var dx = tipX - x[from];
+        var dy = tipY - y[from];
+
+        return Distance(dx, dy) < MinHeadStroke ? null : Math.Atan2(dy, dx);
     }
+
+    private static double Distance(int dx, int dy) => Math.Sqrt((dx * dx) + (dy * dy));
 
     public void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin, BlurCache cache)
     {
@@ -99,7 +127,7 @@ public sealed class FreehandArrowAnnotation : IAnnotation
 
         canvas.DrawPath(path, paint);
 
-        if (HeadAngle(_x, _y, _strokeWidth) is { } angle)
+        if (HeadAngle(_x, _y) is { } angle)
         {
             ArrowHead.Draw(canvas, paint, _x[^1], _y[^1], angle, _strokeWidth);
         }
