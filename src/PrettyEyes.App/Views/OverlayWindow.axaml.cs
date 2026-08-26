@@ -6,7 +6,6 @@ using Avalonia.Rendering.Composition;
 using Avalonia.Threading;
 using PrettyEyes.App.Controls;
 using PrettyEyes.Core.Annotations;
-using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Rendering;
@@ -565,14 +564,10 @@ public partial class OverlayWindow : Window
         // out clipped. Copying a colour is where that shows: the reading goes
         // from a pair of coordinates to a hex code plus a word.
         //
-        // TEMPORARY: logged only when the two disagree, which is the signature
-        // of the clipping and nothing else. Remove once the fix is confirmed.
-        if (Math.Abs(Loupe.Bounds.Width - Loupe.DesiredSize.Width) > 0.5)
-        {
-            Log.Default.Info(
-                $"плитка: отведено {Loupe.Bounds.Width:F0}, нужно {Loupe.DesiredSize.Width:F0}");
-        }
-
+        // Measured 26.08.2026 before this line existed: the two disagreed on
+        // 407 pointer moves in one session, by one or two pixels each time as
+        // the coordinates changed width. Small enough to go unnoticed for
+        // years, and the same lag is what swallowed half of "скопирован".
         Loupe.Arrange(new Rect(Loupe.DesiredSize));
 
         var scale = RenderScaling;
