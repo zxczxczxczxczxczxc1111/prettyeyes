@@ -233,14 +233,14 @@ public class JsonSettingsStoreTests
         {
             ToolStyles = new Dictionary<ToolKind, ToolStyle>
             {
-                [ToolKind.Arrow] = new(Palette.Blue, StrokeSize.Large),
+                [ToolKind.Arrow] = ToolStyle.Default.WithWidth(40) with { Color = Palette.Blue },
             },
         });
 
         var loaded = new ToolStyles(store.Load().ToolStyles!);
 
         Assert.Equal(Palette.Blue, loaded.For(ToolKind.Arrow).Color);
-        Assert.Equal(StrokeSize.Large, loaded.For(ToolKind.Arrow).Size);
+        Assert.Equal(40, loaded.For(ToolKind.Arrow).Width);
         Assert.Equal(ToolStyle.Default, loaded.For(ToolKind.Rectangle));
     }
 

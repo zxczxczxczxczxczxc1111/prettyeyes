@@ -1,6 +1,14 @@
 namespace PrettyEyes.Core.Tools;
 
-/// <summary>How thick a drawn shape is. Three steps, not a slider.</summary>
+/// <summary>
+/// How thick a drawn shape is, in three steps.
+///
+/// Kept for the settings file and nothing else. The card asks for a number of
+/// pixels now and Width is what anything drawing reads; this is written
+/// alongside it as the nearest step, so a build that predates Width still finds
+/// a thickness instead of falling back to the thinnest line there is. The value
+/// carried in memory means nothing - it is recomputed on the way to the file.
+/// </summary>
 public enum StrokeSize
 {
     Small,
@@ -41,7 +49,8 @@ public sealed record ToolStyle(
     int FontSize = ToolStyle.DefaultFontSize,
     TextBackdrop TextBackdrop = TextBackdrop.Plate,
     int TextPadding = ToolStyle.DefaultTextPadding,
-    bool FreehandArrow = false)
+    bool FreehandArrow = false,
+    int Width = 0)
 {
     /// <summary>Where a label starts before the wheel touches it.</summary>
     public const int DefaultFontSize = 18;
@@ -55,8 +64,21 @@ public sealed record ToolStyle(
     /// <summary>Largest type. Past this a label is a poster, not a note.</summary>
     public const int MaxFontSize = 200;
 
-    /// <summary>Carmine at medium, which is what every version so far drew.</summary>
-    public static ToolStyle Default => new(Palette.Carmine, StrokeSize.Medium);
+    /// <summary>Thinnest line worth drawing.</summary>
+    public const int MinWidth = 1;
+
+    /// <summary>
+    /// Thick enough to cover a face in one pass, which is what the widest
+    /// setting is for. Past this a stroke hides the screenshot rather than
+    /// marking it.
+    /// </summary>
+    public const int MaxWidth = 60;
+
+    /// <summary>What the middle preset drew, and what a new style starts at.</summary>
+    public const int DefaultWidth = 3;
+
+    /// <summary>Carmine at the middle width, which is what every version so far drew.</summary>
+    public static ToolStyle Default => new(Palette.Carmine, StrokeSize.Medium, Width: DefaultWidth);
 
     /// <summary>
     /// What a tool draws with before anyone has an opinion. Only the
@@ -65,20 +87,53 @@ public sealed record ToolStyle(
     /// </summary>
     public static ToolStyle DefaultFor(ToolKind kind) => kind switch
     {
-        ToolKind.Marker => new(Palette.Yellow, StrokeSize.Medium),
+        // Wide by itself now. This used to be a hidden multiplier of four
+        // applied by the annotation, which made the number on the card a lie.
+        // The preset passed in means nothing - it is rewritten on the way to
+        // the file - so it is spelled default rather than pretending to a value.
+        ToolKind.Marker => new ToolStyle(Palette.Yellow, default).WithWidth(12),
 
         // White on a plate, because carmine text on a dark screenshot is a
         // decoration rather than a message. Task 13 wires the popup to it.
-        ToolKind.Text => new(Palette.White, StrokeSize.Medium),
+        ToolKind.Text => new(Palette.White, StrokeSize.Medium, Width: DefaultWidth),
+
+        // Freehand out of the box: it is the arrow people reach for, and the
+        // straight one is a click away in the card.
+        ToolKind.Arrow => Default with { FreehandArrow = true },
         _ => Default,
     };
 
-    /// <summary>Stroke width in physical pixels.</summary>
-    public float StrokeWidth => Size switch
+    /// <summary>
+    /// Stroke width in physical pixels.
+    ///
+    /// Zero means a settings file older than this field. Normalize turns those
+    /// into real numbers because only it knows which tool a style belongs to,
+    /// and the marker needs more than the others; this fallback is for a style
+    /// that never went through it.
+    /// </summary>
+    public float StrokeWidth => Width > 0 ? Width : DefaultWidth;
+
+    /// <summary>
+    /// A new thickness, pulled into range.
+    ///
+    /// Size is deliberately left alone. It is written at the file boundary,
+    /// where the tool is known - the released build multiplies the marker's
+    /// preset by four on its own, so a preset computed here would be four times
+    /// wrong for that one tool, and wrong in a direction nobody would notice
+    /// until they went back a version.
+    /// </summary>
+    public ToolStyle WithWidth(int pixels) =>
+        this with { Width = Math.Clamp(pixels, MinWidth, MaxWidth) };
+
+    /// <summary>
+    /// Which of the three old steps a width is closest to. For the file only:
+    /// nothing in this build draws by preset any more.
+    /// </summary>
+    public static StrokeSize NearestSize(int width) => width switch
     {
-        StrokeSize.Small => 2f,
-        StrokeSize.Large => 5f,
-        _ => 3f,
+        <= 2 => StrokeSize.Small,
+        <= 3 => StrokeSize.Medium,
+        _ => StrokeSize.Large,
     };
 }
 

@@ -13,16 +13,65 @@ public class ToolStyleTests
         var style = ToolStyle.Default;
 
         Assert.Equal(Palette.Carmine, style.Color);
-        Assert.Equal(StrokeSize.Medium, style.Size);
-        Assert.Equal(3f, style.StrokeWidth);
+        Assert.Equal(ToolStyle.DefaultWidth, style.StrokeWidth);
     }
 
     [Theory]
-    [InlineData(StrokeSize.Small, 2f)]
-    [InlineData(StrokeSize.Medium, 3f)]
-    [InlineData(StrokeSize.Large, 5f)]
-    public void Every_step_has_its_own_width(StrokeSize size, float expected) =>
-        Assert.Equal(expected, new ToolStyle(Palette.Blue, size).StrokeWidth);
+    [InlineData(1)]
+    [InlineData(3)]
+    [InlineData(17)]
+    [InlineData(60)]
+    public void The_width_is_the_number_of_pixels(int pixels) =>
+        Assert.Equal(pixels, ToolStyle.Default.WithWidth(pixels).StrokeWidth);
+
+    [Theory]
+    [InlineData(0, ToolStyle.MinWidth)]
+    [InlineData(-4, ToolStyle.MinWidth)]
+    [InlineData(999, ToolStyle.MaxWidth)]
+    public void A_width_outside_the_range_is_pulled_back_in(int asked, int expected) =>
+        Assert.Equal(expected, ToolStyle.Default.WithWidth(asked).Width);
+
+    [Fact]
+    public void Setting_a_width_leaves_the_legacy_preset_alone()
+    {
+        // The preset is written at the file boundary, where the tool is known,
+        // because the released build multiplies the marker's preset by four on
+        // its own. Computed here it would be wrong for that one tool, and wrong
+        // by a factor of four.
+        var wide = ToolStyle.Default.WithWidth(40);
+
+        Assert.Equal(40, wide.Width);
+        Assert.Equal(ToolStyle.Default.Size, wide.Size);
+    }
+
+    [Fact]
+    public void A_style_from_before_the_number_draws_the_default_width()
+    {
+        // Width absent means a file older than this field. Normalize turns
+        // those into real numbers, but a style that reaches a tool without
+        // passing through it still has to draw something sane.
+        var old = new ToolStyle(Palette.Blue, StrokeSize.Large);
+
+        Assert.Equal(0, old.Width);
+        Assert.Equal(ToolStyle.DefaultWidth, old.StrokeWidth);
+    }
+
+    [Fact]
+    public void The_arrow_draws_freehand_out_of_the_box()
+    {
+        // The mode people asked to have by default. A stored arrow style is a
+        // separate matter and belongs to the schema migration.
+        Assert.True(ToolStyle.DefaultFor(ToolKind.Arrow).FreehandArrow);
+    }
+
+    [Fact]
+    public void The_marker_is_wide_by_itself_now()
+    {
+        // It used to be four times whatever the card said, which made the
+        // number a lie. The width it had at the middle preset is now simply its
+        // default.
+        Assert.Equal(12, ToolStyle.DefaultFor(ToolKind.Marker).StrokeWidth);
+    }
 
     [Fact]
     public void A_tool_without_a_style_draws_the_default()

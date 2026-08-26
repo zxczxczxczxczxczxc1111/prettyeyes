@@ -55,11 +55,11 @@ public class FreehandArrowToolTests
     [Fact]
     public void The_style_decides_the_width()
     {
-        var thin = new FreehandArrowTool(new ToolStyle(Palette.Blue, StrokeSize.Small));
+        var thin = new FreehandArrowTool(ToolStyle.Default.WithWidth(2));
         thin.Begin(0, 0);
         var narrow = thin.End(100, 0)!;
 
-        var thick = new FreehandArrowTool(new ToolStyle(Palette.Blue, StrokeSize.Large));
+        var thick = new FreehandArrowTool(ToolStyle.Default.WithWidth(40));
         thick.Begin(0, 0);
         var wide = thick.End(100, 0)!;
 
