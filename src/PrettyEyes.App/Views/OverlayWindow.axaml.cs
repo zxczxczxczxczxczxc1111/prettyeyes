@@ -233,6 +233,9 @@ public partial class OverlayWindow : Window
     /// <summary>Frames this window painted for the capture it is showing.</summary>
     public int Repaints => Surface.Repaints;
 
+    /// <summary>Frames this window painted as nothing. TEMPORARY, see CaptureCanvas.Blanks.</summary>
+    public int Blanks => Surface.Blanks;
+
     /// <summary>
     /// A tool gesture has a new half-finished shape. Raised rather than drawn,
     /// because a shape can straddle two monitors and this window is only one of
