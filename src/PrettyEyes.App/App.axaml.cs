@@ -82,7 +82,7 @@ public partial class App : Application
             // opens the settings would otherwise never learn there is a newer
             // version at all.
             Services.Updates.Announced += (_, version) => Services.Notifier.Notify(
-                "prettyeyes",
+                AppFlavor.Current.DisplayName,
                 $"Доступна версия {version}. Обновить можно из меню в трее.");
 
             Services.Updates.Start();
@@ -180,7 +180,7 @@ public partial class App : Application
         }
         catch (InvalidOperationException ex)
         {
-            Services.Notifier.Notify("prettyeyes", $"Не удалось снять экран: {ex.Message}");
+            Services.Notifier.Notify(AppFlavor.Current.DisplayName, $"Не удалось снять экран: {ex.Message}");
             return;
         }
 
@@ -213,7 +213,7 @@ public partial class App : Application
         }
         catch (InvalidOperationException ex)
         {
-            Services.Notifier.Notify("prettyeyes", $"Не удалось снять экран: {ex.Message}");
+            Services.Notifier.Notify(AppFlavor.Current.DisplayName, $"Не удалось снять экран: {ex.Message}");
             return;
         }
 
@@ -251,7 +251,7 @@ public partial class App : Application
         }
 
         Services.Notifier.Notify(
-            "prettyeyes",
+            AppFlavor.Current.DisplayName,
             result == SinkResult.Sent
                 ? "Скриншот монитора скопирован в буфер."
                 : "Не удалось скопировать скриншот в буфер.");
@@ -359,7 +359,7 @@ public partial class App : Application
         }
         else
         {
-            Services.Notifier.Notify("prettyeyes", "Не удалось обновиться. Попробуй позже.");
+            Services.Notifier.Notify(AppFlavor.Current.DisplayName, "Не удалось обновиться. Попробуй позже.");
         }
     }
 

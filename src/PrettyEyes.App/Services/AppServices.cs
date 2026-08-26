@@ -309,7 +309,7 @@ public sealed class AppServices : IDisposable
             if (!registered)
             {
                 notifier.Notify(
-                    "prettyeyes",
+                    AppFlavor.Current.DisplayName,
                     $"{HotkeyBox.Busy(hotkey)} Смени её в настройках.");
             }
         }

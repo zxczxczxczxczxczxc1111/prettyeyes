@@ -7,6 +7,7 @@ using PrettyEyes.App.Controls;
 using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Platform;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
@@ -166,6 +167,16 @@ public partial class SettingsWindow : Window
         BuildToolRow();
 
         CheckUpdates.IsChecked = settings.CheckUpdates;
+        // The window icon is an Avalonia resource, so ApplicationIcon does not
+        // reach it: without this the check build would show the release icon in
+        // its title bar, on its taskbar button and in its own header.
+        var flavourIcon = new Bitmap(AssetLoader.Open(new Uri(AppFlavor.Current.IconAsset)));
+
+        HeaderIcon.Source = flavourIcon;
+        Icon = new WindowIcon(flavourIcon);
+        Title = AppFlavor.Current.DisplayName;
+        HeaderTitle.Text = AppFlavor.Current.DisplayName;
+
         CurrentVersion.Text = $"установлена {BuildLabel.Current}";
         ShowUpdateState(updates.State);
 

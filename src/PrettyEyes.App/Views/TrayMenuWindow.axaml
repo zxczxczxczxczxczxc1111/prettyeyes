@@ -1,7 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="PrettyEyes.App.Views.TrayMenuWindow"
-        Title="prettyeyes"
         SystemDecorations="None"
         ShowInTaskbar="False"
         CanResize="False"

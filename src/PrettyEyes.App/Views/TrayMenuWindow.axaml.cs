@@ -4,6 +4,7 @@ using Avalonia.Media.Transformation;
 using Avalonia.Threading;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Platform.Windows;
+using PrettyEyes.Core.Platform;
 
 namespace PrettyEyes.App.Views;
 
@@ -21,6 +22,10 @@ public partial class TrayMenuWindow : Window
     public TrayMenuWindow()
     {
         InitializeComponent();
+
+        // Borderless and out of the taskbar, but the title still reaches
+        // accessibility tools and window lists, so it names its own build.
+        Title = AppFlavor.Current.DisplayName;
 
         CaptureItem.Click += (_, _) => Pick(TrayMenuChoice.Capture);
         OpenFolderItem.Click += (_, _) => Pick(TrayMenuChoice.OpenFolder);

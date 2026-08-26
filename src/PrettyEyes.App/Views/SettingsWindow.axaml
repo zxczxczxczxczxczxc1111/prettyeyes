@@ -3,8 +3,6 @@
         xmlns:controls="using:PrettyEyes.App.Controls"
         xmlns:views="using:PrettyEyes.App.Views"
         x:Class="PrettyEyes.App.Views.SettingsWindow"
-        Title="prettyeyes"
-        Icon="/Assets/prettyeyes.ico"
         Width="880" Height="640"
         CanResize="False"
         SystemDecorations="None"
@@ -27,8 +25,8 @@
     <Panel>
     <DockPanel>
       <Grid DockPanel.Dock="Top" x:Name="TitleBar" Height="44" ColumnDefinitions="Auto,*,Auto">
-        <Image Grid.Column="0" Source="/Assets/prettyeyes.ico" Width="16" Height="16" Margin="16,0,0,0"/>
-        <TextBlock Grid.Column="1" Text="prettyeyes" Margin="10,0,0,0"
+        <Image Grid.Column="0" x:Name="HeaderIcon" Width="16" Height="16" Margin="16,0,0,0"/>
+        <TextBlock Grid.Column="1" x:Name="HeaderTitle" Margin="10,0,0,0"
                    VerticalAlignment="Center" Foreground="{StaticResource TextDim}" FontSize="12"/>
         <Button Grid.Column="2" x:Name="CloseButton" Classes="ghost close"
                 Margin="0,0,10,0" Content="✕"/>
