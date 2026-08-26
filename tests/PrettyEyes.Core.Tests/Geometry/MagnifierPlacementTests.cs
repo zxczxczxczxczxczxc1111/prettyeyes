@@ -88,4 +88,59 @@ public class MagnifierPlacementTests
         Assert.Equal(0, placed.X);
         Assert.Equal(0, placed.Y);
     }
+
+    [Fact]
+    public void A_panel_below_the_cursor_pushes_it_up()
+    {
+        // Reported live 26.08.2026: hovering just above the toolbar put the
+        // magnifier underneath it. The toolbar is a later sibling in the same
+        // panel, so it paints on top and the magnifier is simply gone.
+        var toolbar = new CaptureRect(900, 740, 400, 44);
+
+        var placed = MagnifierPlacement.Choose(1000, 700, Monitor, Size, Gap, toolbar);
+
+        Assert.Equal(700 - Gap - Size, placed.Y);
+        Assert.Equal(1000 + Gap, placed.X);
+    }
+
+    [Fact]
+    public void A_panel_it_does_not_touch_changes_nothing()
+    {
+        var elsewhere = new CaptureRect(100, 100, 400, 44);
+
+        var placed = MagnifierPlacement.Choose(1000, 700, Monitor, Size, Gap, elsewhere);
+
+        Assert.Equal(700 + Gap, placed.Y);
+    }
+
+    [Fact]
+    public void With_no_panel_given_it_behaves_as_before()
+    {
+        Assert.Equal(Place(1000, 700), MagnifierPlacement.Choose(1000, 700, Monitor, Size, Gap));
+    }
+
+    [Fact]
+    public void A_panel_on_both_sides_leaves_it_where_it_was()
+    {
+        // Nowhere better to go: moving it would trade one covered magnifier for
+        // another, and the flip would read as a twitch.
+        var everywhere = new CaptureRect(0, 0, 2560, 1440);
+
+        var placed = MagnifierPlacement.Choose(1000, 700, Monitor, Size, Gap, everywhere);
+
+        Assert.Equal(700 + Gap, placed.Y);
+    }
+
+    [Fact]
+    public void Pushed_up_it_still_stays_on_the_monitor()
+    {
+        // Near the top edge there is no room above, so the clamp has to win
+        // over the panel: off-screen is worse than covered.
+        var toolbar = new CaptureRect(900, 20, 400, 44);
+
+        var placed = MagnifierPlacement.Choose(1000, 10, Monitor, Size, Gap, toolbar);
+
+        Assert.True(placed.Y >= Monitor.Y);
+        Assert.True(placed.Bottom <= Monitor.Bottom);
+    }
 }

@@ -514,7 +514,10 @@ public partial class OverlayWindow : Window
 
         Surface.MagnifierAt = new PixelPoint(x, y);
 
-        var box = MagnifierPlacement.Choose(x, y, _monitorBounds, MagnifierSize, MagnifierGap);
+        // The toolbar is drawn after the canvas, so a magnifier under it is not
+        // dimmed, it is gone. Found live 26.08.2026 hovering just above it.
+        var box = MagnifierPlacement.Choose(
+            x, y, _monitorBounds, MagnifierSize, MagnifierGap, PanelBounds(Toolbar));
 
         Loupe.IsVisible = true;
 
@@ -603,6 +606,29 @@ public partial class OverlayWindow : Window
         var localY = (y - _monitorBounds.Y) / scale;
 
         return Covers(Toolbar, localX, localY) || Covers(Chip, localX, localY);
+    }
+
+
+    /// <summary>
+    /// A panel's rectangle in virtual-desktop pixels, or empty when it is not on
+    /// screen. The panels are moved by transform and sized in this window's
+    /// logical pixels, while the magnifier is placed in the model's.
+    /// </summary>
+    private CaptureRect PanelBounds(Control control)
+    {
+        if (!control.IsVisible || control.RenderTransform is not TranslateTransform at)
+        {
+            return CaptureRect.Empty;
+        }
+
+        var scale = RenderScaling;
+        var size = control.DesiredSize;
+
+        return new CaptureRect(
+            (int)(at.X * scale) + _monitorBounds.X,
+            (int)(at.Y * scale) + _monitorBounds.Y,
+            (int)(size.Width * scale),
+            (int)(size.Height * scale));
     }
 
     private static bool Covers(Control control, double x, double y)
@@ -1357,7 +1383,8 @@ public partial class OverlayWindow : Window
         if (Loupe.Update(MagnifierReadout.Copied(colour)))
         {
             Loupe.Measure(Size.Infinity);
-            PlaceLoupe(MagnifierPlacement.Choose(at.X, at.Y, _monitorBounds, MagnifierSize, MagnifierGap));
+            PlaceLoupe(MagnifierPlacement.Choose(
+                at.X, at.Y, _monitorBounds, MagnifierSize, MagnifierGap, PanelBounds(Toolbar)));
         }
 
         // The reading on the plate is no longer the one the pointer is over.
