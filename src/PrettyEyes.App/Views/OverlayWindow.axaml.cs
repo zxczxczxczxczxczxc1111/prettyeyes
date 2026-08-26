@@ -234,9 +234,6 @@ public partial class OverlayWindow : Window
     /// <summary>Frames this window painted for the capture it is showing.</summary>
     public int Repaints => Surface.Repaints;
 
-    /// <summary>Frames this window painted as nothing. TEMPORARY, see CaptureCanvas.Blanks.</summary>
-    public int Blanks => Surface.Blanks;
-
     /// <summary>
     /// Completes once the compositor has put this window's current contents on
     /// screen. Null when the window has no composition visual, which for a

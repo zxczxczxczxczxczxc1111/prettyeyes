@@ -123,13 +123,6 @@ public sealed class CaptureCanvas : Control
     public int Repaints { get; private set; }
 
     /// <summary>
-    /// Frames this canvas painted as nothing at all, after the capture was let
-    /// go of. TEMPORARY: the pool's blank-then-hide dance assumes one of these
-    /// lands inside 50 ms, and nothing in the application checks that it did.
-    /// </summary>
-    public int Blanks { get; private set; }
-
-    /// <summary>
     /// The colour under the crosshair, sampled once per position rather than
     /// per frame. Null when the cursor is off the captured frame.
     /// </summary>
@@ -271,7 +264,6 @@ public sealed class CaptureCanvas : Control
     {
         if (_source is null || _document is null)
         {
-            Blanks++;
             return;
         }
 

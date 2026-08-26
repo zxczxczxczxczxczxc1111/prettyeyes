@@ -135,10 +135,6 @@ public sealed class OverlayWindowPool
 
         Clear();
 
-        // TEMPORARY diagnostics: see HideEmptied.
-        Log.Default.Info($"гашение, после Clear: пусто {string.Join(", ", _windows.Select(w => w.Blanks))}"
-            + $" / с картинкой {string.Join(", ", _windows.Select(w => w.Repaints))}");
-
         // Hidden once the emptying frame is actually on screen, not a fixed
         // beat later. A hidden window keeps whatever the compositor last put
         // on it, so hiding one that has not repainted yet stores the previous
@@ -222,14 +218,6 @@ public sealed class OverlayWindowPool
         }
 
         _hide.Stop();
-
-        // TEMPORARY diagnostics for the flash of the previous capture on
-        // reopen. Compared against the line written by HideBlanked: an
-        // unchanged blank count means the emptying repaint never ran before
-        // the window was hidden, and the frame frozen into it is still the
-        // previous capture.
-        Log.Default.Info($"гашение, перед скрытием: пусто {string.Join(", ", _windows.Select(w => w.Blanks))}"
-            + $" / с картинкой {string.Join(", ", _windows.Select(w => w.Repaints))}");
 
         foreach (var window in _windows)
         {
