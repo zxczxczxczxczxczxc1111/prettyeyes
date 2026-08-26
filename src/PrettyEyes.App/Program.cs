@@ -3,6 +3,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using PrettyEyes.Core.Diagnostics;
+using PrettyEyes.Core.Platform;
 using PrettyEyes.Platform.Windows;
 
 namespace PrettyEyes.App;
@@ -16,7 +17,9 @@ class Program
     public static void Main(string[] args)
     {
         // Named mutex the installer checks before replacing the executable.
-        using var instance = new Mutex(initiallyOwned: true, "PrettyEyesSingleInstance", out var isFirst);
+        // Its name carries the flavour: the check build must not silently exit
+        // just because the real one is already running.
+        using var instance = new Mutex(initiallyOwned: true, AppFlavor.Current.MutexName, out var isFirst);
 
         if (!isFirst)
         {
@@ -43,7 +46,7 @@ class Program
 
         // Must happen before any window exists, so the shell groups them under
         // the same identity the installer's shortcut carries.
-        AppIdentity.Declare();
+        AppIdentity.Declare(AppFlavor.Current.AppUserModelId);
 
         // The build, not just the version: an hour went into finding out
 // which of two 1.3.0 builds wrote a log of five thousand lines.

@@ -10,14 +10,21 @@ namespace PrettyEyes.Platform.Windows;
 public sealed class RegistryAutostart : IAutostart
 {
     private const string KeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
-    private const string ValueName = "prettyeyes";
+
+    private readonly string _valueName;
+
+    /// <param name="valueName">
+    /// The entry this build owns. Two builds sharing one entry would each
+    /// rewrite the other's path, and the loser would start nothing.
+    /// </param>
+    public RegistryAutostart(string valueName) => _valueName = valueName;
 
     public bool IsEnabled
     {
         get
         {
             using var key = Registry.CurrentUser.OpenSubKey(KeyPath);
-            return key?.GetValue(ValueName) is string value && value.Length > 0;
+            return key?.GetValue(_valueName) is string value && value.Length > 0;
         }
     }
 
@@ -36,7 +43,7 @@ public sealed class RegistryAutostart : IAutostart
         {
             using var key = Registry.CurrentUser.OpenSubKey(KeyPath, writable: true);
 
-            if (key?.GetValue(ValueName) is not string stored || stored.Length == 0)
+            if (key?.GetValue(_valueName) is not string stored || stored.Length == 0)
             {
                 return false;
             }
@@ -55,7 +62,7 @@ public sealed class RegistryAutostart : IAutostart
                 return false;
             }
 
-            key.SetValue(ValueName, $"\"{path}\"");
+            key.SetValue(_valueName, $"\"{path}\"");
 
             return true;
         }
@@ -82,7 +89,7 @@ public sealed class RegistryAutostart : IAutostart
 
             if (!enabled)
             {
-                key.DeleteValue(ValueName, throwOnMissingValue: false);
+                key.DeleteValue(_valueName, throwOnMissingValue: false);
                 return true;
             }
 
@@ -94,7 +101,7 @@ public sealed class RegistryAutostart : IAutostart
             }
 
             // Quoted: an unquoted path with spaces silently fails to start.
-            key.SetValue(ValueName, $"\"{path}\"");
+            key.SetValue(_valueName, $"\"{path}\"");
             return true;
         }
         catch (UnauthorizedAccessException)

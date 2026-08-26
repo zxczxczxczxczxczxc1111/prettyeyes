@@ -247,8 +247,8 @@ public sealed class AppServices : IDisposable
 
         // Our own tray icon: Avalonia's only comes with a native menu, and a
         // native menu cannot be made to look like the rest of the app.
-        var tray = new Win32TrayIcon("prettyeyes");
-        var notifier = new ToastNotifier(AppIdentity.AppUserModelId, tray);
+        var tray = new Win32TrayIcon(AppFlavor.Current.DisplayName);
+        var notifier = new ToastNotifier(AppFlavor.Current.AppUserModelId, tray);
 
         // Warmed here, before the first hotkey: building an overlay window
         // takes 69 ms the first time, and that time belongs to start-up.
@@ -314,7 +314,7 @@ public sealed class AppServices : IDisposable
             }
         }
 
-        var autostart = new RegistryAutostart();
+        var autostart = new RegistryAutostart(AppFlavor.Current.AutostartValueName);
 
         // A dead autostart entry is silent: the checkbox says on, Windows starts
         // nothing, and nobody finds out until they wonder why the tray is empty
