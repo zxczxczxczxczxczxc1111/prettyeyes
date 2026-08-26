@@ -61,6 +61,13 @@ public sealed class OverlaySession
     private bool _freshDrag;
     private bool _closed;
 
+    /// <summary>
+    /// A copy or a save is in flight. The handlers are async void, and once the
+    /// decoration runs off the UI thread the key repeat of a held Ctrl+C is no
+    /// longer serialised by a blocked message loop.
+    /// </summary>
+    private bool _sending;
+
     /// <summary>Who had the keyboard before this capture started.</summary>
     private IntPtr _cameFrom;
 
@@ -93,6 +100,13 @@ public sealed class OverlaySession
         _cameFrom = WindowFocus.Current;
 
         _closed = false;
+
+        // Reset with the flag above it. The session is reused for the next
+        // capture, and a send still in flight when the previous one closed would
+        // otherwise leave this raised: the copy button in the new overlay would
+        // do nothing at all, with no error and no line in the log.
+        _sending = false;
+
         _layout = capture.Layout;
         Document = new Document(capture.Image, capture.Bounds);
 
@@ -615,6 +629,16 @@ public sealed class OverlaySession
     /// </summary>
     private async Task SendSafelyAsync(IImageSink sink, bool closeOnSuccess = true, string? failure = null)
     {
+        // A copy or a save is already in flight. Held Ctrl+C repeats through
+        // Windows key repeat, and now that the decoration runs off the UI
+        // thread nothing serialises those any more.
+        if (_sending)
+        {
+            return;
+        }
+
+        _sending = true;
+
         try
         {
             await SendAsync(sink, closeOnSuccess, failure);
@@ -630,6 +654,12 @@ public sealed class OverlaySession
                 ? ex.Message
                 : "Не удалось отдать скриншот. Подробности в журнале.");
         }
+        finally
+        {
+            // Cleared before this returns, so the second call OnCopyClicked
+            // makes with autosave on still goes through.
+            _sending = false;
+        }
     }
 
     private async Task SendAsync(IImageSink sink, bool closeOnSuccess = true, string? failure = null)
@@ -639,9 +669,6 @@ public sealed class OverlaySession
             return;
         }
 
-        // The overlays are Topmost, and a system dialog would open underneath
-        // them. Drop it for the duration and put it back if the user cancels.
-        SetTopmost(false);
 
         try
         {
@@ -650,7 +677,26 @@ public sealed class OverlaySession
             // an alpha channel the DIB cannot carry.
             var style = _services.Settings.Export ?? ExportStyle.None;
 
-            using var image = DocumentRenderer.Render(Document, style);
+            // The crop reads the document: its annotations, its selection and
+            // its pixels. None of that is built for two threads, and the frame
+            // itself is disposed on the next capture, not on close. So the part
+            // that touches the document stays here.
+            var (shot, fitted) = DocumentRenderer.Shot(Document, style);
+
+            // The decoration is three blurs, an aura and a tile of grain over a
+            // picture that belongs to nobody else. That part can go.
+            //
+            // No try/catch around the await to dispose the shot: Finish already
+            // owns it in the decorated branch and disposes it there, so a
+            // rescue here would be a second release of a dead object.
+            using var image = await Task.Run(() => DocumentRenderer.Finish(shot, fitted));
+
+            // The overlays are Topmost, and a system dialog would open
+            // underneath them. Dropped here rather than before the render:
+            // the render no longer blocks the message loop, so dropping it
+            // early would leave other windows sitting over the frozen
+            // photograph for the whole time the decoration takes.
+            SetTopmost(false);
 
             var result = await sink.SendAsync(image, CancellationToken.None);
 

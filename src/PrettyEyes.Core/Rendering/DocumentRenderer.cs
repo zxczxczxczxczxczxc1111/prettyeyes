@@ -59,13 +59,32 @@ public static class DocumentRenderer
 
     public static SKImage Render(Document document, ExportStyle style)
     {
+        var (shot, fitted) = Shot(document, style);
+
+        return Finish(shot, fitted);
+    }
+
+    /// <summary>
+    /// The screenshot without decoration, plus the style as it applies to this
+    /// size. Split out of Render so the caller can take the part that reads the
+    /// document on the thread that owns the document, and hand the expensive
+    /// part to a background thread.
+    /// </summary>
+    public static (SKImage Image, ExportStyle Fitted) Shot(Document document, ExportStyle style)
+    {
         var frame = document.SourceBounds;
-
         var selection = document.Selection.IsEmpty ? frame : document.Selection;
-
         var shot = Crop(document, selection);
-        var fitted = style.FitTo(shot.Width, shot.Height);
 
+        return (shot, style.FitTo(shot.Width, shot.Height));
+    }
+
+    /// <summary>
+    /// Padding, backdrop, shadow, aura and grain. Touches nothing but the image
+    /// handed in, which is what makes it safe to run away from the UI thread.
+    /// </summary>
+    public static SKImage Finish(SKImage shot, ExportStyle fitted)
+    {
         // Without decoration the caller owns the screenshot as it is.
         if (!fitted.Enabled)
         {
