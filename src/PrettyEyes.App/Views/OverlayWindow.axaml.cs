@@ -516,8 +516,18 @@ public partial class OverlayWindow : Window
 
         // The toolbar is drawn after the canvas, so a magnifier under it is not
         // dimmed, it is gone. Found live 26.08.2026 hovering just above it.
+        //
+        // Handed to both, because both decide a position: the canvas draws the
+        // magnifier and picks where it goes, this method only places the plate
+        // under it. Telling one and not the other was the first attempt at this
+        // fix, and it moved the plate out of the way while leaving the
+        // magnifier exactly where it was reported.
+        var toolbar = PanelBounds(Toolbar);
+
+        Surface.MagnifierAvoid = toolbar;
+
         var box = MagnifierPlacement.Choose(
-            x, y, _monitorBounds, MagnifierSize, MagnifierGap, PanelBounds(Toolbar));
+            x, y, _monitorBounds, MagnifierSize, MagnifierGap, toolbar);
 
         Loupe.IsVisible = true;
 

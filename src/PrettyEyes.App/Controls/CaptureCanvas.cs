@@ -55,7 +55,8 @@ public sealed class CaptureCanvas : Control
     static CaptureCanvas()
     {
         AffectsRender<CaptureCanvas>(
-            VeilOpacityProperty, FrameOpacityProperty, MagnifierAtProperty, MagnifierGridProperty);
+            VeilOpacityProperty, FrameOpacityProperty, MagnifierAtProperty, MagnifierGridProperty,
+            MagnifierAvoidProperty);
     }
 
     /// <summary>
@@ -110,6 +111,24 @@ public sealed class CaptureCanvas : Control
     {
         get => GetValue(MagnifierGridProperty);
         set => SetValue(MagnifierGridProperty, value);
+    }
+
+    /// <summary>
+    /// A panel the magnifier must not hide under, in virtual-desktop pixels, or
+    /// empty when there is none.
+    ///
+    /// The window knows where its toolbar is; the canvas is the one that draws
+    /// the magnifier and picks where it goes. Before this the two picked
+    /// separately: the window moved the plate out of the way and the magnifier
+    /// stayed under the panel, which is exactly how it was reported.
+    /// </summary>
+    public static readonly StyledProperty<CaptureRect> MagnifierAvoidProperty =
+        AvaloniaProperty.Register<CaptureCanvas, CaptureRect>(nameof(MagnifierAvoid));
+
+    public CaptureRect MagnifierAvoid
+    {
+        get => GetValue(MagnifierAvoidProperty);
+        set => SetValue(MagnifierAvoidProperty, value);
     }
 
     /// <summary>
@@ -238,7 +257,8 @@ public sealed class CaptureCanvas : Control
             (float)VeilOpacity,
             (float)FrameOpacity,
             MagnifierAt,
-            MagnifierGrid));
+            MagnifierGrid,
+            MagnifierAvoid));
     }
 
     private sealed class CaptureDrawOperation : ICustomDrawOperation
@@ -294,15 +314,17 @@ public sealed class CaptureCanvas : Control
         private readonly float _frameOpacity;
         private readonly PixelPoint? _magnifierAt;
         private readonly bool _magnifierGrid;
+        private readonly CaptureRect _magnifierAvoid;
 
         public CaptureDrawOperation(
             Rect bounds, SKImage source, BlurCache cache, CaptureRect frame, CaptureRect monitor,
             CaptureRect usable, CaptureRect selection, IReadOnlyList<IAnnotation> annotations,
             IAnnotation? preview, float scaling, float veilOpacity, float frameOpacity,
-            PixelPoint? magnifierAt, bool magnifierGrid)
+            PixelPoint? magnifierAt, bool magnifierGrid, CaptureRect magnifierAvoid)
         {
             _magnifierAt = magnifierAt;
             _magnifierGrid = magnifierGrid;
+            _magnifierAvoid = magnifierAvoid;
             Bounds = bounds;
             _source = source;
             _cache = cache;
@@ -433,7 +455,8 @@ public sealed class CaptureCanvas : Control
                 return;
             }
 
-            var box = MagnifierPlacement.Choose(at.X, at.Y, _monitor, MagnifierSize, MagnifierGap);
+            var box = MagnifierPlacement.Choose(
+                at.X, at.Y, _monitor, MagnifierSize, MagnifierGap, _magnifierAvoid);
             var destination = SKRect.Create(box.X, box.Y, box.Width, box.Height);
 
             var span = MagnifierSize / MagnifierZoom;
