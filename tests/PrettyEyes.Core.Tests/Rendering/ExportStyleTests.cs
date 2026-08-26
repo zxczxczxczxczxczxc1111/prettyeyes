@@ -1,4 +1,4 @@
-using PrettyEyes.Core.Geometry;
+﻿using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Rendering;
 using SkiaSharp;
@@ -101,6 +101,27 @@ public class ExportStyleTests
     {
         Assert.False(new ExportStyle(true, 0, ExportBackground.Black, 0, true).ShadowAllowed);
         Assert.True(new ExportStyle(true, 24, ExportBackground.Black, 0, true).ShadowAllowed);
+    }
+
+    [Fact]
+    public void A_small_shot_loses_the_shadow_along_with_the_padding()
+    {
+        // The padding is clamped to a quarter of the shorter side, and below
+        // 24 a shadow has nowhere to fall. Both decisions have to be taken on
+        // the clamped number: 48 asked for, 15 given.
+        var fitted = ExportStyle.Card.FitTo(60, 60);
+
+        Assert.Equal(15, fitted.Padding);
+        Assert.False(fitted.Shadow);
+    }
+
+    [Fact]
+    public void A_full_size_shot_keeps_both()
+    {
+        var fitted = ExportStyle.Card.FitTo(2560, 1440);
+
+        Assert.Equal(48, fitted.Padding);
+        Assert.True(fitted.Shadow);
     }
 
     [Fact]

@@ -1,4 +1,4 @@
-namespace PrettyEyes.Core.Rendering;
+﻿namespace PrettyEyes.Core.Rendering;
 
 /// <summary>What the screenshot sits on when it leaves the application.</summary>
 public enum ExportBackground
@@ -72,7 +72,10 @@ public sealed record ExportStyle(
     /// A shadow needs somewhere to fall. With no padding it lands outside the
     /// canvas and the only visible effect is a clipped edge.
     /// </summary>
-    public bool ShadowAllowed => Padding >= 24;
+    public bool ShadowAllowed => Padding >= MinShadowPadding;
+
+    /// <summary>Below this the shadow lands outside the canvas.</summary>
+    private const int MinShadowPadding = 24;
 
     /// <summary>
     /// Padding is capped at a quarter of the shorter side and rounding at an
@@ -88,11 +91,18 @@ public sealed record ExportStyle(
 
         var shorter = Math.Min(width, height);
 
+        var padding = Math.Min(Padding, shorter / 4);
+
         return this with
         {
-            Padding = Math.Min(Padding, shorter / 4),
+            Padding = padding,
             CornerRadius = Math.Min(CornerRadius, shorter / 8),
-            Shadow = Shadow && ShadowAllowed,
+
+            // Decided on the clamped padding, not on the one that was asked
+            // for. Inside a with-expression the right-hand side reads the
+            // original object, so ShadowAllowed here would answer about a
+            // padding this style is not going to get.
+            Shadow = Shadow && padding >= MinShadowPadding,
         };
     }
 }
