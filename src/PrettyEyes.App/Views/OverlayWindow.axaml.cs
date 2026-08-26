@@ -6,6 +6,7 @@ using Avalonia.Rendering.Composition;
 using Avalonia.Threading;
 using PrettyEyes.App.Controls;
 using PrettyEyes.Core.Annotations;
+using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Rendering;
@@ -380,7 +381,19 @@ public partial class OverlayWindow : Window
         // The session redraws through here after every change to the document,
         // and the cursor reads the document: Ctrl over a glyph that has just
         // been undone must stop promising a carry. None of that shows up in
-        // the echo, so the echo is dropped instead.
+        // the echo, so the echo is dropped.
+        //
+        // Dropping it is not enough on its own, which is what the first attempt
+        // got wrong: an empty echo only makes the next pointer event count, and
+        // undo arrives with the hand perfectly still. There is no next event
+        // until somebody moves the mouse, so the cursor is asked again here,
+        // from wherever the pointer was last seen. A window the pointer is not
+        // over has no echo and is left alone.
+        if (_echo is { } last && !_dragging)
+        {
+            UpdateCursor(last.X, last.Y, (KeyModifiers)last.Modifiers);
+        }
+
         _echo = null;
     }
 
@@ -533,6 +546,22 @@ public partial class OverlayWindow : Window
     /// </summary>
     private void PlaceLoupe(CaptureRect box)
     {
+        // Arranged, not only measured. Measuring hands back the size the plate
+        // wants and marks it valid, but the panel above it keeps handing out
+        // the rectangle it worked out last time, so a line that got wider comes
+        // out clipped. Copying a colour is where that shows: the reading goes
+        // from a pair of coordinates to a hex code plus a word.
+        //
+        // TEMPORARY: logged only when the two disagree, which is the signature
+        // of the clipping and nothing else. Remove once the fix is confirmed.
+        if (Math.Abs(Loupe.Bounds.Width - Loupe.DesiredSize.Width) > 0.5)
+        {
+            Log.Default.Info(
+                $"плитка: отведено {Loupe.Bounds.Width:F0}, нужно {Loupe.DesiredSize.Width:F0}");
+        }
+
+        Loupe.Arrange(new Rect(Loupe.DesiredSize));
+
         var scale = RenderScaling;
         var width = Loupe.DesiredSize.Width;
 
