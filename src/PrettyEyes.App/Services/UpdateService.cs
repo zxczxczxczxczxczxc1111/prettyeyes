@@ -151,6 +151,10 @@ public sealed class UpdateService : IDisposable
         if (!release.Version.NewerThan(Current))
         {
             _found = null;
+
+            // A silent success and a silent failure look the same from the
+            // outside, and one of them is worth knowing about.
+            Log.Default.Info($"обновлений нет, установлена {BuildLabel.Current}");
             Publish(new UpdateState(UpdateStage.UpToDate, Current));
 
             return;

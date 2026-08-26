@@ -166,7 +166,7 @@ public partial class SettingsWindow : Window
         BuildToolRow();
 
         CheckUpdates.IsChecked = settings.CheckUpdates;
-        CurrentVersion.Text = $"установлена {UpdateService.Current}";
+        CurrentVersion.Text = $"установлена {BuildLabel.Current}";
         ShowUpdateState(updates.State);
 
         _export = settings.Export ?? ExportStyle.None;

@@ -45,7 +45,9 @@ class Program
         // the same identity the installer's shortcut carries.
         AppIdentity.Declare();
 
-        Log.Default.Info("запуск");
+        // The build, not just the version: an hour went into finding out
+// which of two 1.3.0 builds wrote a log of five thousand lines.
+        Log.Default.Info($"запуск {BuildLabel.Current}");
 
         try
         {
