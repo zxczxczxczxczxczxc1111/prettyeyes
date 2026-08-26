@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using PrettyEyes.Core.Updates;
 using Xunit;
 
@@ -49,6 +49,25 @@ public class ReleaseInfoTests
             "Лупа и эмодзи.",
             string.Empty,
             $"sha256: {Hash}");
+
+        var info = ReleaseInfo.Parse(Release("v1.1.0", "prettyeyes-setup-1.1.0.exe", body));
+
+        Assert.Equal(Hash, info!.Sha256);
+    }
+
+    /// <summary>
+    /// Written 26.08.2026 after 1.4.0 went out with the hash wrapped in code
+    /// backticks for looks. The pattern wanted the digits right after the
+    /// colon, found none, and every installed copy refused the update it had
+    /// just downloaded - correctly, by its own rules, over punctuation.
+    /// </summary>
+    [Theory]
+    [InlineData("sha256: `{0}`")]
+    [InlineData("sha256: **{0}**")]
+    [InlineData("sha256: \"{0}\"")]
+    public void Punctuation_around_the_hash_does_not_hide_it(string line)
+    {
+        var body = string.Format(line, Hash);
 
         var info = ReleaseInfo.Parse(Release("v1.1.0", "prettyeyes-setup-1.1.0.exe", body));
 

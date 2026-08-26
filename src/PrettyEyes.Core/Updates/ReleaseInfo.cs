@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace PrettyEyes.Core.Updates;
@@ -75,6 +75,15 @@ public sealed partial record ReleaseInfo(ReleaseVersion Version, string AssetNam
         return match.Success ? match.Groups[1].Value.ToLowerInvariant() : null;
     }
 
-    [GeneratedRegex(@"sha256:\s*([0-9a-fA-F]{64})", RegexOptions.IgnoreCase)]
+    /// <summary>
+    /// Between the label and the digits anything decorative is allowed through:
+    /// backticks, asterisks, quotes. Markdown, in other words. 1.4.0 shipped
+    /// with the hash in code backticks, the digits were no longer right after
+    /// the colon, and every copy already installed refused the update it had
+    /// just downloaded - by its own rule, over punctuation. Letters still stop
+    /// the run, so this cannot wander off and pick up a hash from further down
+    /// the page.
+    /// </summary>
+    [GeneratedRegex(@"sha256:[\s`""'*_]*([0-9a-fA-F]{64})", RegexOptions.IgnoreCase)]
     private static partial Regex HashPattern();
 }
