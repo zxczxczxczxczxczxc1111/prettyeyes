@@ -1,7 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Media;
 using PrettyEyes.Core.Geometry;
-using SkiaSharp;
 
 namespace PrettyEyes.App.Views;
 
@@ -15,45 +14,57 @@ namespace PrettyEyes.App.Views;
 /// </summary>
 public partial class MagnifierLabel : UserControl
 {
-    public MagnifierLabel() => InitializeComponent();
+    // Built once and mutated. A fresh brush per pointer move is an
+    // AvaloniaObject per pointer move, with all the property-change plumbing
+    // that comes with one, for a colour that usually did not change.
+    private readonly SolidColorBrush _swatch = new();
 
-    /// <summary>Before a selection exists: the pixel and its colour.</summary>
-    public void ShowPixel(int x, int y, SKColor? colour)
+    private MagnifierReadout _shown;
+
+    public MagnifierLabel()
     {
-        Position.Text = $"{x}, {y}";
+        InitializeComponent();
+        Swatch.Background = _swatch;
+    }
 
-        if (colour is { } value)
+    /// <summary>
+    /// Puts a reading on the plate. Answers whether anything changed, which is
+    /// how the caller knows the plate needs measuring again.
+    /// </summary>
+    public bool Update(MagnifierReadout readout)
+    {
+        if (_shown == readout)
         {
-            Value.Text = $"#{value.Red:X2}{value.Green:X2}{value.Blue:X2}";
-            Swatch.Background = new SolidColorBrush(Color.FromRgb(value.Red, value.Green, value.Blue));
+            return false;
+        }
+
+        Position.Text = readout.Position;
+        Value.Text = readout.Value;
+
+        if (readout.Swatch is { } colour)
+        {
+            _swatch.Color = Color.FromRgb(colour.Red, colour.Green, colour.Blue);
             Swatch.IsVisible = true;
         }
         else
         {
-            // Off the captured frame: there is no colour to name.
-            Value.Text = "-";
             Swatch.IsVisible = false;
         }
-    }
 
-    /// <summary>While a selection is being dragged its size matters more.</summary>
-    public void ShowSize(CaptureRect selection)
-    {
-        Position.Text = $"{selection.Width} x {selection.Height}";
-        Value.Text = string.Empty;
-        Swatch.IsVisible = false;
-    }
+        _shown = readout;
 
-    /// <summary>Says the colour went to the clipboard, for a moment.</summary>
-    public void ShowCopied(SKColor colour)
-    {
-        Position.Text = $"#{colour.Red:X2}{colour.Green:X2}{colour.Blue:X2}";
-        Value.Text = "скопирован";
-        Swatch.Background = new SolidColorBrush(Color.FromRgb(colour.Red, colour.Green, colour.Blue));
-        Swatch.IsVisible = true;
+        return true;
     }
 
     public void Show() => Card.Opacity = 1;
 
-    public void Hide() => Card.Opacity = 0;
+    public void Hide()
+    {
+        Card.Opacity = 0;
+
+        // Forgotten on the way out: coming back to the same pixel must still
+        // repaint the plate, and must still measure it, or it returns holding
+        // the width of whatever it last showed.
+        _shown = default;
+    }
 }

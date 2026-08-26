@@ -60,6 +60,20 @@ public partial class OverlayWindow : Window
     private int _anchorY;
     private int _lastX;
     private int _lastY;
+
+    /// <summary>
+    /// The last pointer state this window acted on, or null when it has to act
+    /// on the next event whatever it says: a fresh capture, or the magnifier
+    /// having been taken away from outside.
+    ///
+    /// One deliberate hole: OverToolbar reads Toolbar.IsVisible and
+    /// Chip.IsVisible, and neither is in the key. Every path that shows or
+    /// hides the toolbar today drags a change of _selection or _dragging along
+    /// with it, so the hole does not reproduce. Start hiding the toolbar on a
+    /// timer or on a tool change and this needs a fourth place to be dropped.
+    /// </summary>
+    private PointerEcho? _echo;
+
     private bool _dragging;
 
     /// <summary>The document, for finding what is under the pointer.</summary>
@@ -362,6 +376,12 @@ public partial class OverlayWindow : Window
     {
         _selection = selection;
         Surface.ShowSelection(selection);
+
+        // The session redraws through here after every change to the document,
+        // and the cursor reads the document: Ctrl over a glyph that has just
+        // been undone must stop promising a carry. None of that shows up in
+        // the echo, so the echo is dropped instead.
+        _echo = null;
     }
 
     /// <summary>
@@ -405,8 +425,20 @@ public partial class OverlayWindow : Window
     /// </summary>
     public event EventHandler? PointerSeen;
 
-    /// <summary>Takes the magnifier away because another overlay has it now.</summary>
-    public void DropMagnifier() => HideMagnifier();
+    /// <summary>
+    /// The neighbouring window has the pointer, so this one lets its magnifier
+    /// go. Called from outside, without any pointer event of our own.
+    /// </summary>
+    public void DropMagnifier()
+    {
+        HideMagnifier();
+
+        // Taken away from outside, so the key has to forget where the pointer
+        // was: coming back to the very pixel it was taken at must bring the
+        // magnifier back. Deliberately here and not in HideMagnifier, which
+        // runs on every move while a tool is armed.
+        _echo = null;
+    }
 
     /// <summary>
     /// Starts the overlay disappearing.
@@ -470,13 +502,40 @@ public partial class OverlayWindow : Window
         Surface.MagnifierAt = new PixelPoint(x, y);
 
         var box = MagnifierPlacement.Choose(x, y, _monitorBounds, MagnifierSize, MagnifierGap);
-        var scale = RenderScaling;
 
         Loupe.IsVisible = true;
-        Loupe.Measure(Size.Infinity);
 
-        // Centred under the magnifier, and never off the monitor.
+        var readout = _dragging && _mode != OverlayMode.Drawing && !_selection.IsEmpty
+            ? MagnifierReadout.ForSize(_selection)
+            : MagnifierReadout.ForPixel(x, y, Surface.ColorAt(x, y));
+
+        // Measured only when the line changed: Measure walks the plate's whole
+        // subtree. Honest about the size of this win: the reading carries the
+        // coordinates, so it changes on nearly every event that got past the
+        // echo. What it does buy is the selection-size case, where the numbers
+        // hold still, and correctness after the plate has been hidden.
+        if (Loupe.Update(readout))
+        {
+            Loupe.Measure(Size.Infinity);
+        }
+
+        PlaceLoupe(box);
+        Loupe.Show();
+    }
+
+    /// <summary>
+    /// Puts the plate under the magnifier: centred on it, never off the
+    /// monitor, and above it when there is no room below.
+    ///
+    /// Its own method because the plate can change width without the pointer
+    /// moving - copying a colour rewrites the line - and a plate anchored for
+    /// a narrower reading hangs off the right edge of the screen.
+    /// </summary>
+    private void PlaceLoupe(CaptureRect box)
+    {
+        var scale = RenderScaling;
         var width = Loupe.DesiredSize.Width;
+
         var left = (((box.X + (box.Width / 2.0)) - _monitorBounds.X) / scale) - (width / 2);
         var top = ((box.Bottom - _monitorBounds.Y) / scale) + 6;
 
@@ -485,20 +544,16 @@ public partial class OverlayWindow : Window
             top = ((box.Y - _monitorBounds.Y) / scale) - 6 - Loupe.DesiredSize.Height;
         }
 
-        Loupe.RenderTransform = new TranslateTransform(
-            Math.Clamp(left, 0, Math.Max(0, Width - width)),
-            Math.Max(0, top));
-
-        if (_dragging && _mode != OverlayMode.Drawing && !_selection.IsEmpty)
+        // Mutated, not replaced: assigning a new transform detaches the old one
+        // and attaches a fresh set of property subscriptions, once per pixel.
+        if (Loupe.RenderTransform is not TranslateTransform place)
         {
-            Loupe.ShowSize(_selection);
-        }
-        else
-        {
-            Loupe.ShowPixel(x, y, Surface.ColorAt(x, y));
+            place = new TranslateTransform();
+            Loupe.RenderTransform = place;
         }
 
-        Loupe.Show();
+        place.X = Math.Clamp(left, 0, Math.Max(0, Width - width));
+        place.Y = Math.Max(0, top);
     }
 
     private void HideMagnifier()
@@ -552,6 +607,13 @@ public partial class OverlayWindow : Window
         _placingText = false;
         _gesture.Reset();
         _toolbarSize = null;
+
+        // A window out of the pool remembers where the pointer was during the
+        // previous capture. Hovering that same pixel again must not be taken
+        // for a repeat.
+        _echo = null;
+        _lastX = int.MinValue;
+        _lastY = int.MinValue;
 
         // The pool promises windows carry nothing of their own once released,
         // and this one holds a closure over a session that is already gone.
@@ -908,17 +970,27 @@ public partial class OverlayWindow : Window
 
         var (x, y) = ToVirtualPixels(e.GetPosition(this));
 
-        // A mouse reports far more often than the compositor draws; repeating
-        // the same physical pixel only buys another repaint.
-        if (x == _lastX && y == _lastY && _dragging)
+        var echo = new PointerEcho(
+            x, y, (int)e.KeyModifiers, (int)_mode, _dragging, _selection);
+
+        // A mouse reports far more often than the compositor draws. Nothing
+        // below depends on anything outside this key, so a repeat of the key
+        // is a repeat of the whole handler.
+        if (_echo == echo)
         {
             return;
         }
+
+        _echo = echo;
 
         if (!_dragging)
         {
             UpdateCursor(x, y, e.KeyModifiers);
             UpdateMagnifier(x, y);
+
+            _lastX = x;
+            _lastY = y;
+
             return;
         }
 
@@ -962,6 +1034,10 @@ public partial class OverlayWindow : Window
                 SelectionChanged?.Invoke(this, CaptureRect.FromPoints(_anchorX, _anchorY, x, y));
                 break;
 
+            // Safe to read the delta here: no path that reaches this case is
+            // reachable without a press having reseeded the pair first. The
+            // text-picking branch never computes a delta, and a double click
+            // leaves _dragging false.
             case OverlayMode.Adjusting:
                 var moved = SelectionGrips.Apply(_selection, _grip, x - _lastX, y - _lastY, _frameBounds);
                 SelectionChanged?.Invoke(this, moved);
@@ -1248,7 +1324,16 @@ public partial class OverlayWindow : Window
         }
 
         ColourCopyRequested?.Invoke(this, $"#{colour.Red:X2}{colour.Green:X2}{colour.Blue:X2}");
-        Loupe.ShowCopied(colour);
+
+        if (Loupe.Update(MagnifierReadout.Copied(colour)))
+        {
+            Loupe.Measure(Size.Infinity);
+            PlaceLoupe(MagnifierPlacement.Choose(at.X, at.Y, _monitorBounds, MagnifierSize, MagnifierGap));
+        }
+
+        // The reading on the plate is no longer the one the pointer is over.
+        // The next event has to put the ordinary reading back whatever it says.
+        _echo = null;
 
         return true;
     }
