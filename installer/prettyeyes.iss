@@ -3,22 +3,52 @@
 #define AppName "prettyeyes"
 #define AppVersion "1.3.0"
 #define AppExe "PrettyEyes.App.exe"
-#define AppId "{{8E5C1F42-4E2B-4E4A-9E4B-4B6E4B0A7D31}"
-#define PublishDir "..\src\PrettyEyes.App\bin\Release\net10.0-windows10.0.22621.0\win-x64\publish"
+; Собирается ключом ISCC /DCheck. Всё, что здесь разведено, разведено потому, что
+; иначе проверочная сборка займёт место боевой. AppId решает, что во что ставится;
+; DisableDirPage закрывает последний путь, по которому человек мог бы указать папку
+; боевой руками, и тогда Restart Manager закрыл бы её и переписал её же exe.
+#ifdef Check
+  #define AppNameFull "prettyeyes проверка"
+  #define AppIdValue "{{BADE425C-DA8E-45BD-8BCE-14FAD7873C2C}"
+  #define DirName "prettyeyes-check"
+  #define OutputName "prettyeyes-check-setup"
+  #define UserModelId "prettyeyes.check"
+  #define AutostartValue "prettyeyes-check"
+  #define IconFile "..\prettyeyes-check.ico"
+  #define DirPage "yes"
+  #define AutostartFlags " Flags: unchecked"
+#else
+  #define AppNameFull "prettyeyes"
+  #define AppIdValue "{{8E5C1F42-4E2B-4E4A-9E4B-4B6E4B0A7D31}"
+  #define DirName "prettyeyes"
+  #define OutputName "prettyeyes-setup"
+  #define UserModelId "prettyeyes.app"
+  #define AutostartValue "prettyeyes"
+  #define IconFile "..\prettyeyes.ico"
+  #define DirPage "auto"
+  #define AutostartFlags ""
+#endif
+
+; Каталог публикации приходит из build.ps1: у каждой сборки он свой, иначе
+; установщик может упаковать бинарь чужого вида.
+#ifndef PublishDir
+  #define PublishDir "..\src\PrettyEyes.Appin\Release
+et10.0-windows10.0.22621.0\win-x64\publish"
+#endif
 
 [Setup]
-AppId={#AppId}
-AppName={#AppName}
+AppId={#AppIdValue}
+AppName={#AppNameFull}
 AppVersion={#AppVersion}
 AppPublisher={#AppName}
-DefaultDirName={localappdata}\Programs\{#AppName}
-DefaultGroupName={#AppName}
+DefaultDirName={localappdata}\Programs\{#DirName}
+DefaultGroupName={#AppNameFull}
 DisableProgramGroupPage=yes
-DisableDirPage=auto
+DisableDirPage={#DirPage}
 PrivilegesRequired=lowest
 OutputDir=..\dist
-OutputBaseFilename=prettyeyes-setup-{#AppVersion}
-SetupIconFile=..\prettyeyes.ico
+OutputBaseFilename={#OutputName}-{#AppVersion}
+SetupIconFile={#IconFile}
 UninstallDisplayIcon={app}\{#AppExe}
 WizardStyle=modern
 ; Russian is the product language; English stays available through /LANG=english.
@@ -47,15 +77,15 @@ Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-Name: "autostart"; Description: "{cm:AutostartTask}"; GroupDescription: "{cm:GeneralGroup}"
+Name: "autostart"; Description: "{cm:AutostartTask}"; GroupDescription: "{cm:GeneralGroup}";{#AutostartFlags}
 
 [CustomMessages]
 russian.AutostartTask=Запускать вместе с Windows
 russian.GeneralGroup=Дополнительно
-russian.LaunchApp=Запустить prettyeyes
+russian.LaunchApp=Запустить {#AppNameFull}
 english.AutostartTask=Start with Windows
 english.GeneralGroup=Additional options
-english.LaunchApp=Launch prettyeyes
+english.LaunchApp=Launch {#AppNameFull}
 
 [Files]
 Source: "{#PublishDir}\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
@@ -63,11 +93,11 @@ Source: "{#PublishDir}\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
 [Icons]
 ; AppUserModelID is what makes Windows treat this as a real application and
 ; show its toast notifications; without a shortcut carrying it they are dropped.
-Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"; AppUserModelID: "prettyeyes.app"
+Name: "{autoprograms}\{#AppNameFull}"; Filename: "{app}\{#AppExe}"; AppUserModelID: "{#UserModelId}"
 
 [Registry]
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; \
-    ValueName: "prettyeyes"; ValueData: """{app}\{#AppExe}"""; Flags: uninsdeletevalue; Tasks: autostart
+    ValueName: "{#AutostartValue}"; ValueData: """{app}\{#AppExe}"""; Flags: uninsdeletevalue; Tasks: autostart
 
 [Run]
 ; No skipifsilent on purpose. The built-in updater runs Setup with /SILENT, and
@@ -250,5 +280,5 @@ begin
   WizardForm.PreparingNoRadio.Visible := False;
 
   WizardForm.PreparingLabel.Caption :=
-    'prettyeyes сейчас запущен. Программа установки закроет его, обновит и запустит снова.';
+    '{#AppNameFull} сейчас запущен. Программа установки закроет его, обновит и запустит снова.';
 end;

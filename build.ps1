@@ -1,7 +1,12 @@
 ﻿# Publishes the app and builds the installer. One command, no memory required.
+param([switch]$Check)
 $ErrorActionPreference = "Stop"
 
-$publish = "src\PrettyEyes.App\bin\Release\net10.0-windows10.0.22621.0\win-x64\publish"
+$flavor = if ($Check) { "check" } else { "release" }
+
+# Two flavours, two output folders. One folder means the installer can pick up a
+# stale binary of the other flavour and ship it under the wrong identity.
+$publish = "src\PrettyEyes.App\bin\Release\net10.0-windows10.0.22621.0\win-x64\publish-$flavor"
 # Inno Setup installs per-user or per-machine depending on how it was set up.
 $isccCandidates = @(
     "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
@@ -15,19 +20,25 @@ if (-not $iscc) {
 }
 
 dotnet publish src/PrettyEyes.App -c Release -r win-x64 --self-contained true `
-    -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+    -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:BuildFlavor=$flavor -o $publish
 
 if (-not (Test-Path "$publish\PrettyEyes.App.exe")) {
     throw "Публикация не дала исполняемый файл: $publish"
 }
 
-& $iscc "installer\prettyeyes.iss"
+$issArgs = @("/DPublishDir=..\$publish")
+
+if ($Check) { $issArgs += "/DCheck" }
+
+& $iscc @issArgs "installer\prettyeyes.iss"
 Write-Host "Установщик собран в dist\"
 
 # The hash goes into the release notes as "sha256: <хэш>". The updater refuses
 # a release without one, so printing it here is not a nicety: forget the line
 # and nobody updates.
-$setup = Get-ChildItem "dist\prettyeyes-setup-*.exe" | Sort-Object LastWriteTime | Select-Object -Last 1
+$pattern = if ($Check) { "dist\prettyeyes-check-setup-*.exe" } else { "dist\prettyeyes-setup-*.exe" }
+$setup = Get-ChildItem $pattern | Sort-Object LastWriteTime | Select-Object -Last 1
 
 if ($setup) {
     $hash = (Get-FileHash $setup.FullName -Algorithm SHA256).Hash.ToLower()
