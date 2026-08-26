@@ -9,15 +9,16 @@ namespace PrettyEyes.Core.Annotations;
 /// A line drawn by hand, as a pencil or as a highlighter.
 ///
 /// One annotation for both because they differ in paint and nothing else: the
-/// pencil puts opaque ink on top, the highlighter multiplies a wide translucent
-/// band into what is underneath, which is what makes text stay readable through
-/// it. Two classes would mean the same path smoothing twice.
+/// pencil puts opaque ink on top, the highlighter multiplies a translucent band
+/// into what is underneath, which is what makes text stay readable through it.
+/// Two classes would mean the same path smoothing twice.
+///
+/// Width used to be part of the difference as well, quietly multiplied by four
+/// behind whatever the card said. It is asked for directly now, and a marker is
+/// wide because its default is wide.
 /// </summary>
 public sealed class StrokeAnnotation : IAnnotation
 {
-    /// <summary>How much wider a highlighter is than a pencil of the same size.</summary>
-    public const float HighlighterWidth = 4f;
-
     /// <summary>
     /// Translucent enough to read through, opaque enough to be a mark. Above
     /// roughly a third the text underneath starts to go.
@@ -54,7 +55,7 @@ public sealed class StrokeAnnotation : IAnnotation
         }
 
         _color = color;
-        _strokeWidth = highlighter ? strokeWidth * HighlighterWidth : strokeWidth;
+        _strokeWidth = strokeWidth;
         _highlighter = highlighter;
 
         var pad = (int)Math.Ceiling(_strokeWidth / 2f) + 1;

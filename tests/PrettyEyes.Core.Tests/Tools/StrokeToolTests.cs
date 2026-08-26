@@ -55,9 +55,11 @@ public class StrokeToolTests
     }
 
     [Fact]
-    public void The_highlighter_is_wider_than_the_pencil_it_shares_a_style_with()
+    public void A_highlighter_is_exactly_as_wide_as_it_was_told()
     {
-        var style = new ToolStyle(Palette.Yellow, StrokeSize.Medium);
+        // It used to quadruple whatever the card said behind the user's back.
+        // The card asks for pixels now, and pixels have to mean pixels.
+        var style = ToolStyle.Default.WithWidth(10);
 
         var pencil = new StrokeTool(style);
         pencil.Begin(10, 10);
@@ -67,7 +69,7 @@ public class StrokeToolTests
         marker.Begin(10, 10);
         var thick = marker.End(40, 10)!;
 
-        Assert.True(thick.Bounds.Height > thin.Bounds.Height);
+        Assert.Equal(thin.Bounds.Height, thick.Bounds.Height);
     }
 
     [Fact]
