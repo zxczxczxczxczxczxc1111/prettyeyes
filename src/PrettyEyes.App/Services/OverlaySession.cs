@@ -522,6 +522,13 @@ public sealed class OverlaySession
             window.SetToolActive(active: false);
             window.ResetSelection();
             window.HideToolbar();
+
+            // A card is anchored to the toolbar, so hiding one without the
+            // other leaves it floating over the frozen screen with nothing to
+            // belong to. Every other path that clears the screen already does
+            // this pair; this one was simply missed.
+            window.HideStyleCard();
+            window.HideEmojiCard();
         }
     }
 
