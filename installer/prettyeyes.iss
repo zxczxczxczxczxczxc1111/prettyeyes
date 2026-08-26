@@ -4,9 +4,9 @@
 #define AppVersion "1.3.0"
 #define AppExe "PrettyEyes.App.exe"
 ; Собирается ключом ISCC /DCheck. Всё, что здесь разведено, разведено потому, что
-; иначе проверочная сборка займёт место боевой. AppId решает, что во что ставится;
+; иначе проверочная сборка займёт место прода. AppId решает, что во что ставится;
 ; DisableDirPage закрывает последний путь, по которому человек мог бы указать папку
-; боевой руками, и тогда Restart Manager закрыл бы её и переписал её же exe.
+; прода руками, и тогда Restart Manager закрыл бы прод и переписал его же exe.
 #ifdef Check
   #define AppNameFull "prettyeyes проверка"
   #define AppIdValue "{{BADE425C-DA8E-45BD-8BCE-14FAD7873C2C}"
