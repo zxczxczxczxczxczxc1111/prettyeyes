@@ -12,6 +12,21 @@ public partial class EmojiPickerView : UserControl
 {
     private const int RecentCount = 8;
 
+    /// <summary>
+    /// Decoded once for the whole process.
+    ///
+    /// It used to be one decode per glyph per window: the picker lives in every
+    /// overlay window and in every pinned one, so two monitors and a pin came
+    /// to a hundred and twenty bitmaps of the same forty pictures. The recent
+    /// row rebuilt eight more on every pick and let the old ones go without
+    /// disposing them.
+    ///
+    /// A plain Dictionary because this is only ever touched from the UI thread.
+    /// Never emptied: forty small pictures for the life of a process is the
+    /// point, not a leak.
+    /// </summary>
+    private static readonly Dictionary<string, Bitmap> Glyphs = [];
+
     private readonly List<string> _recent = [];
 
     public EmojiPickerView()
@@ -75,6 +90,31 @@ public partial class EmojiPickerView : UserControl
         }
     }
 
+
+    /// <summary>
+    /// The picture for a glyph, shared by every row and every window.
+    ///
+    /// Deliberately at the file's own size. It is shown at 22 logical pixels,
+    /// which is 55 physical at the 250% Windows offers, and the file's 72 is
+    /// the headroom that covers it. One shared bitmap cannot be decoded per
+    /// monitor scaling anyway.
+    /// </summary>
+    internal static Bitmap For(string code)
+    {
+        if (Glyphs.TryGetValue(code, out var cached))
+        {
+            return cached;
+        }
+
+        using var stream = AssetLoader.Open(
+            new Uri($"avares://PrettyEyes.App/Assets/Emoji/{code}.png"));
+
+        var glyph = new Bitmap(stream);
+        Glyphs[code] = glyph;
+
+        return glyph;
+    }
+
     private Button NewButton(string code)
     {
         var button = new Button
@@ -83,8 +123,7 @@ public partial class EmojiPickerView : UserControl
             {
                 Width = 22,
                 Height = 22,
-                Source = new Bitmap(AssetLoader.Open(
-                    new Uri($"avares://PrettyEyes.App/Assets/Emoji/{code}.png"))),
+                Source = For(code),
             },
         };
 

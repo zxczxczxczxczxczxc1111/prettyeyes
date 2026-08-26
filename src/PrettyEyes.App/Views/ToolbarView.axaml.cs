@@ -181,9 +181,10 @@ public partial class ToolbarView : UserControl
     /// <summary>Puts the chosen glyph on the emoji button.</summary>
     public void ShowGlyph(string code)
     {
-        EmojiGlyph.Source = new Avalonia.Media.Imaging.Bitmap(
-            Avalonia.Platform.AssetLoader.Open(
-                new Uri($"avares://PrettyEyes.App/Assets/Emoji/{code}.png")));
+        // The picker's cache, not a decode of its own. This runs on every glyph
+        // pick and once per window, and it overwrote Source each time, dropping
+        // the previous picture without disposing it.
+        EmojiGlyph.Source = EmojiPickerView.For(code);
 
         EmojiGlyph.IsVisible = true;
         EmojiOutline.IsVisible = false;
