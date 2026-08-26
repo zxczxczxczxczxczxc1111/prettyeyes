@@ -29,6 +29,7 @@ public sealed class CaptureCanvas : Control
     private CaptureRect _selection;
     private Document? _document;
     private IAnnotation? _preview;
+    private PixelProbe? _probe;
 
     public CaptureCanvas()
     {
@@ -126,24 +127,7 @@ public sealed class CaptureCanvas : Control
     /// The colour under the crosshair, sampled once per position rather than
     /// per frame. Null when the cursor is off the captured frame.
     /// </summary>
-    public SKColor? ColorAt(int x, int y)
-    {
-        if (_source is null)
-        {
-            return null;
-        }
-
-        var local = new CaptureRect(x - _frameBounds.X, y - _frameBounds.Y, 1, 1);
-
-        if (local.X < 0 || local.Y < 0 || local.X >= _source.Width || local.Y >= _source.Height)
-        {
-            return null;
-        }
-
-        using var pixels = _source.PeekPixels();
-
-        return pixels?.GetPixelColor(local.X, local.Y);
-    }
+    public SKColor? ColorAt(int x, int y) => _probe?.ColourAt(x, y);
 
     /// <summary>
     /// Puts the veil and the frame at a value without animating there.
@@ -168,54 +152,20 @@ public sealed class CaptureCanvas : Control
     ///
     /// Around, not at: the cursor covers two dozen pixels, and a decision taken
     /// from the single pixel under its tip flips on every speck of dust in a
-    /// photograph. Sampled on a coarse grid - the answer only has to be right
-    /// enough to choose between two inks.
+    /// photograph.
     /// </summary>
-    public double? LuminanceAround(int x, int y, int reach)
-    {
-        if (_source is null)
-        {
-            return null;
-        }
-
-        using var pixels = _source.PeekPixels();
-
-        if (pixels is null)
-        {
-            return null;
-        }
-
-        const int Step = 4;
-
-        var total = 0.0;
-        var counted = 0;
-
-        for (var dy = -reach; dy <= reach; dy += Step)
-        {
-            for (var dx = -reach; dx <= reach; dx += Step)
-            {
-                var px = x + dx - _frameBounds.X;
-                var py = y + dy - _frameBounds.Y;
-
-                if (px < 0 || py < 0 || px >= _source.Width || py >= _source.Height)
-                {
-                    continue;
-                }
-
-                var colour = pixels.GetPixelColor(px, py);
-
-                total += (0.2126 * colour.Red) + (0.7152 * colour.Green) + (0.0722 * colour.Blue);
-                counted++;
-            }
-        }
-
-        return counted == 0 ? null : total / (counted * 255.0);
-    }
+    public double? LuminanceAround(int x, int y, int reach) => _probe?.LuminanceAround(x, y, reach);
 
     public void Attach(Document document, CaptureRect monitorBounds, CaptureRect usable)
     {
         _document = document;
         _source = document.Source;
+
+        // One map per capture rather than one per question. The image is frozen
+        // for the life of the document, so the map cannot go stale under it.
+        _probe?.Dispose();
+        _probe = new PixelProbe(document.Source, document.SourceBounds);
+
         _frameBounds = document.SourceBounds;
         _monitorBounds = monitorBounds;
         _monitorUsable = usable;
@@ -231,6 +181,8 @@ public sealed class CaptureCanvas : Control
     {
         _document = null;
         _source = null;
+        _probe?.Dispose();
+        _probe = null;
         _selection = CaptureRect.Empty;
         _preview = null;
         InvalidateVisual();
