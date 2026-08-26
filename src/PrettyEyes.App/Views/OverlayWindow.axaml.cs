@@ -230,6 +230,9 @@ public partial class OverlayWindow : Window
     /// </summary>
     public void ShowPreview(IAnnotation? preview) => Surface.ShowPreview(preview);
 
+    /// <summary>Frames this window painted for the capture it is showing.</summary>
+    public int Repaints => Surface.Repaints;
+
     /// <summary>
     /// A tool gesture has a new half-finished shape. Raised rather than drawn,
     /// because a shape can straddle two monitors and this window is only one of

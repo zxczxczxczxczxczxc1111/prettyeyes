@@ -112,6 +112,17 @@ public sealed class CaptureCanvas : Control
     }
 
     /// <summary>
+    /// How many frames this canvas has actually painted since the capture was
+    /// attached.
+    ///
+    /// Public for the same reason BlurCache.Computed is: a repaint nobody can
+    /// count is a repaint nobody can argue about. One gesture on one monitor
+    /// is the baseline; the same gesture costing the same number on the other
+    /// monitors means somebody is being woken up for nothing.
+    /// </summary>
+    public int Repaints { get; private set; }
+
+    /// <summary>
     /// The colour under the crosshair, sampled once per position rather than
     /// per frame. Null when the cursor is off the captured frame.
     /// </summary>
@@ -208,6 +219,7 @@ public sealed class CaptureCanvas : Control
         _frameBounds = document.SourceBounds;
         _monitorBounds = monitorBounds;
         _monitorUsable = usable;
+        Repaints = 0;
         InvalidateVisual();
     }
 
@@ -254,6 +266,8 @@ public sealed class CaptureCanvas : Control
         {
             return;
         }
+
+        Repaints++;
 
         // Snapshot on the UI thread: the draw operation runs on the render one.
         var annotations = _document.SnapshotAnnotations();

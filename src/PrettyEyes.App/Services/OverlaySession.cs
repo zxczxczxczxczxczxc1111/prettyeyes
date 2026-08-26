@@ -1269,6 +1269,11 @@ public sealed class OverlaySession
             Unsubscribe(window);
         }
 
+        // One line per capture, not per frame. Two monitors reporting the same
+        // number for a gesture that happened on one of them is the symptom
+        // task 3 exists for.
+        Log.Default.Info($"перерисовок по мониторам: {string.Join(", ", _windows.Select(w => w.Repaints))}");
+
         // Faded, not cut. The screenshot is already in the clipboard by now, so
         // the tenth of a second this takes is spent after the work is done and
         // before the screen comes back - which is the moment that reads as
