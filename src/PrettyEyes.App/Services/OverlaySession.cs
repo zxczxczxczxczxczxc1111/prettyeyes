@@ -1,4 +1,5 @@
-﻿using Avalonia.Input;
+﻿using System.Diagnostics;
+using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Threading;
 using PrettyEyes.App.Views;
@@ -198,6 +199,28 @@ public sealed class OverlaySession
         }
 
         _windows.FirstOrDefault()?.Activate();
+
+        // Two numbers, not one, and this is the one the person feels. The scope
+        // above stops when our work is done; between that and the compositor
+        // putting the first frame on screen the overlay is a transparent window
+        // showing the live desktop. On a still screen those milliseconds are
+        // invisible. Over anything moving - a page with animations, a video -
+        // the picture keeps going and then snaps back to the moment of the
+        // capture, which reads as the shot arriving late.
+        var arrival = Stopwatch.StartNew();
+        var painted = _windows.Select(window => window.Painted()).OfType<Task>().ToArray();
+
+        if (painted.Length == 0)
+        {
+            return;
+        }
+
+        // Rendered runs its continuations synchronously and can land on the
+        // render thread; the log does not care, but nothing here may touch a
+        // window.
+        Task.WhenAll(painted).ContinueWith(
+            _ => Log.Default.Info($"первый кадр оверлея на экране: {arrival.Elapsed.TotalMilliseconds:F1} мс"),
+            TaskScheduler.Default);
     }
 
     /// <summary>
