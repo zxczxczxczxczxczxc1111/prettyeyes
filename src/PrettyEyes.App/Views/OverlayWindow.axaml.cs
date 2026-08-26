@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
@@ -805,8 +805,21 @@ public partial class OverlayWindow : Window
         var x = Math.Clamp(localRight - size.Width, 0, Math.Max(0, Width - size.Width));
 
         // Moved by transform, not by margin: a margin change relayouts the
-        // whole window on every step of a drag.
-        Toolbar.RenderTransform = new TranslateTransform(x, y);
+        // whole window on every step of a drag. The transform itself is reused
+        // rather than replaced - a new one per frame is an allocation plus a
+        // property change on a control that is already showing.
+        //
+        // The type has to stay TranslateTransform: OverToolbar reads X and Y
+        // off it through Covers.
+        if (Toolbar.RenderTransform is not TranslateTransform panel)
+        {
+            panel = new TranslateTransform();
+            Toolbar.RenderTransform = panel;
+        }
+
+        panel.X = x;
+        panel.Y = y;
+
         Toolbar.FadeIn();
 
         PlaceChip(selection, localX, localTop, toolbarAbove: y < localTop);
@@ -845,13 +858,17 @@ public partial class OverlayWindow : Window
         // The renderer crops the selection to the captured frame, so the chip
         // has to show the cropped size or it promises pixels that never arrive.
         var visible = selection.Intersect(_frameBounds);
-        Chip.Update(visible.IsEmpty ? selection : visible, _export);
+        var changed = Chip.Update(visible.IsEmpty ? selection : visible, _export);
         Chip.IsVisible = true;
 
-        // The chip does change width with the number it shows, so it is
-        // measured every time - but it is a single text line, and it is moved
-        // by transform like the panel.
-        Chip.Measure(Size.Infinity);
+        // The chip changes width with the number it shows, so it is measured -
+        // but only when the number actually moved. The rest of the time the
+        // last DesiredSize still holds, and a measure pass is skipped.
+        if (changed)
+        {
+            Chip.Measure(Size.Infinity);
+        }
+
         var size = Chip.DesiredSize;
 
         var y = localTop - Gap - size.Height;
@@ -863,7 +880,15 @@ public partial class OverlayWindow : Window
 
         var x = Math.Clamp(localX, 0, Math.Max(0, Width - size.Width));
 
-        Chip.RenderTransform = new TranslateTransform(x, y);
+        if (Chip.RenderTransform is not TranslateTransform at)
+        {
+            at = new TranslateTransform();
+            Chip.RenderTransform = at;
+        }
+
+        at.X = x;
+        at.Y = y;
+
         Chip.FadeIn();
     }
 

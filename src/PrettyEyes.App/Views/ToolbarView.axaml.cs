@@ -1,4 +1,4 @@
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
 using Avalonia.Input;
 using Avalonia.Interactivity;
@@ -144,12 +144,25 @@ public partial class ToolbarView : UserControl
     /// <summary>Fades and lifts the card in; the transition lives in the XAML.</summary>
     public void FadeIn()
     {
+        // Called from every step of a drag, and the card is already in by the
+        // second one. Without this the string below is parsed sixty times a
+        // second to arrive at the transform that is already there.
+        if (Card.Opacity >= 1)
+        {
+            return;
+        }
+
         Card.Opacity = 1;
         Card.RenderTransform = TransformOperations.Parse("translateY(0px)");
     }
 
     public void FadeOut()
     {
+        if (Card.Opacity <= 0)
+        {
+            return;
+        }
+
         Card.Opacity = 0;
         Card.RenderTransform = TransformOperations.Parse("translateY(8px)");
     }

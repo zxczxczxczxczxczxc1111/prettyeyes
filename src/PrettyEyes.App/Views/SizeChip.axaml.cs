@@ -1,4 +1,4 @@
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
 using Avalonia.Media.Transformation;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Rendering;
@@ -18,23 +18,48 @@ public partial class SizeChip : UserControl
     /// actually be: promising 1200 x 800 and writing 1296 x 896 is a small lie
     /// that costs somebody a re-crop.
     /// </summary>
-    public void Update(CaptureRect selection, ExportStyle? style = null)
+    /// <returns>
+    /// Whether the text changed. A drag along one axis keeps the other number
+    /// the same, and a drag that stays inside one pixel step changes neither:
+    /// the caller uses this to skip the measure pass.
+    /// </returns>
+    public bool Update(CaptureRect selection, ExportStyle? style = null)
     {
         var fitted = (style ?? ExportStyle.None).FitTo(selection.Width, selection.Height);
 
-        Label.Text = fitted.Enabled && fitted.Padding > 0
+        var text = fitted.Enabled && fitted.Padding > 0
             ? $"{selection.Width} x {selection.Height} -> {selection.Width + (fitted.Padding * 2)} x {selection.Height + (fitted.Padding * 2)}"
             : $"{selection.Width} x {selection.Height}";
+
+        if (Label.Text == text)
+        {
+            return false;
+        }
+
+        Label.Text = text;
+        return true;
     }
 
     public void FadeIn()
     {
+        // Same as the toolbar: the chip is in after the first frame of a drag,
+        // and every later call would re-parse the string for nothing.
+        if (Card.Opacity >= 1)
+        {
+            return;
+        }
+
         Card.Opacity = 1;
         Card.RenderTransform = TransformOperations.Parse("translateY(0px)");
     }
 
     public void FadeOut()
     {
+        if (Card.Opacity <= 0)
+        {
+            return;
+        }
+
         Card.Opacity = 0;
         Card.RenderTransform = TransformOperations.Parse("translateY(8px)");
     }
