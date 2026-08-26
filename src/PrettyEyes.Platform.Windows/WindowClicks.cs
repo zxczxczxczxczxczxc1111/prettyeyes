@@ -12,13 +12,16 @@ public static class WindowClicks
     /// it. WS_EX_TRANSPARENT only works on a layered window, so the layer is
     /// asked for at the same time.
     ///
-    /// And then the layer is given a value, which is the part that was missing.
-    /// A window that has just been handed WS_EX_LAYERED has no layer contents
-    /// until somebody says what they are, and until then Windows has nothing to
-    /// compose and draws nothing at all. Live symptom, found 26.08.2026 and
-    /// present in 1.3.0: the flash frame appeared on the first whole-monitor
-    /// shot of a run and never again. It was a race, and the first shot won it
-    /// because everything on that path was still cold.
+    /// And then the layer is given a value. A window handed WS_EX_LAYERED has no
+    /// layer contents until somebody says what they are, and Windows composes
+    /// what it is told about.
+    ///
+    /// Added 26.08.2026 while chasing a flash frame that showed up on the first
+    /// whole-monitor shot of a run and rarely after. It helped and it was not
+    /// the cause: the cause was the UI thread being busy decorating the
+    /// screenshot, so the window could not paint until after it had been told
+    /// to close. Kept because a layered window with an undefined layer is a
+    /// loaded gun either way, not because it fixed that.
     /// </summary>
     public static void PassThrough(IntPtr window)
     {
