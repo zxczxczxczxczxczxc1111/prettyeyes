@@ -471,6 +471,24 @@ public partial class OverlayWindow : Window
         StyleCard.Close();
         EmojiCard.Close();
         Chip.IsVisible = false;
+
+        // The banner is the same case: a failed save leaves it up, Escape
+        // dismisses the overlay, and without this it hangs over the desktop for
+        // the pool's beat after everything around it has gone.
+        HideError();
+
+        // What was drawn goes with the rest of it. The canvas paints the
+        // annotations straight out of the document, so hiding every control we
+        // own still leaves the drawings sitting on the frozen desktop until the
+        // pool gets round to Reset - fifty milliseconds and a frame later. That
+        // is long enough to see, and it reads as the drawing outliving the
+        // overlay it was made in.
+        //
+        // Detaching here rather than shortening the pool's beat: the beat is
+        // there so the emptying frame reaches the screen before the window is
+        // hidden, which is a different problem. Detach is idempotent, and Reset
+        // still calls it.
+        Surface.Detach();
     }
 
     /// <summary>Off means the magnifier never shows, whatever the pointer does.</summary>
