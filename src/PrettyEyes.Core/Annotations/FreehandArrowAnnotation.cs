@@ -1,4 +1,4 @@
-using PrettyEyes.Core.Geometry;
+﻿using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Rendering;
 using SkiaSharp;
@@ -49,7 +49,7 @@ public sealed class FreehandArrowAnnotation : IAnnotation
         // conditional on HeadAllowed - a preview and the finished arrow have to
         // claim the same ground, or the bounds jump on release and a
         // neighbouring monitor keeps a strip nobody repainted.
-        var pad = (int)Math.Ceiling(ArrowHead.Length(strokeWidth, Span)) + 1;
+        var pad = (int)Math.Ceiling(ArrowHead.Reach(strokeWidth, Span)) + 1;
         var left = _x.Min();
         var top = _y.Min();
 

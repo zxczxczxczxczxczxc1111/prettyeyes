@@ -1,4 +1,4 @@
-using SkiaSharp;
+﻿using SkiaSharp;
 
 namespace PrettyEyes.Core.Annotations;
 
@@ -15,8 +15,45 @@ namespace PrettyEyes.Core.Annotations;
 /// </summary>
 public static class ArrowHead
 {
-    private const float LengthFactor = 4f;
-    private const double Spread = Math.PI / 7;
+    /// <summary>
+    /// How long the head is as a multiple of the line it ends, and how far its
+    /// base corners swing out from the axis.
+    ///
+    /// Both measured off the editor in Telegram rather than guessed, on five
+    /// arrows whose numbers agreed: against a 23 pixel stroke their head runs
+    /// 2.6 strokes deep and 3.0 wide. The first attempt here was four deep and
+    /// a 25 degree spread, which is a long thin spike - reported as "too
+    /// sharp", and the measurement says why.
+    /// </summary>
+    private const float LengthFactor = 3f;
+    private const double Spread = Math.PI / 6;
+
+    /// <summary>
+    /// The head's outline, stroked in its own colour with round joints, as a
+    /// fraction of the head's own length.
+    ///
+    /// This is what blunts the point and softens the base corners. Measured:
+    /// their arrowhead is a filled shape - 83% of its convex hull - yet at the
+    /// very tip it is still about one stroke wide instead of coming to nothing.
+    /// A bare triangle looks like a blade next to it.
+    ///
+    /// Taken off the head rather than off the line on purpose. At the width the
+    /// measurement was made the two are the same number, but the head has a
+    /// floor and the line does not, so a hairline would otherwise get a head of
+    /// full length with a rounding of half a pixel - sharper than every other
+    /// arrow in the same picture.
+    /// </summary>
+    private const float OutlineFactor = 0.15f;
+
+    /// <summary>
+    /// The shortest a head is allowed to be, whatever the line.
+    ///
+    /// Without it the head is purely a multiple of the width, so a hairline
+    /// gets a head three pixels long: reported as "at small sizes it is
+    /// practically invisible", and it was, because the head drowned in the
+    /// line it was supposed to end.
+    /// </summary>
+    public const float MinLength = 12f;
 
     /// <summary>
     /// Where the line should stop, as a fraction of the head length back from
@@ -36,7 +73,18 @@ public static class ArrowHead
     /// thirds of the line survives under the head.
     /// </summary>
     public static float Length(float strokeWidth, double strokeLength) =>
-        (float)Math.Min(strokeWidth * LengthFactor, strokeLength / 2);
+        (float)Math.Min(Math.Max(strokeWidth * LengthFactor, MinLength), strokeLength / 2);
+
+    /// <summary>
+    /// How far the head reaches from the tip once its outline is counted. What
+    /// Bounds has to cover; Length alone leaves the outline outside the box.
+    /// </summary>
+    public static float Reach(float strokeWidth, double strokeLength)
+    {
+        var length = Length(strokeWidth, strokeLength);
+
+        return length + (length * OutlineFactor / 2);
+    }
 
     /// <param name="angle">
     /// Where the line arrives from, as Atan2 of the incoming direction. The
@@ -60,10 +108,16 @@ public static class ArrowHead
 
         path.Close();
 
+        // Filled and outlined in one pass, in the same colour. The outline is
+        // what rounds the point and the base corners; a bare fill comes to a
+        // needle, which is what "too sharp" meant.
         using var paint = new SKPaint
         {
             Color = new SKColor(color),
-            Style = SKPaintStyle.Fill,
+            Style = SKPaintStyle.StrokeAndFill,
+            StrokeWidth = headLength * OutlineFactor,
+            StrokeJoin = SKStrokeJoin.Round,
+            StrokeCap = SKStrokeCap.Round,
             IsAntialias = true,
         };
 

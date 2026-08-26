@@ -26,7 +26,7 @@ public sealed class ArrowAnnotation : IAnnotation
         // Padded by the head length: the arrowhead sticks out past the line,
         // and Bounds has to cover everything the annotation actually paints.
         var line = CaptureRect.FromPoints(x1, y1, x2, y2);
-        var pad = (int)Math.Ceiling(ArrowHead.Length(strokeWidth, Length));
+        var pad = (int)Math.Ceiling(ArrowHead.Reach(strokeWidth, Length));
         Bounds = new CaptureRect(
             line.X - pad, line.Y - pad, line.Width + pad * 2, line.Height + pad * 2);
     }
