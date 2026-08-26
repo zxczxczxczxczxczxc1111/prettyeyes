@@ -1,4 +1,4 @@
-using Avalonia.Input;
+﻿using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Threading;
 using PrettyEyes.App.Views;
@@ -150,6 +150,12 @@ public sealed class OverlaySession
             {
                 window.ToolbarControl.ShowGlyph(_emoji);
             }
+            // The pool hands windows back in whatever state the previous
+            // capture left them. A successful copy takes Topmost off and never
+            // puts it back, so without this the second capture of a session
+            // stops floating above other topmost windows.
+            window.Topmost = true;
+
             // The window comes out of a pool and remembers the highlight from
             // the last capture. The session is new and remembers nothing. Say
             // it out loud.
