@@ -1,4 +1,4 @@
-using Avalonia.Threading;
+﻿using Avalonia.Threading;
 using Avalonia;
 using Avalonia.Animation;
 using Avalonia.Animation.Easings;
@@ -349,7 +349,9 @@ public sealed class CaptureCanvas : Control
 
         public void Render(ImmediateDrawingContext context)
         {
-            var watch = System.Diagnostics.Stopwatch.StartNew();
+            // GetTimestamp instead of StartNew: this runs on the render thread
+            // once per frame, and a Stopwatch is an allocation there.
+            var started = System.Diagnostics.Stopwatch.GetTimestamp();
 
             try
             {
@@ -357,16 +359,16 @@ public sealed class CaptureCanvas : Control
             }
             finally
             {
-                watch.Stop();
+                var elapsed = System.Diagnostics.Stopwatch
+                    .GetElapsedTime(started).TotalMilliseconds;
 
                 // Only the frames that missed: a line per frame would bury the
                 // log, and a frame nobody noticed is not worth a line.
-                if (watch.Elapsed.TotalMilliseconds > FrameBudgetMs)
+                if (elapsed > FrameBudgetMs)
                 {
-                    Log.Default.Info($"медленный кадр: {watch.Elapsed.TotalMilliseconds:F1} мс, "
+                    Log.Default.Info($"медленный кадр: {elapsed:F1} мс, "
                         + $"объектов {_annotations.Count}");
                 }
-
             }
         }
 

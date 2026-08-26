@@ -1,4 +1,4 @@
-using Avalonia;
+﻿using Avalonia;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
@@ -67,8 +67,17 @@ class Program
 
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()
-        => AppBuilder.Configure<App>()
+    {
+        var builder = AppBuilder.Configure<App>()
             .UsePlatformDetect()
-            .WithInterFont()
-            .LogToTrace();
+            .WithInterFont();
+
+#if DEBUG
+        // The app keeps its own log; Avalonia's trace listener is for us while
+        // developing, not for the people running the release.
+        builder = builder.LogToTrace();
+#endif
+
+        return builder;
+    }
 }
