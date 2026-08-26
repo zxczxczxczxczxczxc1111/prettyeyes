@@ -20,6 +20,31 @@ public sealed class WindowsHotkeys : IHotkeys
 
     private readonly HashSet<HotkeyAction> _registered = [];
 
+    /// <summary>
+    /// How often the held keys are asked whether they are still down. Three
+    /// frames: fast enough that a deliberate second press is never swallowed,
+    /// slow enough to be free.
+    /// </summary>
+    private const uint ReleasePoll = 50;
+
+    /// <summary>Any id will do; the window has one timer and this is it.</summary>
+    private static readonly IntPtr PollId = new(1);
+
+    /// <summary>
+    /// Actions whose key has fired and has not been let go of since.
+    ///
+    /// Windows repeats WM_HOTKEY for as long as the key is held, and a repeat
+    /// is not a second press: holding the whole-monitor key used to take eight
+    /// screenshots in two seconds, and before there was any guard at all it
+    /// took the machine down. What a person means by holding a key is one
+    /// action, so the repeats are dropped and the key has to come up before the
+    /// action arms again.
+    ///
+    /// The value is the virtual key, kept because WM_HOTKEY carries it and
+    /// GetAsyncKeyState needs it.
+    /// </summary>
+    private readonly Dictionary<HotkeyAction, int> _held = [];
+
     // Held in a field on purpose: the delegate is passed to native code, and a
     // collected one crashes the process on the first message.
     private readonly NativeMethods.WndProc _windowProc;
@@ -104,9 +129,65 @@ public sealed class WindowsHotkeys : IHotkeys
             Unregister(action);
         }
 
+        // The poll goes with the window it was set on. Left behind, it would
+        // keep asking about keys nobody is listening for any more.
+        NativeMethods.KillTimer(_hwnd, PollId);
+        _held.Clear();
+
         if (_hwnd != IntPtr.Zero)
         {
             NativeMethods.DestroyWindow(_hwnd);
+        }
+    }
+
+
+    /// <summary>
+    /// Raises the action, unless this is the same key still being held down.
+    ///
+    /// A held key repeats through Windows key repeat, roughly thirty times a
+    /// second, and every repeat arrives here as an ordinary WM_HOTKEY. There is
+    /// no flag on the message saying which is which, so the answer has to come
+    /// from the key itself: fired once, the action stays disarmed until
+    /// GetAsyncKeyState reports the key up.
+    /// </summary>
+    private void Fire(HotkeyAction action, int virtualKey)
+    {
+        if (_held.ContainsKey(action))
+        {
+            return;
+        }
+
+        // Recorded before the handler runs, not after: the handler can be slow
+        // (a whole-monitor shot is a capture, a render and a clipboard write),
+        // and repeats arriving while it works must already find the action
+        // disarmed.
+        _held[action] = virtualKey;
+
+        if (_held.Count == 1)
+        {
+            NativeMethods.SetTimer(_hwnd, PollId, ReleasePoll, IntPtr.Zero);
+        }
+
+        Pressed?.Invoke(this, action);
+    }
+
+    /// <summary>
+    /// Arms again every action whose key has come up, and stops asking once
+    /// none are left.
+    /// </summary>
+    private void ReleaseFinished()
+    {
+        foreach (var (action, virtualKey) in _held.ToArray())
+        {
+            if ((NativeMethods.GetAsyncKeyState(virtualKey) & NativeMethods.KeyDown) == 0)
+            {
+                _held.Remove(action);
+            }
+        }
+
+        if (_held.Count == 0)
+        {
+            NativeMethods.KillTimer(_hwnd, PollId);
         }
     }
 
@@ -118,9 +199,18 @@ public sealed class WindowsHotkeys : IHotkeys
 
             if (Enum.IsDefined(action))
             {
-                Pressed?.Invoke(this, action);
+                // The virtual key rides in the high word of lParam, which is
+                // the only place it is available here: the registration lives
+                // in the settings and this window never sees it.
+                Fire(action, (lParam.ToInt32() >> 16) & 0xFFFF);
                 return IntPtr.Zero;
             }
+        }
+
+        if (message == NativeMethods.WM_TIMER && lParam == IntPtr.Zero && wParam == PollId)
+        {
+            ReleaseFinished();
+            return IntPtr.Zero;
         }
 
         if (message == WM_DISPLAYCHANGE)

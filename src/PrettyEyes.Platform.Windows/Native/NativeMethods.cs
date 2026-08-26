@@ -317,4 +317,26 @@ internal static class NativeMethods
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool SetProcessWorkingSetSize(IntPtr process, IntPtr minimum, IntPtr maximum);
+
+    /// <summary>Posted by SetTimer to the window that asked for it.</summary>
+    internal const uint WM_TIMER = 0x0113;
+
+    /// <summary>
+    /// The high bit means the key is down right now.
+    ///
+    /// Deliberately not the low bit, which says "was pressed since somebody
+    /// last asked": that state is global and shared with every other caller in
+    /// the process, so reading it is a race with whoever asks next.
+    /// </summary>
+    internal const int KeyDown = 0x8000;
+
+    [DllImport("user32.dll")]
+    internal static extern short GetAsyncKeyState(int virtualKey);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern IntPtr SetTimer(IntPtr hWnd, IntPtr id, uint interval, IntPtr callback);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool KillTimer(IntPtr hWnd, IntPtr id);
 }
