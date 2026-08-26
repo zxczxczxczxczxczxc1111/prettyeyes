@@ -311,6 +311,6 @@ public class JsonSettingsStoreTests
         Assert.Null(settings.PinHotkey);
         // Not asserting SchemaVersion here: Normalize assigns it unconditionally,
         // so the check would pass no matter what the rest of this does.
-        Assert.Equal(12, AppSettings.CurrentSchema);
+        Assert.Equal(13, AppSettings.CurrentSchema);
     }
 }

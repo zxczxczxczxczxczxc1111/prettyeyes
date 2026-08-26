@@ -1,5 +1,6 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using PrettyEyes.Core.Platform;
+using PrettyEyes.Core.Tools;
 using PrettyEyes.Core.Rendering;
 
 namespace PrettyEyes.Core.Settings;
@@ -82,9 +83,6 @@ public sealed class JsonSettingsStore : ISettingsStore
         // Schema 3 added the pixel grid, on by default for the same reason.
         MagnifierGrid = stored.SchemaVersion >= 3 ? stored.MagnifierGrid : true,
 
-        // Schema 4 added per-tool styles. Missing means every tool draws the
-        // default, which is exactly what an empty dictionary says.
-        ToolStyles = stored.ToolStyles ?? [],
 
         // Schema 5 added emoji. No glyph chosen yet is a valid state: the grid
         // opens on the first click instead of stamping something arbitrary.
@@ -109,8 +107,97 @@ public sealed class JsonSettingsStore : ISettingsStore
 
         // Schema 10 added the cursor. A missing enum reads as its first value,
         // which is the crosshair everyone had until now, so nothing to do.
+
+        // Schema 4 added per-tool styles; schema 13 replaced the three
+        // thickness presets with a number of pixels and took the marker's
+        // hidden multiplier away with it. A style older than that carries a
+        // preset and no number, and only here is the tool known - which matters,
+        // because the marker drew four times what its preset said.
+        ToolStyles = stored.SchemaVersion >= 13
+            ? stored.ToolStyles ?? []
+            : Migrate(stored.ToolStyles),
+
         SchemaVersion = AppSettings.CurrentSchema,
     };
+
+    /// <summary>How much wider the released build draws a highlighter.</summary>
+    private const int MarkerFactor = 4;
+
+    /// <summary>
+    /// What schema 13 does to every stored tool style: a preset becomes the
+    /// number of pixels it used to put on the screen, and a stored arrow starts
+    /// drawing freehand.
+    ///
+    /// The arrow is here rather than in the defaults because a default cannot
+    /// reach a tool the user has already touched - one change of colour and the
+    /// style is in the file for good. Nobody picked the straight arrow on
+    /// purpose either: the choice did not exist in any released build.
+    /// </summary>
+    private static Dictionary<ToolKind, ToolStyle> Migrate(
+        Dictionary<ToolKind, ToolStyle>? stored)
+    {
+        var migrated = new Dictionary<ToolKind, ToolStyle>();
+
+        if (stored is null)
+        {
+            return migrated;
+        }
+
+        foreach (var (kind, style) in stored)
+        {
+            if (style is null)
+            {
+                continue;
+            }
+
+            var drawn = PresetWidth(style.Size);
+
+            if (kind == ToolKind.Marker)
+            {
+                drawn *= MarkerFactor;
+            }
+
+            migrated[kind] = kind == ToolKind.Arrow
+                ? style.WithWidth(drawn) with { FreehandArrow = true }
+                : style.WithWidth(drawn);
+        }
+
+        return migrated;
+    }
+
+    /// <summary>What each of the three old presets put on the screen.</summary>
+    private static int PresetWidth(StrokeSize size) => size switch
+    {
+        StrokeSize.Small => 2,
+        StrokeSize.Large => 5,
+        _ => ToolStyle.DefaultWidth,
+    };
+
+    /// <summary>
+    /// The thickness as the released build will read it.
+    ///
+    /// That build has no Width and draws by preset, multiplying the marker's by
+    /// four. Written here rather than wherever a width is chosen, because only
+    /// here is the tool known - and a preset computed without the tool is four
+    /// times wrong for the highlighter, every single time. Doing it at the file
+    /// boundary also means a style that arrived any other way, from another
+    /// machine or from a hand-edited file, is put right before it is written.
+    /// </summary>
+    private static Dictionary<ToolKind, ToolStyle> WithLegacyPresets(
+        IReadOnlyDictionary<ToolKind, ToolStyle> styles)
+    {
+        var mirrored = new Dictionary<ToolKind, ToolStyle>();
+
+        foreach (var (kind, style) in styles)
+        {
+            var drawn = (int)style.StrokeWidth;
+            var asPreset = kind == ToolKind.Marker ? drawn / MarkerFactor : drawn;
+
+            mirrored[kind] = style with { Size = ToolStyle.NearestSize(asPreset) };
+        }
+
+        return mirrored;
+    }
 
     /// <summary>
     /// Written through a temporary file and moved into place: a half-written
@@ -129,7 +216,12 @@ public sealed class JsonSettingsStore : ISettingsStore
                 Directory.CreateDirectory(directory);
             }
 
-            File.WriteAllText(temporary, JsonSerializer.Serialize(settings, Options));
+            var written = settings with
+            {
+                ToolStyles = WithLegacyPresets(settings.ToolStyles ?? []),
+            };
+
+            File.WriteAllText(temporary, JsonSerializer.Serialize(written, Options));
             File.Move(temporary, _path, overwrite: true);
 
             return true;
