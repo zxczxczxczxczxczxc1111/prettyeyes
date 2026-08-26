@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Rendering.Composition;
 using Avalonia.Threading;
 using PrettyEyes.App.Controls;
 using PrettyEyes.Core.Annotations;
@@ -235,6 +236,22 @@ public partial class OverlayWindow : Window
 
     /// <summary>Frames this window painted as nothing. TEMPORARY, see CaptureCanvas.Blanks.</summary>
     public int Blanks => Surface.Blanks;
+
+    /// <summary>
+    /// Completes once the compositor has put this window's current contents on
+    /// screen. Null when the window has no composition visual, which for a
+    /// pooled one means it was never shown and has nothing to keep.
+    ///
+    /// The pool empties a window and then hides it, and a hidden window keeps
+    /// whatever the compositor last put on it. Waiting a fixed 50 ms for the
+    /// emptying frame was a guess, and a measured one at that: over eight
+    /// closes, one hid a window that had not repainted, and the next capture
+    /// showed the previous one - drawings and all - for the 44 ms it takes to
+    /// paint a first frame of its own. This is the same wait, asked instead of
+    /// assumed.
+    /// </summary>
+    public Task? Painted() =>
+        ElementComposition.GetElementVisual(this)?.Compositor.RequestCompositionBatchCommitAsync().Rendered;
 
     /// <summary>
     /// A tool gesture has a new half-finished shape. Raised rather than drawn,
