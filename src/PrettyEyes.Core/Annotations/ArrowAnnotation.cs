@@ -7,9 +7,6 @@ namespace PrettyEyes.Core.Annotations;
 
 public sealed class ArrowAnnotation : IAnnotation
 {
-    private const float HeadLengthFactor = 4f;
-    private const double HeadAngle = Math.PI / 7;
-
     private readonly int _x1;
     private readonly int _y1;
     private readonly int _x2;
@@ -29,7 +26,7 @@ public sealed class ArrowAnnotation : IAnnotation
         // Padded by the head length: the arrowhead sticks out past the line,
         // and Bounds has to cover everything the annotation actually paints.
         var line = CaptureRect.FromPoints(x1, y1, x2, y2);
-        var pad = (int)Math.Ceiling(strokeWidth * HeadLengthFactor);
+        var pad = (int)Math.Ceiling(ArrowHead.Length(strokeWidth));
         Bounds = new CaptureRect(
             line.X - pad, line.Y - pad, line.Width + pad * 2, line.Height + pad * 2);
     }
@@ -50,14 +47,7 @@ public sealed class ArrowAnnotation : IAnnotation
         canvas.DrawLine(_x1, _y1, _x2, _y2, paint);
 
         var angle = Math.Atan2(_y2 - _y1, _x2 - _x1);
-        var headLength = _strokeWidth * HeadLengthFactor;
 
-        for (var side = -1; side <= 1; side += 2)
-        {
-            var branch = angle + Math.PI + side * HeadAngle;
-            var x = _x2 + (float)(Math.Cos(branch) * headLength);
-            var y = _y2 + (float)(Math.Sin(branch) * headLength);
-            canvas.DrawLine(_x2, _y2, x, y, paint);
-        }
+        ArrowHead.Draw(canvas, paint, _x2, _y2, angle, _strokeWidth);
     }
 }

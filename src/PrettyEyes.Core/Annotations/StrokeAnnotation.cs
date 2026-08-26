@@ -72,7 +72,7 @@ public sealed class StrokeAnnotation : IAnnotation
 
     public void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin, BlurCache cache)
     {
-        using var path = BuildPath();
+        using var path = StrokePath.Build(_x, _y);
 
         // A highlighter is a translucent ink, so what it does depends on what
         // is under it. On paper multiplying is exactly right: black text stays
@@ -141,37 +141,4 @@ public sealed class StrokeAnnotation : IAnnotation
         return counted > 0 && total / counted > PaperLuminance;
     }
 
-    /// <summary>
-    /// Points to a curve. Each segment runs to the midpoint of the next one
-    /// with the point itself as the control, which is the cheapest smoothing
-    /// there is and turns the polyline the mouse reports into something that
-    /// looks drawn rather than plotted.
-    /// </summary>
-    private SKPath BuildPath()
-    {
-        var path = new SKPath();
-
-        if (_x.Length == 1)
-        {
-            // A tap still leaves a dot: a zero-length path strokes nothing.
-            path.MoveTo(_x[0], _y[0]);
-            path.LineTo(_x[0] + 0.01f, _y[0]);
-
-            return path;
-        }
-
-        path.MoveTo(_x[0], _y[0]);
-
-        for (var i = 1; i < _x.Length - 1; i++)
-        {
-            var midX = (_x[i] + _x[i + 1]) / 2f;
-            var midY = (_y[i] + _y[i + 1]) / 2f;
-
-            path.QuadTo(_x[i], _y[i], midX, midY);
-        }
-
-        path.LineTo(_x[^1], _y[^1]);
-
-        return path;
-    }
 }
