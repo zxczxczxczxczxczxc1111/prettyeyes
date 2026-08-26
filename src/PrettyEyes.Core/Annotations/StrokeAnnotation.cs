@@ -59,14 +59,28 @@ public sealed class StrokeAnnotation : IAnnotation
         _highlighter = highlighter;
 
         var pad = (int)Math.Ceiling(_strokeWidth / 2f) + 1;
-        var left = _x.Min();
-        var top = _y.Min();
+
+        // One pass rather than four. The constructor runs on every pointer
+        // move: the tools build a fresh annotation for the preview each time,
+        // and four walks of the same two arrays is three too many.
+        var left = _x[0];
+        var right = _x[0];
+        var top = _y[0];
+        var bottom = _y[0];
+
+        for (var i = 1; i < _x.Length; i++)
+        {
+            if (_x[i] < left) { left = _x[i]; }
+            if (_x[i] > right) { right = _x[i]; }
+            if (_y[i] < top) { top = _y[i]; }
+            if (_y[i] > bottom) { bottom = _y[i]; }
+        }
 
         Bounds = new CaptureRect(
             left - pad,
             top - pad,
-            _x.Max() - left + (pad * 2),
-            _y.Max() - top + (pad * 2));
+            right - left + (pad * 2),
+            bottom - top + (pad * 2));
     }
 
     public CaptureRect Bounds { get; }
