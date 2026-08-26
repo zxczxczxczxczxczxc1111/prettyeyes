@@ -52,6 +52,7 @@ internal static class Program
 
         Sample(wgc);
         RenderPath(wgc);
+        DrawLoop(wgc);
         Allocations(wgc);
         Breakdown(monitors);
     }
@@ -201,6 +202,87 @@ internal static class Program
             DocumentRenderer.Render(document, ExportStyle.Sheet).Dispose());
 
         document.Clear();
+    }
+
+    /// <summary>
+    /// What a dragged frame costs frame after frame.
+    ///
+    /// RenderPath above measures one export; this measures the loop: the same
+    /// unchanged annotations drawn again and again into an offscreen surface,
+    /// which is what the overlay does while the mouse moves. Allocations are
+    /// counted with it because the render thread is exactly where a per-frame
+    /// allocation turns into a pause somebody sees.
+    /// </summary>
+    private static void DrawLoop(IScreenCapture capture)
+    {
+        var shot = capture.CaptureAll();
+        using var document = new Document(shot.Image, shot.Bounds);
+
+        var monitor = shot.Layout.Monitors[0].Bounds;
+
+        using var surface = SKSurface.Create(new SKImageInfo(1200, 800))
+            ?? throw new InvalidOperationException("Не выделить поверхность 1200x800.");
+
+        // Annotations live in virtual-desktop coordinates, and the left monitor
+        // starts at a negative origin. Without this the whole squiggle lands
+        // outside the surface, Skia clips all of it, and the measurement is of
+        // an empty canvas. DocumentRenderer.Crop does the same translation for
+        // the same reason.
+        surface.Canvas.Translate(-monitor.X - 100, -monitor.Y - 100);
+
+        Console.WriteLine();
+
+        foreach (var (count, highlighter) in ((int Count, bool Highlighter)[])
+            [(1, false), (5, false), (20, false), (5, true)])
+        {
+            document.Clear();
+
+            for (var i = 0; i < count; i++)
+            {
+                document.Add(new StrokeAnnotation(
+                    Squiggle(monitor.X + 150 + (i * 7), monitor.Y + 150, 300),
+                    0xFFE5484D,
+                    strokeWidth: highlighter ? 12 : 3,
+                    highlighter));
+            }
+
+            var annotations = document.SnapshotAnnotations();
+
+            void Frame()
+            {
+                foreach (var annotation in annotations)
+                {
+                    annotation.Draw(surface.Canvas, document.Source, document.SourceBounds, document.BlurCache);
+                }
+            }
+
+            // Warm first: the first draw of anything pays for whatever Skia
+            // sets up lazily, and that is not what a frame in the middle of a
+            // drag looks like.
+            Frame();
+
+            var before = GC.GetTotalAllocatedBytes(precise: true);
+            Measure($"цикл, росчерков {count}{(highlighter ? ", маркер" : "")}", Frame);
+            var after = GC.GetTotalAllocatedBytes(precise: true);
+
+            Console.WriteLine($"{"",-38} аллокаций за {Runs} кадров {(after - before) / 1024.0:F1} КБ");
+        }
+    }
+
+    /// <summary>
+    /// A hand-drawn line of the shape people actually draw: three hundred
+    /// points with a wobble, which is what a second of dragging reports.
+    /// </summary>
+    private static List<(int X, int Y)> Squiggle(int x, int y, int points)
+    {
+        var line = new List<(int X, int Y)>(points);
+
+        for (var i = 0; i < points; i++)
+        {
+            line.Add((x + i, y + (int)(Math.Sin(i / 9.0) * 40)));
+        }
+
+        return line;
     }
 
     /// <summary>
