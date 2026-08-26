@@ -29,6 +29,13 @@ public sealed class OverlaySession
     private OverlayWindow? _pointerWindow;
     private DesktopLayout? _layout;
     private ToolKind? _activeTool;
+
+    /// <summary>
+    /// Whether the armed tool was clicked by a person rather than armed by the
+    /// default. Escape treats the two differently, and only the session can
+    /// tell them apart: it arms the default by calling OnToolPicked on itself.
+    /// </summary>
+    private bool _toolPickedByHand;
     private readonly ToolStyles _styles;
     private string? _emoji;
     private bool _toolbarShown;
@@ -102,6 +109,8 @@ public sealed class OverlaySession
             // the last capture. The session is new and remembers nothing. Say
             // it out loud.
             window.ToolbarControl.SetActive(_activeTool);
+            window.EscapeClearsTool = () =>
+                EscapeStep.ClearsTool(_toolPickedByHand, Document?.Annotations.Count > 0);
             window.ToolbarControl.ShowStyles(_styles);
             window.ToolbarControl.ShowTools(new ToolVisibility(_services.Settings.Tools));
 
@@ -440,6 +449,10 @@ public sealed class OverlaySession
 
         _activeTool = kind;
 
+        // The session arms the default by calling this on itself; anything else
+        // is a person clicking a button. Escape needs the difference.
+        _toolPickedByHand = kind is not null && !ReferenceEquals(sender, this);
+
         // Only the visible toolbar raised this, but the others have to agree:
         // the selection can move to another monitor mid-session.
         foreach (var window in _windows)
@@ -464,6 +477,7 @@ public sealed class OverlaySession
         CancelText();
 
         _activeTool = null;
+        _toolPickedByHand = false;
         _toolbarShown = false;
         Document.Selection = CaptureRect.Empty;
         Document.Clear();

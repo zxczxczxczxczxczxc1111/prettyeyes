@@ -171,6 +171,13 @@ public partial class OverlayWindow : Window
     /// </summary>
     public bool TextToolArmed { get; set; }
 
+    /// <summary>
+    /// Whether Escape takes the tool back instead of closing. Asked rather than
+    /// told: the window comes out of a pool, and a stored answer would still be
+    /// the previous capture's answer.
+    /// </summary>
+    public Func<bool>? EscapeClearsTool { get; set; }
+
     /// <summary>A key arrived while a caret was up. The session reads it.</summary>
     public event EventHandler<KeyEventArgs>? TextKeyPressed;
 
@@ -503,6 +510,10 @@ public partial class OverlayWindow : Window
         _placingText = false;
         _gesture.Reset();
         _toolbarSize = null;
+
+        // The pool promises windows carry nothing of their own once released,
+        // and this one holds a closure over a session that is already gone.
+        EscapeClearsTool = null;
 
         // Snapped rather than animated: see SnapOpacities.
         Surface.SnapOpacities(veil: 0, frame: 0);
@@ -1091,7 +1102,10 @@ public partial class OverlayWindow : Window
                 EmojiCard.Close();
                 break;
 
-            case Key.Escape when _mode == OverlayMode.Drawing:
+            // Unwired means the old behaviour: a window with no session behind
+            // it has no business closing a capture on its own.
+            case Key.Escape when _mode == OverlayMode.Drawing
+                && (EscapeClearsTool?.Invoke() ?? true):
                 ToolCleared?.Invoke(this, EventArgs.Empty);
                 break;
 
