@@ -1,3 +1,4 @@
+﻿using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Platform.Windows.Native;
 
@@ -202,6 +203,18 @@ public sealed class WindowsHotkeys : IHotkeys
                 // The virtual key rides in the high word of lParam, which is
                 // the only place it is available here: the registration lives
                 // in the settings and this window never sees it.
+                // How long the keystroke took to reach us. Everything the log
+                // says about a screenshot starts after this point, so a slow
+                // hand-over from Windows - a busy foreground application, a
+                // message queue stuck behind something else - reads as an
+                // application that sat still for a moment and then woke up.
+                var waited = Environment.TickCount - NativeMethods.GetMessageTime();
+
+                if (waited >= 16)
+                {
+                    Log.Default.Info($"клавиша шла до приложения {waited} мс");
+                }
+
                 Fire(action, (lParam.ToInt32() >> 16) & 0xFFFF);
                 return IntPtr.Zero;
             }

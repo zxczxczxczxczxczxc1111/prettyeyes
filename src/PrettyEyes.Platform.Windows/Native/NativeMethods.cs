@@ -102,6 +102,15 @@ internal static class NativeMethods
 
     internal const int IDI_APPLICATION = 32512;
 
+    /// <summary>
+    /// When the message being handled was posted, on the same clock as
+    /// Environment.TickCount. The difference between the two is how long a
+    /// keystroke spent on its way to us, which is the one stretch of a
+    /// screenshot that nothing else measures.
+    /// </summary>
+    [DllImport("user32.dll")]
+    internal static extern int GetMessageTime();
+
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     internal static extern bool Shell_NotifyIcon(int message, ref NotifyIconData data);
 
