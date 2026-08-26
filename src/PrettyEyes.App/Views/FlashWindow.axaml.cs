@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Platform.Windows;
 
@@ -43,6 +44,18 @@ public partial class FlashWindow : Window
         window.Position = new PixelPoint(monitor.X, monitor.Y);
 
         var handle = window.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+
+        // TEMPORARY. Sizing this window one pixel short of the monitor, the way
+        // OverlayWindow.Resize does, made the flash disappear altogether, and
+        // reading the code did not say why. These are the numbers that decision
+        // needs: what the monitor is, what scale the window thinks it is on,
+        // and what size it actually ended up. Remove once the taskbar is fixed.
+        Log.Default.Info(
+            $"вспышка: монитор {monitor.Width}x{monitor.Height} в {monitor.X},{monitor.Y}"
+            + $", масштаб {window.RenderScaling:F2}"
+            + $", размер {window.Width:F0}x{window.Height:F0}"
+            + $", кадр {window.Bounds.Width:F0}x{window.Bounds.Height:F0}"
+            + $", хэндл {(handle == IntPtr.Zero ? "нет" : "есть")}");
 
         WindowSwitcher.Hide(handle);
 
