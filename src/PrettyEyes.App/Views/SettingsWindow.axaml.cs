@@ -178,7 +178,18 @@ public partial class SettingsWindow : Window
         HeaderTitle.Text = AppFlavor.Current.DisplayName;
 
         CurrentVersion.Text = $"установлена {BuildLabel.Current}";
-        ShowUpdateState(updates.State);
+
+        if (AppFlavor.Current.UpdatesAllowed)
+        {
+            ShowUpdateState(updates.State);
+        }
+        else
+        {
+            CheckUpdates.IsVisible = false;
+            CheckNow.IsVisible = false;
+            InstallUpdate.IsVisible = false;
+            UpdateStatus.Text = "проверочная сборка, обновлений нет";
+        }
 
         _export = settings.Export ?? ExportStyle.None;
         _loading = false;
@@ -946,6 +957,14 @@ public partial class SettingsWindow : Window
     /// </summary>
     private void ShowUpdateState(UpdateState state)
     {
+        if (!AppFlavor.Current.UpdatesAllowed)
+        {
+            // OnCheckUpdatesChanged also lands here, and without this the line
+            // set once at start-up would be quietly overwritten if the checkbox
+            // ever comes back.
+            return;
+        }
+
         var busy = state.Stage is UpdateStage.Checking or UpdateStage.Downloading or UpdateStage.Installing;
 
         CheckNow.IsEnabled = !busy;

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Reflection;
 using Avalonia.Threading;
 using PrettyEyes.Core.Diagnostics;
+using PrettyEyes.Core.Platform;
 using PrettyEyes.Core.Updates;
 
 namespace PrettyEyes.App.Services;
@@ -93,6 +94,13 @@ public sealed class UpdateService : IDisposable
 
     public void Start()
     {
+        // The check build never replaces itself: it lives next to the real one,
+        // and an update would quietly turn it into the real one.
+        if (!AppFlavor.Current.UpdatesAllowed)
+        {
+            return;
+        }
+
         if (_enabled())
         {
             _timer.Start();
@@ -105,6 +113,13 @@ public sealed class UpdateService : IDisposable
     /// </summary>
     public void Reschedule()
     {
+        // The check build never replaces itself: it lives next to the real one,
+        // and an update would quietly turn it into the real one.
+        if (!AppFlavor.Current.UpdatesAllowed)
+        {
+            return;
+        }
+
         if (_enabled())
         {
             if (!_timer.IsEnabled)
@@ -123,6 +138,13 @@ public sealed class UpdateService : IDisposable
 
     public async Task CheckAsync(bool manual)
     {
+        // The check build never replaces itself: it lives next to the real one,
+        // and an update would quietly turn it into the real one.
+        if (!AppFlavor.Current.UpdatesAllowed)
+        {
+            return;
+        }
+
         if (State.Stage is UpdateStage.Checking or UpdateStage.Downloading or UpdateStage.Installing)
         {
             return;
