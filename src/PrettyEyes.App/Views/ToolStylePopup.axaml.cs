@@ -1,4 +1,4 @@
-using System.Globalization;
+﻿using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
@@ -35,9 +35,25 @@ public partial class ToolStylePopup : UserControl
             Colors.Children.Add(NewSwatch(colour));
         }
 
-        SmallStep.Click += (_, _) => Pick(_style with { Size = StrokeSize.Small });
-        MediumStep.Click += (_, _) => Pick(_style with { Size = StrokeSize.Medium });
-        LargeStep.Click += (_, _) => Pick(_style with { Size = StrokeSize.Large });
+        Thinner.Click += (_, _) => Rewidth(-1);
+        Thicker.Click += (_, _) => Rewidth(1);
+
+        // Sixty steps is a long way to walk one press at a time, so the wheel
+        // takes the journey. Said plainly rather than dressed up as house
+        // style: nothing else in this card has a wheel, and over a pinned
+        // window a bare wheel zooms. Handled stops it reaching that.
+        StrokeRow.PointerWheelChanged += (_, e) =>
+        {
+            // Sideways scrolling and a tilting wheel both report zero here, and
+            // treating zero as "down" would quietly make the line thinner.
+            if (e.Delta.Y == 0)
+            {
+                return;
+            }
+
+            Rewidth(e.Delta.Y > 0 ? 1 : -1);
+            e.Handled = true;
+        };
 
         // System font first, then whatever this machine has, alphabetically.
         // The list is no longer curated: a scrolling list holds three hundred
@@ -125,18 +141,22 @@ public partial class ToolStylePopup : UserControl
             Mark(FreehandArrow, _style.FreehandArrow);
         }
 
-        foreach (var (button, size) in Steps())
-        {
-            button.Classes.Remove(ActiveClass);
-
-            if (size == _style.Size)
-            {
-                button.Classes.Add(ActiveClass);
-            }
-        }
-
         if (!text)
         {
+            var width = (int)_style.StrokeWidth;
+
+            WidthValue.Text = width.ToString(CultureInfo.InvariantCulture);
+
+            // Capped, and drawn opaque even for the highlighter, which lays
+            // down a translucent band: this bar says how wide, not how it will
+            // look on the screenshot.
+            WidthSample.Height = Math.Min(width, 20);
+            WidthSample.Fill = new SolidColorBrush(Color.FromUInt32(_style.Color));
+
+            Thinner.IsEnabled = width > ToolStyle.MinWidth;
+            Thicker.IsEnabled = width < ToolStyle.MaxWidth;
+
+            // Everything below belongs to the text card and to nothing else.
             return;
         }
 
@@ -180,6 +200,17 @@ public partial class ToolStylePopup : UserControl
             button.Classes.Add(ActiveClass);
         }
     }
+
+    /// <summary>
+    /// One pixel per press. The wheel is there for the long journeys, and a
+    /// bigger step would make the thin end unreachable, where a single pixel is
+    /// the whole difference between a hairline and a line.
+    ///
+    /// Counted from StrokeWidth rather than Width so it agrees with the number
+    /// on the card: a style that never went through Normalize carries zero and
+    /// draws the default.
+    /// </summary>
+    private void Rewidth(int step) => Pick(_style.WithWidth((int)_style.StrokeWidth + step));
 
     /// <summary>
     /// The size for the next label. Labels already on the screenshot keep
@@ -319,10 +350,4 @@ public partial class ToolStylePopup : UserControl
         return (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
     }
 
-    private IEnumerable<(Button Button, StrokeSize Size)> Steps()
-    {
-        yield return (SmallStep, StrokeSize.Small);
-        yield return (MediumStep, StrokeSize.Medium);
-        yield return (LargeStep, StrokeSize.Large);
-    }
 }

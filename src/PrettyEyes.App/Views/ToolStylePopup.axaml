@@ -82,15 +82,30 @@
       <Rectangle Height="1" Fill="{StaticResource Border}"/>
 
       <StackPanel x:Name="StrokeRow" Orientation="Horizontal" Spacing="4">
-        <Button Classes="step" x:Name="SmallStep" ToolTip.Tip="Тонкая">
-          <Rectangle Height="2"/>
+        <Button Classes="step" x:Name="Thinner" MinWidth="28" ToolTip.Tip="Тоньше">
+          <TextBlock Text="-"/>
         </Button>
-        <Button Classes="step" x:Name="MediumStep" ToolTip.Tip="Средняя">
-          <Rectangle Height="3"/>
+        <Border MinWidth="34" VerticalAlignment="Center" ToolTip.Tip="Толщина в пикселях">
+          <TextBlock x:Name="WidthValue"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center"
+                     Foreground="{StaticResource TextStrong}"/>
+        </Border>
+        <Button Classes="step" x:Name="Thicker" MinWidth="28" ToolTip.Tip="Толще">
+          <TextBlock Text="+"/>
         </Button>
-        <Button Classes="step" x:Name="LargeStep" ToolTip.Tip="Толстая">
-          <Rectangle Height="5"/>
-        </Button>
+
+        <Rectangle Width="1" Margin="6,4" Fill="{StaticResource Border}"/>
+
+        <!-- Shows what the number means rather than saying it twice. Capped in
+             height: at sixty pixels a true-to-life bar would be taller than the
+             card it sits in. -->
+        <Border Width="52" Height="28" VerticalAlignment="Center">
+          <Rectangle x:Name="WidthSample"
+                     HorizontalAlignment="Stretch"
+                     VerticalAlignment="Center"
+                     RadiusX="2" RadiusY="2"/>
+        </Border>
       </StackPanel>
 
       <!-- Only the arrow has two ways of being drawn, so only the arrow gets
