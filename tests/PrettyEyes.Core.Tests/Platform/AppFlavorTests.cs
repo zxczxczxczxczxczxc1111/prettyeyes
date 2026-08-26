@@ -1,4 +1,7 @@
+using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Platform;
+using PrettyEyes.Core.Settings;
+using PrettyEyes.Core.Stats;
 using Xunit;
 
 namespace PrettyEyes.Core.Tests.Platform;
@@ -58,6 +61,19 @@ public class AppFlavorTests
         Assert.Equal("PrettyEyesSingleInstance", AppFlavor.Release.MutexName);
         Assert.Equal("prettyeyes.app", AppFlavor.Release.AppUserModelId);
         Assert.Equal("prettyeyes", AppFlavor.Release.AutostartValueName);
+    }
+
+    [Fact]
+    public void The_check_build_writes_nowhere_near_the_real_one()
+    {
+        // EndsWith rather than Contains on purpose: "prettyeyes" is a substring
+        // of "prettyeyes-check", so a swapped pair would pass Contains.
+        Assert.EndsWith(@"\prettyeyes-check\log.txt", Log.PathFor(AppFlavor.Check));
+        Assert.EndsWith(@"\prettyeyes\log.txt", Log.PathFor(AppFlavor.Release));
+        Assert.EndsWith(@"\prettyeyes-check\settings.json", JsonSettingsStore.PathFor(AppFlavor.Check));
+        Assert.EndsWith(@"\prettyeyes\settings.json", JsonSettingsStore.PathFor(AppFlavor.Release));
+        Assert.EndsWith(@"\prettyeyes-check\stats.json", JsonStatsStore.PathFor(AppFlavor.Check));
+        Assert.EndsWith(@"\prettyeyes\stats.json", JsonStatsStore.PathFor(AppFlavor.Release));
     }
 
     [Fact]

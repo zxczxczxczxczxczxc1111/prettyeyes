@@ -1,4 +1,5 @@
 using System.Text.Json;
+using PrettyEyes.Core.Platform;
 
 namespace PrettyEyes.Core.Stats;
 
@@ -17,11 +18,14 @@ public sealed class JsonStatsStore
 
     public JsonStatsStore(string path) => _path = path;
 
-    /// <summary>%APPDATA%\prettyeyes\stats.json</summary>
-    public static string DefaultPath => Path.Combine(
+    /// <summary>stats.json в папке той сборки, о которой спрашивают.</summary>
+    public static string PathFor(AppFlavor flavor) => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "prettyeyes",
+        flavor.DataFolder,
         "stats.json");
+
+    /// <summary>Путь этой сборки.</summary>
+    public static string DefaultPath => PathFor(AppFlavor.Current);
 
     public ShotStats Load()
     {

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using PrettyEyes.Core.Platform;
 
 namespace PrettyEyes.Core.Diagnostics;
 
@@ -27,11 +28,14 @@ public sealed class Log
         _maxBytes = maxBytes;
     }
 
-    /// <summary>%APPDATA%\prettyeyes\log.txt, next to settings.json.</summary>
-    public static string DefaultPath => Path.Combine(
+    /// <summary>log.txt в папке той сборки, о которой спрашивают.</summary>
+    public static string PathFor(AppFlavor flavor) => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "prettyeyes",
+        flavor.DataFolder,
         "log.txt");
+
+    /// <summary>Путь этой сборки, рядом с settings.json.</summary>
+    public static string DefaultPath => PathFor(AppFlavor.Current);
 
     /// <summary>The instance the application uses; tests build their own.</summary>
     public static Log Default => _default ??= new Log(DefaultPath);

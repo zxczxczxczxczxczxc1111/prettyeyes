@@ -22,11 +22,14 @@ public sealed class JsonSettingsStore : ISettingsStore
 
     public JsonSettingsStore(string path) => _path = path;
 
-    /// <summary>%APPDATA%\prettyeyes\settings.json</summary>
-    public static string DefaultPath => Path.Combine(
+    /// <summary>settings.json в папке той сборки, о которой спрашивают.</summary>
+    public static string PathFor(AppFlavor flavor) => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "prettyeyes",
+        flavor.DataFolder,
         "settings.json");
+
+    /// <summary>Путь этой сборки.</summary>
+    public static string DefaultPath => PathFor(AppFlavor.Current);
 
     public AppSettings Load()
     {
