@@ -1,4 +1,4 @@
-using PrettyEyes.Core.Geometry;
+﻿using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Rendering;
 using SkiaSharp;
@@ -26,7 +26,7 @@ public sealed class ArrowAnnotation : IAnnotation
         // Padded by the head length: the arrowhead sticks out past the line,
         // and Bounds has to cover everything the annotation actually paints.
         var line = CaptureRect.FromPoints(x1, y1, x2, y2);
-        var pad = (int)Math.Ceiling(ArrowHead.Length(strokeWidth));
+        var pad = (int)Math.Ceiling(ArrowHead.Length(strokeWidth, Length));
         Bounds = new CaptureRect(
             line.X - pad, line.Y - pad, line.Width + pad * 2, line.Height + pad * 2);
     }
@@ -44,10 +44,25 @@ public sealed class ArrowAnnotation : IAnnotation
             IsAntialias = true,
         };
 
-        canvas.DrawLine(_x1, _y1, _x2, _y2, paint);
-
         var angle = Math.Atan2(_y2 - _y1, _x2 - _x1);
+        var head = ArrowHead.Length(_strokeWidth, Length);
+        var stop = head * ArrowHead.BaseAlong;
 
-        ArrowHead.Draw(canvas, paint, _x2, _y2, angle, _strokeWidth);
+        // Stopped short of the tip rather than run into it. The stroke has a
+        // round cap, so drawn all the way it would bulge half a width past the
+        // point of the triangle and blunt it; ending under the fill hides both
+        // the cap and the joint.
+        canvas.DrawLine(
+            _x1,
+            _y1,
+            _x2 - (float)(Math.Cos(angle) * stop),
+            _y2 - (float)(Math.Sin(angle) * stop),
+            paint);
+
+        ArrowHead.Draw(canvas, _color, _x2, _y2, angle, head);
     }
+
+    /// <summary>How long the arrow is, tip to tail.</summary>
+    private double Length => Math.Sqrt(
+        ((double)(_x2 - _x1) * (_x2 - _x1)) + ((double)(_y2 - _y1) * (_y2 - _y1)));
 }

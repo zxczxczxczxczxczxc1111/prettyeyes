@@ -101,10 +101,10 @@ public class FreehandArrowAnnotationTests
         var arrow = new FreehandArrowAnnotation(
             [(20, 20), (60, 20), (100, 20)], color: 0xFFB01030, strokeWidth: 3f);
 
-        // The branches reach back and sideways from the tip, and Bounds is what
-        // Document.MovableAt hit-tests against: a box that ends at the last
-        // point makes the head unclickable.
-        var reach = (int)Math.Ceiling(ArrowHead.Length(3f));
+        // The head reaches back and sideways from the tip, and Bounds is what
+        // the session asks when deciding which monitors a preview belongs on: a
+        // box that ends at the last point leaves the head unpainted next door.
+        var reach = (int)Math.Ceiling(ArrowHead.Length(3f, 80));
 
         Assert.True(arrow.Bounds.X <= 20 - reach);
         Assert.True(arrow.Bounds.Y <= 20 - reach);

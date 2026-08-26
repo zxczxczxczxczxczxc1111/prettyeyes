@@ -44,9 +44,12 @@ public sealed class FreehandArrowAnnotation : IAnnotation
         _color = color;
         _strokeWidth = strokeWidth;
 
-        // Padded by the head: the branches stick out past the last point, and
-        // Bounds has to cover everything the annotation actually paints.
-        var pad = (int)Math.Ceiling(ArrowHead.Length(strokeWidth)) + 1;
+        // Padded by the head: it sticks out past the last point, and Bounds has
+        // to cover everything the annotation actually paints. Deliberately not
+        // conditional on HeadAllowed - a preview and the finished arrow have to
+        // claim the same ground, or the bounds jump on release and a
+        // neighbouring monitor keeps a strip nobody repainted.
+        var pad = (int)Math.Ceiling(ArrowHead.Length(strokeWidth, Span)) + 1;
         var left = _x.Min();
         var top = _y.Min();
 
@@ -124,8 +127,6 @@ public sealed class FreehandArrowAnnotation : IAnnotation
 
     public void Draw(SKCanvas canvas, SKImage source, CaptureRect sourceOrigin, BlurCache cache)
     {
-        using var path = StrokePath.Build(_x, _y);
-
         using var paint = new SKPaint
         {
             Color = new SKColor(_color),
@@ -136,11 +137,55 @@ public sealed class FreehandArrowAnnotation : IAnnotation
             IsAntialias = true,
         };
 
-        canvas.DrawPath(path, paint);
-
-        if (HeadAllowed && HeadAngle(_x, _y) is { } angle)
+        if (!HeadAllowed || HeadAngle(_x, _y) is not { } angle)
         {
-            ArrowHead.Draw(canvas, paint, _x[^1], _y[^1], angle, _strokeWidth);
+            using var whole = StrokePath.Build(_x, _y);
+
+            canvas.DrawPath(whole, paint);
+
+            return;
         }
+
+        var head = ArrowHead.Length(_strokeWidth, Span);
+
+        using var trimmed = TrimmedPath(angle, head * ArrowHead.BaseAlong);
+
+        canvas.DrawPath(trimmed, paint);
+        ArrowHead.Draw(canvas, _color, _x[^1], _y[^1], angle, head);
+    }
+
+    /// <summary>How far the gesture got, first point to last, as the crow flies.</summary>
+    private double Span => Distance(_x[^1] - _x[0], _y[^1] - _y[0]);
+
+    /// <summary>
+    /// The line with its last stretch replaced by one straight run into the
+    /// head.
+    ///
+    /// Without this the fix would be half a fix. The smoothing ends with a
+    /// straight segment into the raw last point, which is the very sample the
+    /// direction stopped trusting: the head would sit true and the line under
+    /// it would still wander off by the same twenty degrees, welded to the
+    /// triangle at an angle. Cut back to the head's base and aimed along it,
+    /// line and head are collinear by construction rather than by luck.
+    /// </summary>
+    private SKPath TrimmedPath(double angle, float stop)
+    {
+        var keep = _x.Length;
+
+        while (keep > 1 && Distance(_x[^1] - _x[keep - 1], _y[^1] - _y[keep - 1]) < stop)
+        {
+            keep--;
+        }
+
+        var x = new int[keep + 1];
+        var y = new int[keep + 1];
+
+        Array.Copy(_x, x, keep);
+        Array.Copy(_y, y, keep);
+
+        x[keep] = (int)Math.Round(_x[^1] - (Math.Cos(angle) * stop));
+        y[keep] = (int)Math.Round(_y[^1] - (Math.Sin(angle) * stop));
+
+        return StrokePath.Build(x, y);
     }
 }
