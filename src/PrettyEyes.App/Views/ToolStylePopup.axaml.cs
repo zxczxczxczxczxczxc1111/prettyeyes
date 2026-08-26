@@ -53,6 +53,9 @@ public partial class ToolStylePopup : UserControl
         BiggerType.Click += (_, _) => Resize(TextAnnotation.SizeStep);
         PlateBackdrop.Click += (_, _) => Pick(_style with { TextBackdrop = TextBackdrop.Plate });
         OutlineBackdrop.Click += (_, _) => Pick(_style with { TextBackdrop = TextBackdrop.Outline });
+
+        StraightArrow.Click += (_, _) => Pick(_style with { FreehandArrow = false });
+        FreehandArrow.Click += (_, _) => Pick(_style with { FreehandArrow = true });
     }
 
     /// <summary>What the first entry says. Stored as null, shown as a word.</summary>
@@ -107,9 +110,20 @@ public partial class ToolStylePopup : UserControl
         }
 
         var text = _kind == ToolKind.Text;
+        var arrow = _kind == ToolKind.Arrow;
 
         StrokeRow.IsVisible = !text;
         TextRow.IsVisible = text;
+        ArrowRow.IsVisible = arrow;
+
+        // Marked here and not down with the text backdrop: the early return a
+        // few lines below is for the text card, and anything after it never
+        // runs for an arrow.
+        if (arrow)
+        {
+            Mark(StraightArrow, !_style.FreehandArrow);
+            Mark(FreehandArrow, _style.FreehandArrow);
+        }
 
         foreach (var (button, size) in Steps())
         {

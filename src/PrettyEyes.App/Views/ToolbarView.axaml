@@ -77,7 +77,7 @@
         <Button Classes="tool" x:Name="BlurButton" ToolTip.Tip="Размытие">
           <Path Data="M4,4 H6.5 V6.5 H4 Z M9.5,4 H12 V6.5 H9.5 Z M6.5,6.5 H9 V9 H6.5 Z M4,9.5 H6.5 V12 H4 Z M9.5,9.5 H12 V12 H9.5 Z"/>
         </Button>
-        <Button Classes="tool" x:Name="ArrowButton" ToolTip.Tip="Стрелка, правая кнопка - цвет и толщина">
+        <Button Classes="tool" x:Name="ArrowButton" ToolTip.Tip="Стрелка, правая кнопка - цвет, толщина и вид">
           <Panel>
             <Path Data="M4,12 L12,4 M12,4 H7.5 M12,4 V8.5"/>
             <!-- The only colour in the interface, and it is not decoration: it

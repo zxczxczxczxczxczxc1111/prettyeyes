@@ -93,6 +93,19 @@
         </Button>
       </StackPanel>
 
+      <!-- Only the arrow has two ways of being drawn, so only the arrow gets
+           this row. The same two-button shape as the text backdrop below: a
+           checkbox would be a third visual language in a card that already has
+           swatches and steppers. -->
+      <StackPanel x:Name="ArrowRow" IsVisible="False" Orientation="Horizontal" Spacing="4">
+        <Button Classes="step" x:Name="StraightArrow" MinWidth="58" ToolTip.Tip="Прямая от точки до точки">
+          <TextBlock Text="Прямая"/>
+        </Button>
+        <Button Classes="step" x:Name="FreehandArrow" MinWidth="58" ToolTip.Tip="Рисуется как карандашом, наконечник в конце">
+          <TextBlock Text="От руки"/>
+        </Button>
+      </StackPanel>
+
       <!-- The text tool has nothing to do with stroke width, so it gets this
            row instead of that one. Both never show at once.
 
