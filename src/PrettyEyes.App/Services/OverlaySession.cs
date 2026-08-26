@@ -25,6 +25,18 @@ public sealed class OverlaySession
     private readonly AppServices _services;
     private IReadOnlyList<OverlayWindow> _windows = [];
 
+    /// <summary>
+    /// What was last handed to each window, by the same index as _windows.
+    ///
+    /// The fan-out runs on every pointer move and hands null to every monitor
+    /// the shape does not reach. Writing null over null costs a full repaint of
+    /// that monitor, and on three screens that is two thirds of the work thrown
+    /// away. Kept here rather than guarded inside the canvas on purpose: the
+    /// canvas repaints unconditionally, and Redraw plus three other callers
+    /// depend on exactly that.
+    /// </summary>
+    private readonly List<IAnnotation?> _sent = [];
+
     /// <summary>The window the pointer was last seen over, magnifier and all.</summary>
     private OverlayWindow? _pointerWindow;
     private DesktopLayout? _layout;
@@ -87,6 +99,15 @@ public sealed class OverlaySession
         // Windows come from the pool: building them here cost 105 ms on the
         // first capture, which the user spends staring at an unfrozen screen.
         _windows = _services.OverlayWindows.Take(capture.Layout);
+
+        // One slot per window, all empty: a window out of the pool has been
+        // cleared by Reset and shows no preview.
+        _sent.Clear();
+
+        for (var i = 0; i < _windows.Count; i++)
+        {
+            _sent.Add(null);
+        }
 
         for (var i = 0; i < _windows.Count; i++)
         {
@@ -808,9 +829,9 @@ public sealed class OverlaySession
     {
         if (_typing is not { } typing)
         {
-            foreach (var window in _windows)
+            for (var i = 0; i < _windows.Count; i++)
             {
-                window.ShowPreview(null);
+                SendPreview(i, null);
             }
 
             return;
@@ -846,8 +867,38 @@ public sealed class OverlaySession
                 && _layout is not null
                 && !_layout.Monitors[i].Bounds.Intersect(preview.Bounds).IsEmpty;
 
-            _windows[i].ShowPreview(reaches ? preview : null);
+            SendPreview(i, reaches ? preview : null);
         }
+    }
+
+    /// <summary>
+    /// Hands a preview to one window, unless that window already has it.
+    ///
+    /// Every path in the session goes through here. Not every path in the
+    /// application does: OverlayWindow clears its own preview in SetTyping,
+    /// FadeOut and Reset, and those go straight to the canvas. The memory here
+    /// can therefore say "sent" about a canvas that has since been emptied.
+    /// That is harmless only because every preview is a fresh object - the
+    /// tools allocate one per pointer move - so the next comparison is false
+    /// anyway. Do not lean on this memory for anything but skipping repeats.
+    /// </summary>
+    private void SendPreview(int index, IAnnotation? preview)
+    {
+        // Both lists, not just one. _windows is the pool's own list handed
+        // straight back by Take, and the pool mutates it in place when the
+        // monitor layout changes.
+        if (index >= _windows.Count || index >= _sent.Count)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(_sent[index], preview))
+        {
+            return;
+        }
+
+        _sent[index] = preview;
+        _windows[index].ShowPreview(preview);
     }
 
     /// <summary>
@@ -1133,11 +1184,11 @@ public sealed class OverlaySession
     {
         _blink?.Stop();
 
-        foreach (var window in _windows)
+        for (var i = 0; i < _windows.Count; i++)
         {
-            window.ShowPreview(null);
-            window.SetTyping(false);
-            window.SetToolActive(_activeTool is not null);
+            SendPreview(i, null);
+            _windows[i].SetTyping(false);
+            _windows[i].SetToolActive(_activeTool is not null);
         }
     }
 
@@ -1300,6 +1351,7 @@ public sealed class OverlaySession
             });
 
         _windows = [];
+        _sent.Clear();
         _layout = null;
         _toolbarShown = false;
         _freshDrag = false;
