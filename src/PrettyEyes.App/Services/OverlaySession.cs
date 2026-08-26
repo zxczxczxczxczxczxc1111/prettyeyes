@@ -39,6 +39,14 @@ public sealed class OverlaySession
     private readonly ToolStyles _styles;
     private string? _emoji;
     private bool _toolbarShown;
+
+    /// <summary>
+    /// A fresh frame is being drawn right now. Separate from _toolbarShown on
+    /// purpose: that one must stay true, or DefaultTool would decide the panel
+    /// is appearing for the first time and arm the default tool again on every
+    /// new frame.
+    /// </summary>
+    private bool _freshDrag;
     private bool _closed;
 
     /// <summary>Who had the keyboard before this capture started.</summary>
@@ -86,6 +94,7 @@ public sealed class OverlaySession
 
             window.SelectionChanged += OnSelectionChanged;
             window.SelectionSettled += OnSelectionSettled;
+            window.SelectionRestarted += OnSelectionRestarted;
             window.Cancelled += OnCancelled;
             window.UndoRequested += OnUndoRequested;
             window.AnnotationDrawn += OnAnnotationDrawn;
@@ -157,6 +166,7 @@ public sealed class OverlaySession
     {
         window.SelectionChanged -= OnSelectionChanged;
         window.SelectionSettled -= OnSelectionSettled;
+        window.SelectionRestarted -= OnSelectionRestarted;
         window.Cancelled -= OnCancelled;
         window.UndoRequested -= OnUndoRequested;
         window.AnnotationDrawn -= OnAnnotationDrawn;
@@ -267,10 +277,29 @@ public sealed class OverlaySession
         }
 
         // Once the toolbar is up it follows the frame; leaving it behind and
-        // teleporting it at the end of the gesture reads as a glitch.
-        if (_toolbarShown)
+        // teleporting it at the end of the gesture reads as a glitch. A frame
+        // drawn from scratch is the exception: there the panel is appearing,
+        // and appearing belongs to the end of the gesture.
+        if (ToolbarDrag.FollowsFrame(_toolbarShown, _freshDrag))
         {
             PlaceToolbar(selection);
+        }
+    }
+
+    /// <summary>
+    /// A new frame is being drawn over the old one. The panel steps out for the
+    /// length of the gesture and comes back when it settles, which is what it
+    /// does for the very first frame.
+    /// </summary>
+    private void OnSelectionRestarted(object? sender, EventArgs e)
+    {
+        _freshDrag = true;
+
+        foreach (var window in _windows)
+        {
+            // Takes the size chip with it, deliberately: the first frame has no
+            // chip either, and this is the same moment repeated.
+            window.HideToolbar();
         }
     }
 
@@ -294,6 +323,7 @@ public sealed class OverlaySession
         var chosen = DefaultTool.Apply(_services.Settings.DefaultTool, _toolbarShown);
 
         _toolbarShown = true;
+        _freshDrag = false;
         PlaceToolbar(selection);
 
         if (chosen is not null)
@@ -479,6 +509,7 @@ public sealed class OverlaySession
         _activeTool = null;
         _toolPickedByHand = false;
         _toolbarShown = false;
+        _freshDrag = false;
         Document.Selection = CaptureRect.Empty;
         Document.Clear();
 
@@ -1247,6 +1278,7 @@ public sealed class OverlaySession
         _windows = [];
         _layout = null;
         _toolbarShown = false;
+        _freshDrag = false;
         Document = null;
 
         Finished?.Invoke(this, EventArgs.Empty);

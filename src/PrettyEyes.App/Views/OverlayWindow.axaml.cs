@@ -130,6 +130,12 @@ public partial class OverlayWindow : Window
     /// </summary>
     public event EventHandler<CaptureRect>? SelectionSettled;
 
+    /// <summary>
+    /// A selection is being drawn from nothing, as opposed to the existing one
+    /// being pulled by a grip. Raised at the press, before the first change.
+    /// </summary>
+    public event EventHandler? SelectionRestarted;
+
     /// <summary>Raised once a tool gesture produced a shape.</summary>
     public event EventHandler<IAnnotation>? AnnotationDrawn;
 
@@ -848,6 +854,10 @@ public partial class OverlayWindow : Window
             _anchorX = x;
             _anchorY = y;
             _mode = OverlayMode.Selecting;
+
+            // Before the change, not after: the very first SelectionChanged
+            // would otherwise drag the panel along for a frame.
+            SelectionRestarted?.Invoke(this, EventArgs.Empty);
             SelectionChanged?.Invoke(this, CaptureRect.FromPoints(x, y, x, y));
         }
         else
