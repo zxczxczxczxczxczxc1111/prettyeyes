@@ -134,7 +134,9 @@ public sealed class StrokeAnnotation : IAnnotation
 
             var colour = pixels.GetPixelColor(px, py);
 
-            // Rec. 601, the same weights the crosshair picks its ink with.
+            // Rec. 601, and deliberately not the Rec. 709 the crosshair uses:
+            // the threshold below was tuned against these weights. Sharing one
+            // formula would move both decisions at once.
             total += ((colour.Red * 0.299) + (colour.Green * 0.587) + (colour.Blue * 0.114)) / 255.0;
             counted++;
         }
