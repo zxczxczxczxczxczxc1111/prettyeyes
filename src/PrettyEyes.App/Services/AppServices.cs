@@ -1,4 +1,4 @@
-using Avalonia.Controls;
+﻿using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using PrettyEyes.App.Controls;
@@ -388,9 +388,14 @@ public sealed class AppServices : IDisposable
     /// </summary>
     /// <summary>
     /// Asks the capture engine, every half minute, whether it has been left
-    /// alone long enough to let go of its devices. Half a minute rather than
-    /// three: the answer is a comparison of two timestamps, and waking up for
-    /// it costs nothing next to what it hands back.
+    /// alone long enough. Half a minute rather than three: the answer is a
+    /// comparison of two timestamps, and waking up for it costs nothing.
+    ///
+    /// What happens on idle used to include letting go of the capture devices.
+    /// It does not any more; the measurement is in DesktopCapture.IdleFor. What
+    /// is left is the two things that cost a screenshot nothing: the drawing
+    /// caches, which will be rebuilt from whatever is looked at next anyway,
+    /// and the working set, which is the number people see.
     /// </summary>
     private void WatchForIdle()
     {
@@ -402,15 +407,15 @@ public sealed class AppServices : IDisposable
         _idle = new Timer(
             _ =>
             {
-                if (!capture.ReleaseIfIdle(DateTime.Now))
+                if (!capture.IdleFor(DateTime.Now))
                 {
                     return;
                 }
 
-                // Only together with the release, never on the plain tick: these
-                // are the font and image caches the drawing code lives on, and
-                // throwing them away while somebody is working means
-                // re-rasterising everything they look at next.
+                // Once per idle spell, never on the plain tick: these are the
+                // font and image caches the drawing code lives on, and throwing
+                // them away while somebody is working means re-rasterising
+                // everything they look at next.
                 SKGraphics.PurgeAllCaches();
 
                 // And only after the purge, because trimming first would hand

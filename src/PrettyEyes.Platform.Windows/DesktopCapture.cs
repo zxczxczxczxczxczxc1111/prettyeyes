@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using PrettyEyes.Core.Capture;
 using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Geometry;
@@ -132,32 +132,30 @@ public sealed class DesktopCapture : IScreenCapture, IDisposable
     }
 
     /// <summary>
-    /// Called on a timer. Lets go of the devices, the textures and the desktop
-    /// buffer once nobody has taken a screenshot for a while.
+    /// Whether nobody has taken a screenshot for a while. True once per idle
+    /// spell, so the caller acts on it and is not asked again until the next
+    /// screenshot.
     ///
-    /// Measured before this existed: the application sat at 285 MB doing
-    /// nothing, of which about 95 was the capture engine holding on for a
-    /// screenshot that might come in an hour. The first capture after a
-    /// release costs a fifth of a second; every one after it is back to 17 ms.
+    /// This used to release the devices, the staging textures and the desktop
+    /// buffer as well, and it no longer does. Measured 26.08.2026 on two 2K
+    /// monitors, in the same run and on the same machine:
+    ///
+    ///   engine warm, working set trimmed:   1.9 MB shown, next shot 37 ms
+    ///   engine released, same trim applied: 1.6 MB shown, next shot 61 ms
+    ///
+    /// The release bought 0.3 MB of what Task Manager reports and cost 24 ms
+    /// on the next screenshot, which after minutes of idling is nearly every
+    /// screenshot a person actually takes. What it frees is 31 MB of committed
+    /// memory, a number no one sees without asking for it. The small figure in
+    /// Task Manager - the reason this whole idle machinery exists - is made by
+    /// the working-set trim four seconds after any work, and that needs none of
+    /// this.
+    ///
+    /// The ability is untouched: PainterChain.Release still lets go of
+    /// everything, and this is only the policy no longer asking it to on a
+    /// timer.
     /// </summary>
-    /// <returns>True when something was actually let go of.</returns>
-    public bool ReleaseIfIdle(DateTime now)
-    {
-        if (_disposed || !_watch.Due(now))
-        {
-            return false;
-        }
-
-        lock (_engine)
-        {
-            _chain.Release();
-            _buffers.Drop();
-        }
-
-        Log.Default.Info("простой: движок захвата отпущен до следующего снимка");
-
-        return true;
-    }
+    public bool IdleFor(DateTime now) => !_disposed && _watch.Due(now);
 
     public void Dispose()
     {

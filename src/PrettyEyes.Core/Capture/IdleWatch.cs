@@ -1,12 +1,14 @@
-namespace PrettyEyes.Core.Capture;
+﻿namespace PrettyEyes.Core.Capture;
 
 /// <summary>
-/// Says when something has been left alone long enough to be let go of.
+/// Says when something has been left alone long enough to act on it.
 ///
 /// A tray application spends its whole life idle and takes a screenshot once
-/// an hour, yet the capture engine holds a Direct3D device, a desktop-sized
-/// buffer and a texture per monitor the entire time. Measured on the author's
-/// machine: 285 MB sitting still, of which about 95 is exactly that.
+/// an hour. What is done at that point is now the drawing caches and the
+/// working set, and no longer the capture devices: measured 26.08.2026, letting
+/// go of those hands back 31 MB of committed memory, 0.3 MB of what Task
+/// Manager shows, and costs the next screenshot 24 ms. See
+/// DesktopCapture.IdleFor.
 ///
 /// Time is passed in rather than read from the clock, because a rule about
 /// elapsed time that asks the system what time it is cannot be tested.
