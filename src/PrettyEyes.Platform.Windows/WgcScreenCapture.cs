@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using PrettyEyes.Core.Diagnostics;
+using PrettyEyes.Core.Capture;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Platform.Windows.Native;
@@ -35,7 +36,7 @@ namespace PrettyEyes.Platform.Windows;
 /// </summary>
 public sealed unsafe class WgcScreenCapture : IMonitorPainter
 {
-    public string Name => "Windows.Graphics.Capture";
+    public string Name => CaptureOrder.WindowsGraphicsCapture;
 
     /// <summary>A frame normally arrives within a frame or two of the display.</summary>
     private static readonly TimeSpan FrameTimeout = TimeSpan.FromSeconds(2);

@@ -165,6 +165,7 @@ public partial class SettingsWindow : Window
         _tools = new ToolVisibility(settings.Tools);
         _styles = new ToolStyles(settings.ToolStyles ?? []);
         BuildToolRow();
+        BuildCaptureSourceRow();
 
         CheckUpdates.IsChecked = settings.CheckUpdates;
         // The window icon is an Avalonia resource, so ApplicationIcon does not
@@ -529,6 +530,75 @@ public partial class SettingsWindow : Window
     /// default: a screenshot tool that arms a pen before anyone asked is a
     /// screenshot tool that draws by accident.
     /// </summary>
+    /// <summary>
+    /// Three words, not an engine list: the person reading this is looking at a
+    /// dark screenshot, not choosing a graphics API. What each one costs is
+    /// spelled out under the row, because every one of them costs something.
+    /// </summary>
+    private static string CaptureSourceName(CaptureSource source) => source switch
+    {
+        CaptureSource.WindowsGraphicsCapture => "Через Windows",
+        CaptureSource.Gdi => "Простой",
+        _ => "Авто",
+    };
+
+    private static string CaptureSourceNoteFor(CaptureSource source) => source switch
+    {
+        CaptureSource.WindowsGraphicsCapture =>
+            "Если снимок выходит тёмным или искажённым, медленнее и может появиться жёлтая рамка",
+        CaptureSource.Gdi =>
+            "Если первые два не подошли, видео и игры выйдут чёрными",
+        _ => "Быстрее всего, без рамки захвата",
+    };
+
+    private void BuildCaptureSourceRow()
+    {
+        CaptureSourceRow.Children.Clear();
+
+        foreach (var source in Enum.GetValues<CaptureSource>())
+        {
+            var button = new Button { Tag = source, Content = CaptureSourceName(source) };
+
+            button.Classes.Add("choice");
+            button.Click += (_, _) => PickCaptureSource(source);
+
+            CaptureSourceRow.Children.Add(button);
+        }
+
+        ShowCaptureSourceRow();
+    }
+
+    private void ShowCaptureSourceRow()
+    {
+        foreach (var child in CaptureSourceRow.Children)
+        {
+            if (child is not Button button)
+            {
+                continue;
+            }
+
+            button.Classes.Remove("active");
+
+            if ((button.Tag as CaptureSource?) == _settings.Capture)
+            {
+                button.Classes.Add("active");
+            }
+        }
+
+        CaptureSourceNote.Text = CaptureSourceNoteFor(_settings.Capture);
+    }
+
+    private void PickCaptureSource(CaptureSource source)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        Store(_settings with { Capture = source });
+        ShowCaptureSourceRow();
+    }
+
     private void BuildDefaultToolRow()
     {
         DefaultToolRow.Children.Clear();

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Platform;
+using PrettyEyes.Core.Settings;
 
 namespace PrettyEyes.Core.Capture;
 
@@ -36,9 +37,17 @@ public sealed class PainterChain : IDisposable
 
     private bool _disposed;
 
-    public PainterChain(IReadOnlyList<IMonitorPainter> painters, Log? log = null)
+    /// <summary>
+    /// Which engine the person asked to go first, read fresh at every capture.
+    /// Null means nobody asked, which is every build until the setting existed.
+    /// </summary>
+    private readonly Func<CaptureSource>? _source;
+
+    public PainterChain(
+        IReadOnlyList<IMonitorPainter> painters, Log? log = null, Func<CaptureSource>? source = null)
     {
         _log = log ?? Log.Default;
+        _source = source;
 
         if (painters.Count == 0)
         {
@@ -70,11 +79,32 @@ public sealed class PainterChain : IDisposable
         }
     }
 
+    /// <summary>
+    /// The painters in the order this capture wants them.
+    ///
+    /// Asked per capture rather than kept, because the setting behind it can
+    /// change between two screenshots and the answer has to change with it.
+    /// Costs a walk over three items.
+    /// </summary>
+    private IEnumerable<IMonitorPainter> InOrder()
+    {
+        var chosen = _source?.Invoke() ?? CaptureSource.Auto;
+
+        if (chosen == CaptureSource.Auto)
+        {
+            return _painters;
+        }
+
+        var order = CaptureOrder.Of(chosen, [.. _painters.Select(painter => painter.Name)]);
+
+        return order.Select(name => _painters.First(painter => painter.Name == name));
+    }
+
     public void Paint(MonitorInfo monitor, IntPtr destination, int stride)
     {
         Exception? lastFailure = null;
 
-        foreach (var painter in _painters)
+        foreach (var painter in InOrder())
         {
             var verdict = (painter.Name, monitor.DeviceId, monitor.Bounds);
 

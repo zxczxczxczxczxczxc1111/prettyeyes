@@ -2,6 +2,7 @@ using PrettyEyes.Core.Capture;
 using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Platform;
+using PrettyEyes.Core.Settings;
 using Xunit;
 
 namespace PrettyEyes.Core.Tests.Capture;
@@ -50,8 +51,51 @@ public class PainterChainTests
     /// fake monitors used to land in the user's own log and read like a broken
     /// installation.
     /// </summary>
-    private static PainterChain Chain(IReadOnlyList<IMonitorPainter> painters) =>
-        new(painters, new Log(Path.Combine(Path.GetTempPath(), "prettyeyes-tests", "chain.log")));
+    private static PainterChain Chain(
+        IReadOnlyList<IMonitorPainter> painters, Func<CaptureSource>? source = null) =>
+        new(
+            painters,
+            new Log(Path.Combine(Path.GetTempPath(), "prettyeyes-tests", "chain.log")),
+            source);
+
+    /// <summary>
+    /// The same chain, told to put a different engine first. Nobody is removed:
+    /// the one that was first is still there, second.
+    /// </summary>
+    [Fact]
+    public void A_chosen_engine_is_asked_before_the_one_that_ships_first()
+    {
+        var duplication = Willing(CaptureOrder.Duplication);
+        var wgc = Willing(CaptureOrder.WindowsGraphicsCapture);
+        var chain = Chain([duplication, wgc], () => CaptureSource.WindowsGraphicsCapture);
+
+        Paint(chain, Monitor("one"));
+
+        Assert.Equal(["one"], wgc.Asked);
+        Assert.Empty(duplication.Asked);
+    }
+
+    /// <summary>
+    /// Read per capture, not once at start-up: changing the setting has to take
+    /// effect on the next screenshot, and asking the user to restart a tray
+    /// application to change a setting is not an answer.
+    /// </summary>
+    [Fact]
+    public void The_choice_is_read_at_every_capture()
+    {
+        var duplication = Willing(CaptureOrder.Duplication);
+        var wgc = Willing(CaptureOrder.WindowsGraphicsCapture);
+        var chosen = CaptureSource.WindowsGraphicsCapture;
+        var chain = Chain([duplication, wgc], () => chosen);
+
+        Paint(chain, Monitor("one"));
+
+        chosen = CaptureSource.Auto;
+        Paint(chain, Monitor("two"));
+
+        Assert.Equal(["one"], wgc.Asked);
+        Assert.Equal(["two"], duplication.Asked);
+    }
 
     [Fact]
     public void The_first_painter_that_can_do_it_paints()

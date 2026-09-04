@@ -146,7 +146,7 @@ public sealed class AppServices : IDisposable
     /// useful answer: on a laptop with an external portrait screen the two
     /// monitors get different answers.
     /// </summary>
-    private static IScreenCapture CreateCapture(IMonitorEnumerator monitors)
+    private static IScreenCapture CreateCapture(IMonitorEnumerator monitors, Func<CaptureSource> source)
     {
         // The spares are wrapped rather than built: Windows.Graphics.Capture
         // makes a Direct3D device and a thread in its constructor, and on a
@@ -161,15 +161,15 @@ public sealed class AppServices : IDisposable
             // projection, and it is the third largest module in the process.
             // On a machine where duplication works it is never needed at all.
             new LazyPainter(
-                "Windows.Graphics.Capture",
+                CaptureOrder.WindowsGraphicsCapture,
                 () => WgcScreenCapture.IsSupported
                     ? new WgcScreenCapture(ReportSlowStep)
                     : throw new NotSupportedException("This Windows build has no Windows.Graphics.Capture.")),
 
-            new LazyPainter("GDI", () => new GdiScreenCapture()),
+            new LazyPainter(CaptureOrder.Gdi, () => new GdiScreenCapture()),
         };
 
-        return new DesktopCapture(monitors, painters, ReportSlowStep);
+        return new DesktopCapture(monitors, painters, ReportSlowStep, source);
     }
 
     /// <summary>
@@ -327,7 +327,10 @@ public sealed class AppServices : IDisposable
         built = new AppServices(
             host,
             monitors,
-            CreateCapture(monitors),
+            // Read through `built` rather than captured now: the setting can
+            // change between two screenshots, and the object holding it does
+            // not exist yet at this line. By the first capture it does.
+            CreateCapture(monitors, () => built?.Settings.Capture ?? CaptureSource.Auto),
             new WindowsClipboard(),
             new FileSink(host.StorageProvider, () => DateTimeOffset.Now),
             folder,

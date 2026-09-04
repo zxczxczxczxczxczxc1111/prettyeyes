@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using PrettyEyes.Core.Diagnostics;
+using PrettyEyes.Core.Capture;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Platform;
 using SharpGen.Runtime;
@@ -44,7 +45,7 @@ public sealed class DuplicationPainter : IMonitorPainter
     private bool _saidFormat;
     private bool _saidProtected;
 
-    public string Name => "дублирование выхода";
+    public string Name => CaptureOrder.Duplication;
 
     public void Paint(MonitorInfo monitor, IntPtr destination, int stride)
     {

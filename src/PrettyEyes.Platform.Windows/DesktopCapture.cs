@@ -1,5 +1,6 @@
 ﻿using System.Diagnostics;
 using PrettyEyes.Core.Capture;
+using PrettyEyes.Core.Settings;
 using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Platform;
@@ -39,18 +40,32 @@ public sealed class DesktopCapture : IScreenCapture, IDisposable
     /// </summary>
     private readonly object _engine = new();
 
+    /// <summary>
+    /// Kept only to say so in the log. A monitor painted by the slower engine
+    /// because somebody asked for it reads exactly like one painted by the
+    /// slower engine because the fast one refused, and those are different
+    /// problems.
+    /// </summary>
+    private readonly Func<CaptureSource>? _source;
+
     private bool _disposed;
     private string _said = string.Empty;
     private int _taken;
 
+    /// <param name="source">
+    /// Which engine goes first, asked at every capture. Null means the chain
+    /// as it ships.
+    /// </param>
     public DesktopCapture(
         IMonitorEnumerator monitors,
         IReadOnlyList<IMonitorPainter> painters,
-        Action<string, double>? timing = null)
+        Action<string, double>? timing = null,
+        Func<CaptureSource>? source = null)
     {
         _monitors = monitors;
-        _chain = new PainterChain(painters);
+        _chain = new PainterChain(painters, log: null, source);
         _timing = timing;
+        _source = source;
     }
 
     /// <summary>
@@ -185,6 +200,11 @@ public sealed class DesktopCapture : IScreenCapture, IDisposable
         var now = string.Join(", ", _chain.Assignments
             .OrderBy(pair => pair.Key, StringComparer.Ordinal)
             .Select(pair => $"{pair.Key}: {pair.Value}"));
+
+        if (_source?.Invoke() is { } chosen and not CaptureSource.Auto)
+        {
+            now += $" (источник выбран вручную: {chosen})";
+        }
 
         if (now == _said)
         {

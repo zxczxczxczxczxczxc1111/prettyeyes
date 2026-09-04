@@ -130,6 +130,19 @@
                    since start-up. -->
               <StackPanel x:Name="Health" Spacing="8"/>
 
+              <!-- Directly under the line that says which engine painted
+                   which monitor: this is where somebody who does not like that
+                   answer changes it. Needed rarely - one laptop in a hundred
+                   hands back a picture the fast engine reads wrongly - so it
+                   sits at the bottom of a section nobody opens by accident. -->
+              <StackPanel Spacing="8">
+                <TextBlock Text="Источник захвата" Foreground="{StaticResource TextFaint}" FontSize="11"/>
+                <StackPanel x:Name="CaptureSourceRow" Orientation="Horizontal" Spacing="4"
+                            HorizontalAlignment="Left"/>
+                <TextBlock x:Name="CaptureSourceNote" Foreground="{StaticResource TextFaint}"
+                           FontSize="11" TextWrapping="Wrap"/>
+              </StackPanel>
+
               <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Left">
                 <Button x:Name="OpenLog" Classes="action" Content="Журнал"/>
                 <Button x:Name="OpenShots" Classes="action" Content="Папка снимков"/>

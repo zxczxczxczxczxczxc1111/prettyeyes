@@ -108,6 +108,10 @@ public sealed class JsonSettingsStore : ISettingsStore
         // Schema 10 added the cursor. A missing enum reads as its first value,
         // which is the crosshair everyone had until now, so nothing to do.
 
+        // Schema 14 let the capture engine be chosen by hand. A missing enum
+        // reads as its first value, which is the automatic chain everyone had
+        // until now, so there is nothing to fill in.
+
         // Schema 4 added per-tool styles; schema 13 replaced the three
         // thickness presets with a number of pixels and took the marker's
         // hidden multiplier away with it. A style older than that carries a

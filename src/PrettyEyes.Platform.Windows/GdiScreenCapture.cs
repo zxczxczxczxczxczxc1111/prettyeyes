@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using PrettyEyes.Core.Capture;
 using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Platform;
 using PrettyEyes.Platform.Windows.Native;
@@ -18,7 +19,7 @@ namespace PrettyEyes.Platform.Windows;
 /// </summary>
 public sealed class GdiScreenCapture : IMonitorPainter
 {
-    public string Name => "GDI";
+    public string Name => CaptureOrder.Gdi;
 
     public void Paint(MonitorInfo monitor, IntPtr destination, int stride)
     {
