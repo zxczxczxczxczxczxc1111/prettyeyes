@@ -1,7 +1,7 @@
 ﻿; prettyeyes installer. Per-user install: a tray utility has no business
 ; asking for administrator rights.
 #define AppName "prettyeyes"
-#define AppVersion "1.4.1"
+#define AppVersion "1.4.2"
 #define AppExe "PrettyEyes.App.exe"
 ; Собирается ключом ISCC /DCheck. Всё, что здесь разведено, разведено потому, что
 ; иначе проверочная сборка займёт место прода. AppId решает, что во что ставится;
