@@ -49,6 +49,13 @@ public partial class SettingsWindow : Window
     private readonly ToolStylePopup _stylePopup = new();
 
     /// <summary>
+    /// The same grid of glyphs the overlay opens. Emoji has no colour and no
+    /// width - EmojiTool never reads a style - so the style card would be
+    /// somebody else's card wearing the emoji title.
+    /// </summary>
+    private readonly EmojiPickerView _emojiPicker = new();
+
+    /// <summary>
     /// Pinning has settings of its own and no old section to live in, so its
     /// card is built here next to the style card rather than waiting for the
     /// general move of the other sections.
@@ -106,6 +113,14 @@ public partial class SettingsWindow : Window
         {
             _styles.Set(change.Kind, change.Style);
             Store(_settings with { ToolStyles = new Dictionary<ToolKind, ToolStyle>(_styles.Stored) });
+        };
+
+        // The sheet closes on a pick, unlike the colour card: a glyph is one
+        // choice, and the next screenshot is where it gets used.
+        _emojiPicker.Picked += (_, code) =>
+        {
+            Store(_settings with { Emoji = code, RecentEmoji = [.. _emojiPicker.Recent] });
+            Modal.Close();
         };
 
         // Esc closes the sheet first and the window second: the other order
@@ -751,59 +766,71 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>
-    /// What the right button, and the corner, open. Drawing tools get the same
-    /// colour and thickness card the overlay uses; the features get theirs when
-    /// their sections move in.
+    /// What the right button, and the corner, open. Which card belongs to which
+    /// icon is decided in ConfigurableFeature and not here: the overlay makes
+    /// the same choice, and a fork spelled out twice is a fork that ends up
+    /// disagreeing with itself.
     /// </summary>
     private void OpenFeatureSettings(ConfigurableFeature feature)
     {
-        if (feature.Id == FeatureId.Pin)
-        {
-            _pinSettings.Load(_settings);
-            Modal.Show(_pinSettings, FeatureName(feature.Id));
-
-            return;
-        }
-
-        if (feature.Id == FeatureId.Magnifier)
-        {
-            _magnifierSettings.Load(_settings);
-            Modal.Show(_magnifierSettings, FeatureName(feature.Id));
-
-            return;
-        }
-
-        if (feature.Id == FeatureId.Cursor)
-        {
-            _cursorSettings.Load(_settings);
-            Modal.Show(_cursorSettings, FeatureName(feature.Id));
-
-            return;
-        }
-
-        if (feature.Id == FeatureId.QuickSave)
-        {
-            _quickSaveSettings.Load(_settings.Save ?? SaveOptions.Default);
-            Modal.Show(_quickSaveSettings, FeatureName(feature.Id));
-
-            return;
-        }
-
-        if (feature.Id == FeatureId.Export)
-        {
-            _exportSettings.Load(_export);
-            Modal.Show(_exportSettings, FeatureName(feature.Id));
-
-            return;
-        }
-
-        if (feature.Tool is not { } tool)
+        if (CardFor(feature) is not { } card)
         {
             return;
         }
 
-        _stylePopup.Open(tool, _styles.For(tool));
-        Modal.Show(_stylePopup, FeatureName(feature.Id));
+        Modal.Show(card, FeatureName(feature.Id));
+    }
+
+    /// <summary>
+    /// The card, already loaded with what it is about to show. Null when there
+    /// is nothing to open, which is blur and nothing else today.
+    /// </summary>
+    private Control? CardFor(ConfigurableFeature feature)
+    {
+        switch (feature.Card)
+        {
+            case FeatureCard.Pin:
+                _pinSettings.Load(_settings);
+
+                return _pinSettings;
+
+            case FeatureCard.Magnifier:
+                _magnifierSettings.Load(_settings);
+
+                return _magnifierSettings;
+
+            case FeatureCard.Cursor:
+                _cursorSettings.Load(_settings);
+
+                return _cursorSettings;
+
+            case FeatureCard.QuickSave:
+                _quickSaveSettings.Load(_settings.Save ?? SaveOptions.Default);
+
+                return _quickSaveSettings;
+
+            case FeatureCard.Export:
+                _exportSettings.Load(_export);
+
+                return _exportSettings;
+
+            case FeatureCard.Emoji:
+                _emojiPicker.Restore(_settings.RecentEmoji ?? []);
+
+                // Open, not just shown: the card starts transparent and six
+                // pixels low, which is how it slides in over the overlay.
+                _emojiPicker.Open();
+
+                return _emojiPicker;
+
+            case FeatureCard.Style when feature.Tool is { } tool:
+                _stylePopup.Open(tool, _styles.For(tool));
+
+                return _stylePopup;
+
+            default:
+                return null;
+        }
     }
 
     /// <summary>Which of them are on, right now.</summary>

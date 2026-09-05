@@ -25,6 +25,25 @@ public class ConfigurableFeatureTests
     }
 
     [Fact]
+    public void Emoji_opens_the_grid_of_glyphs_and_not_the_colour_card()
+    {
+        // Colour and width mean nothing to a stamped glyph: EmojiTool never
+        // reads a style. The settings window used to open the colour card here
+        // anyway, which is somebody else's card wearing the emoji title.
+        var emoji = ConfigurableFeature.All.Single(f => f.Id == FeatureId.Emoji);
+
+        Assert.Equal(FeatureCard.Emoji, emoji.Card);
+    }
+
+    [Fact]
+    public void The_drawing_tools_that_are_not_emoji_open_the_colour_card()
+    {
+        var pencil = ConfigurableFeature.All.Single(f => f.Id == FeatureId.Pencil);
+
+        Assert.Equal(FeatureCard.Style, pencil.Card);
+    }
+
+    [Fact]
     public void The_default_tool_choice_holds_drawing_tools_and_no_emoji()
     {
         var choices = ConfigurableFeature.DefaultToolChoices;
