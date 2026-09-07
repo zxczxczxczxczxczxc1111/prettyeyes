@@ -3,7 +3,7 @@
         xmlns:controls="using:PrettyEyes.App.Controls"
         xmlns:views="using:PrettyEyes.App.Views"
         x:Class="PrettyEyes.App.Views.SettingsWindow"
-        Width="880" Height="640"
+        Width="880" Height="720"
         CanResize="False"
         SystemDecorations="None"
         Background="{StaticResource Bg}"
@@ -36,7 +36,7 @@
         <!-- Two columns, nothing folded away. The window is opened to set
              things up and closed again, so it can afford the room; a setting
              that has to be hunted for is worse than a wide window. -->
-        <Grid Margin="32,8,32,32" ColumnDefinitions="400,32,400" RowDefinitions="Auto,Auto">
+        <Grid Margin="32,8,32,32" ColumnDefinitions="400,32,400" RowDefinitions="Auto">
           <StackPanel Grid.Column="0" Grid.Row="0" Spacing="30">
             <StackPanel Spacing="12">
               <TextBlock Text="Скриншот" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
@@ -50,6 +50,14 @@
                 <TextBlock Text="Весь монитор в буфер" Foreground="{StaticResource Text}"/>
                 <controls:HotkeyBox x:Name="FullScreenHotkey" Classes="field" HorizontalAlignment="Stretch"/>
               </StackPanel>
+
+              <!-- Under the two fields it is almost always about, rather than at
+                   the foot of the window: down there it sat past the toolbar and
+                   past the whole right column, so a refused combination was
+                   announced a screen away from the field that refused it. The
+                   two rarer messages - autostart and a failed save - land here
+                   too, which is the price of one line instead of three. -->
+              <TextBlock x:Name="Message" FontSize="12" TextWrapping="Wrap" IsVisible="False"/>
 
               <!-- Beside the two combinations it lists, rather than alone at the
                    bottom of the other column: down there it was a section with a
@@ -156,9 +164,6 @@
                       HorizontalAlignment="Left"/>
             </StackPanel>
           </StackPanel>
-
-          <TextBlock x:Name="Message" Grid.Row="1" Grid.ColumnSpan="3" Margin="0,20,0,0"
-                     FontSize="12" TextWrapping="Wrap" IsVisible="False"/>
         </Grid>
       </ScrollViewer>
     </DockPanel>
