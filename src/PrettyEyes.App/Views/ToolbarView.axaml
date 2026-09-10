@@ -141,6 +141,12 @@
       <Rectangle Width="1" Margin="0,2" Fill="{StaticResource Border}"/>
 
       <StackPanel Orientation="Horizontal" Spacing="2">
+        <!-- A beam with a dot at the end of it. Here rather than among the
+             tools because it draws nothing: what it leaves on screen is gone in
+             a second and never reaches the picture. -->
+        <Button Classes="tool" x:Name="LaserButton" ToolTip.Tip="Лазерная указка, рисует при зажатой кнопке">
+          <Path Data="M3,13 L9.5,6.5 M11.5,4.5 A1.4,1.4 0 1 0 11.51,4.5"/>
+        </Button>
         <!-- A pushpin. Next to the outputs rather than among the tools: it
              produces something, it does not draw. -->
         <Button Classes="tool" x:Name="PinButton" ToolTip.Tip="Закрепить поверх окон">

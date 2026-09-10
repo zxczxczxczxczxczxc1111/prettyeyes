@@ -44,6 +44,15 @@ public sealed class OverlaySession
     private ToolKind? _activeTool;
 
     /// <summary>
+    /// The beam over the frozen screen. Its own pointer, not the one the live
+    /// mode uses: a stroke left over from a demonstration has no business
+    /// appearing when a capture opens.
+    /// </summary>
+    private readonly LaserPointer _laser = new();
+
+    private bool _laserArmed;
+
+    /// <summary>
     /// Whether the armed tool was clicked by a person rather than armed by the
     /// default. Escape treats the two differently, and only the session can
     /// tell them apart: it arms the default by calling OnToolPicked on itself.
@@ -77,6 +86,14 @@ public sealed class OverlaySession
         _services = services;
         _styles = new ToolStyles(services.Settings.ToolStyles ?? []);
         _emoji = services.Settings.Emoji;
+
+        _laser.Changed += (_, _) =>
+        {
+            foreach (var window in _windows)
+            {
+                window.RefreshLaser();
+            }
+        };
     }
 
     public event EventHandler? Finished;
@@ -170,6 +187,14 @@ public sealed class OverlaySession
             // It arrives on: the headline feature of a release must not be
             // invisible, and one click puts it away.
             window.ToolbarControl.CanPin = _services.Settings.PinButtonShown;
+            window.ToolbarControl.CanLase = _services.Settings.LaserButtonShown;
+            window.ToolbarControl.SetLaserActive(_laserArmed);
+            window.LaserTrail = _laser.Trail;
+            window.LaserArmed = _laserArmed;
+            window.ToolbarControl.LaserClicked += OnLaserClicked;
+            window.LaserStarted += OnLaserStarted;
+            window.LaserMoved += OnLaserMoved;
+            window.LaserCleared += OnLaserCleared;
             // Text is armed like any other tool but builds nothing: its whole
             // gesture is deciding where the caret goes.
             window.ToolFactory = () =>
@@ -243,6 +268,12 @@ public sealed class OverlaySession
         window.ColourCopyRequested -= OnColourCopyRequested;
         window.ToolCleared -= OnToolCleared;
         window.ToolbarControl.PinClicked -= OnPinClicked;
+        window.ToolbarControl.LaserClicked -= OnLaserClicked;
+        window.LaserStarted -= OnLaserStarted;
+        window.LaserMoved -= OnLaserMoved;
+        window.LaserCleared -= OnLaserCleared;
+        window.LaserArmed = false;
+        window.LaserTrail = null;
         window.ToolbarControl.StyleRequested -= OnStyleRequested;
         window.StyleCardControl.StyleChanged -= OnStyleChanged;
         window.EmojiCardControl.Picked -= OnEmojiPicked;
@@ -530,6 +561,14 @@ public sealed class OverlaySession
 
     private void OnToolPicked(object? sender, ToolKind? kind)
     {
+        // A tool and the pointer are two answers to the same question. Picking
+        // one puts the other away, and this is the half that runs when the
+        // person reached for the tool.
+        if (kind is not null && _laserArmed)
+        {
+            ArmLaser(false);
+        }
+
         // Emoji without a glyph has nothing to stamp: the grid opens instead of
         // the tool arming itself with nothing.
         if (kind == ToolKind.Emoji && _emoji is null)
@@ -1308,6 +1347,44 @@ public sealed class OverlaySession
     /// </summary>
     private void OnPinClicked(object? sender, EventArgs e) => PinSelection();
 
+    private void OnLaserClicked(object? sender, EventArgs e) => ArmLaser(!_laserArmed);
+
+    private void OnLaserCleared(object? sender, EventArgs e) => ArmLaser(false);
+
+    private void OnLaserStarted(object? sender, EventArgs e) => _laser.Begin();
+
+    private void OnLaserMoved(object? sender, (double X, double Y) at) => _laser.Trace(at.X, at.Y);
+
+    /// <summary>
+    /// The pointer and a drawing tool are two answers to the same question -
+    /// what the left button does - so arming one puts the other away.
+    /// </summary>
+    private void ArmLaser(bool armed)
+    {
+        if (armed == _laserArmed)
+        {
+            return;
+        }
+
+        _laserArmed = armed;
+
+        if (armed && _activeTool is not null)
+        {
+            OnToolPicked(this, null);
+        }
+
+        if (!armed)
+        {
+            _laser.Stop();
+        }
+
+        foreach (var window in _windows)
+        {
+            window.LaserArmed = armed;
+            window.ToolbarControl.SetLaserActive(armed);
+        }
+    }
+
     /// <summary>
     /// Nails the current selection. Public because the hotkey reaches it from
     /// the application, not through a button.
@@ -1389,6 +1466,7 @@ public sealed class OverlaySession
 
         _closed = true;
         _blink?.Stop();
+        _laser.Dispose();
 
         foreach (var window in _windows)
         {

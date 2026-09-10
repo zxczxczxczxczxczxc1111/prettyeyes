@@ -29,6 +29,7 @@ public enum FeatureId
     QuickSave,
     Export,
     Pin,
+    Laser,
 }
 
 /// <summary>
@@ -48,6 +49,7 @@ public enum FeatureCard
     QuickSave,
     Export,
     Pin,
+    Laser,
 }
 
 /// <summary>
@@ -92,6 +94,11 @@ public sealed record ConfigurableFeature(
         new(FeatureId.QuickSave, FeatureGroup.Feature, FeatureCard.QuickSave, Tool: null),
         new(FeatureId.Export, FeatureGroup.Feature, FeatureCard.Export, Tool: null),
         new(FeatureId.Pin, FeatureGroup.Feature, FeatureCard.Pin, Tool: null),
+
+        // Not a ToolKind and never will be. It draws on the screen and leaves
+        // nothing behind: as a tool it would go into the document, the undo
+        // stack and the exported picture, none of which it belongs in.
+        new(FeatureId.Laser, FeatureGroup.Feature, FeatureCard.Laser, Tool: null),
     ];
 
     /// <summary>

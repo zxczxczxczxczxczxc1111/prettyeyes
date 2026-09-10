@@ -50,6 +50,7 @@ public sealed class KeysView : UserControl
         Add(shot, settings.PinHotkey, "закрепить снимок");
         Add(shot, settings.HidePinnedHotkey, "скрыть закреплённые");
         Add(shot, settings.ShowPinnedHotkey, "показать закреплённые");
+        Add(shot, settings.LaserHotkey, "лазерная указка поверх экрана");
 
         Section("Снимок", shot);
 

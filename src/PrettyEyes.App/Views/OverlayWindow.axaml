@@ -12,6 +12,10 @@
         CanResize="False">
   <Panel x:Name="Root">
     <controls:CaptureCanvas x:Name="Surface"/>
+    <!-- Above the frozen screen and everything drawn on it, below the toolbar.
+         The layer knows nothing about the document, which is the whole reason
+         the pointer cannot end up in an exported picture. -->
+    <controls:LaserLayer x:Name="Laser" IsVisible="False"/>
     <views:SizeChip x:Name="Chip" HorizontalAlignment="Left" VerticalAlignment="Top" IsVisible="False"/>
     <views:MagnifierLabel x:Name="Loupe" HorizontalAlignment="Left" VerticalAlignment="Top" IsVisible="False"
                           IsHitTestVisible="False"/>

@@ -1,0 +1,25 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="using:PrettyEyes.App.Controls"
+             x:Class="PrettyEyes.App.Views.LaserSettingsView"
+             Width="360">
+  <StackPanel Spacing="16">
+    <!-- The window's own message line sits behind the dimmed sheet: a warning
+         shown there while this card is open is a warning nobody sees. -->
+    <TextBlock x:Name="Message" IsVisible="False" FontSize="12" TextWrapping="Wrap"
+               Foreground="{StaticResource Warn}"/>
+
+    <StackPanel Spacing="8">
+      <TextBlock Text="Указка поверх экрана" Foreground="{StaticResource Text}"/>
+      <TextBlock Text="Включает и выключает режим поверх всего, что открыто. Луч рисуется, пока держишь левую кнопку"
+                 Foreground="{StaticResource TextFaint}" FontSize="11" TextWrapping="Wrap"/>
+      <controls:HotkeyBox x:Name="LaserHotkey" Classes="field" HorizontalAlignment="Stretch"/>
+    </StackPanel>
+
+    <TextBlock Text="Пока режим включён, мышь принадлежит указке: клики не доходят до того, что под ней. Выключи её, чтобы снова работать"
+               Foreground="{StaticResource TextFaint}" FontSize="11" TextWrapping="Wrap"/>
+
+    <TextBlock Text="В окне выделения указка есть кнопкой на панели, там мышь ничем больше не занята"
+               Foreground="{StaticResource TextFaint}" FontSize="11" TextWrapping="Wrap"/>
+  </StackPanel>
+</UserControl>

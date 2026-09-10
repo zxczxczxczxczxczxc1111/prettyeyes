@@ -7,6 +7,7 @@ using Avalonia.Threading;
 using PrettyEyes.App.Controls;
 using PrettyEyes.Core.Annotations;
 using PrettyEyes.Core.Geometry;
+using PrettyEyes.Core.Laser;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Rendering;
 using PrettyEyes.Core.Settings;
@@ -50,6 +51,9 @@ public partial class OverlayWindow : Window
     private static readonly Cursor Caret = new(StandardCursorType.Ibeam);
 
     private CaptureRect _monitorBounds;
+
+    /// <summary>True between the button going down on an armed beam and coming up.</summary>
+    private bool _lasing;
 
     /// <summary>The monitor minus the taskbar. Panels stay inside it.</summary>
     private CaptureRect _monitorUsable;
@@ -319,6 +323,7 @@ public partial class OverlayWindow : Window
         // exactly so that "nothing" is the real desktop rather than a black
         // flash or the frame left over from the previous capture.
         Surface.Attach(document, monitor.Bounds, monitor.Usable);
+        Laser.Monitor = monitor.Bounds;
         Resize(monitor);
 
         Show();
@@ -394,6 +399,42 @@ public partial class OverlayWindow : Window
         }
 
         _echo = null;
+    }
+
+    /// <summary>
+    /// The trail this window draws, shared with every other monitor's window.
+    /// </summary>
+    public LaserTrail? LaserTrail
+    {
+        set => Laser.Trail = value;
+    }
+
+    /// <summary>
+    /// Whether the pointer is armed. While it is, the left button draws a beam
+    /// and does nothing else: no selection, no annotation, no caret.
+    /// </summary>
+    public bool LaserArmed
+    {
+        get => Laser.IsVisible;
+        set => Laser.IsVisible = value;
+    }
+
+    /// <summary>The button went down with the pointer armed: a stroke starts.</summary>
+    public event EventHandler? LaserStarted;
+
+    /// <summary>Where the beam is, in physical pixels of the virtual desktop.</summary>
+    public event EventHandler<(double X, double Y)>? LaserMoved;
+
+    /// <summary>Escape with the pointer armed puts it away before anything else.</summary>
+    public event EventHandler? LaserCleared;
+
+    /// <summary>Repaint the beam, because the trail moved on.</summary>
+    public void RefreshLaser()
+    {
+        if (Laser.IsVisible)
+        {
+            Laser.InvalidateVisual();
+        }
     }
 
     /// <summary>
@@ -947,6 +988,19 @@ public partial class OverlayWindow : Window
 
         var (x, y) = ToVirtualPixels(e.GetPosition(this));
 
+        // Armed, the button draws a beam and nothing else happens: the
+        // selection is not touched, no annotation is started, no caret moves.
+        if (LaserArmed)
+        {
+            _lasing = true;
+            LaserStarted?.Invoke(this, EventArgs.Empty);
+            LaserMoved?.Invoke(this, (x, y));
+            e.Pointer.Capture(this);
+            e.Handled = true;
+
+            return;
+        }
+
         // A caret is up somewhere. Either this press belongs to it, or it is
         // the press that finishes the label - and in both cases it is the only
         // thing this press does.
@@ -1073,6 +1127,14 @@ public partial class OverlayWindow : Window
 
         var (x, y) = ToVirtualPixels(e.GetPosition(this));
 
+        if (_lasing)
+        {
+            LaserMoved?.Invoke(this, (x, y));
+            e.Handled = true;
+
+            return;
+        }
+
         var echo = new PointerEcho(
             x, y, (int)e.KeyModifiers, (int)_mode, _dragging, _selection);
 
@@ -1173,6 +1235,14 @@ public partial class OverlayWindow : Window
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+
+        if (_lasing)
+        {
+            _lasing = false;
+            e.Pointer.Capture(null);
+
+            return;
+        }
 
         if (!_dragging)
         {
@@ -1320,6 +1390,12 @@ public partial class OverlayWindow : Window
             // Before the rest of the ladder: a glyph in mid-air is the most
             // recent thing started, so it is the first thing Esc takes back.
             case Key.Escape when _gesture.CancelCarry():
+                break;
+
+            // Before the tool ladder: with a beam on screen, Escape means
+            // "put the pointer away", not "close the capture".
+            case Key.Escape when LaserArmed:
+                LaserCleared?.Invoke(this, EventArgs.Empty);
                 break;
 
             case Key.Escape when StyleCard.IsVisible || EmojiCard.IsVisible:

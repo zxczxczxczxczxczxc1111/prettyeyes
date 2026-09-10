@@ -43,6 +43,26 @@ public class ConfigurableFeatureTests
         Assert.Equal(FeatureCard.Style, pencil.Card);
     }
 
+    /// <summary>
+    /// The pointer draws on the screen and leaves nothing behind. Made a
+    /// ToolKind it would be an annotation: it would go into the document, into
+    /// the undo stack and into the exported picture, and it would be offerable
+    /// as the tool a capture starts with. This is the gate against that, and it
+    /// is a gate rather than a comment because the row it sits in is full of
+    /// things that ARE tools.
+    /// </summary>
+    [Fact]
+    public void The_pointer_is_not_a_drawing_tool_and_never_becomes_an_annotation()
+    {
+        var laser = ConfigurableFeature.All.Single(f => f.Id == FeatureId.Laser);
+
+        Assert.Equal(FeatureGroup.Feature, laser.Group);
+        Assert.Null(laser.Tool);
+        Assert.DoesNotContain(
+            Enum.GetNames<ToolKind>(),
+            name => name.Contains("laser", StringComparison.OrdinalIgnoreCase));
+    }
+
     [Fact]
     public void The_default_tool_choice_holds_drawing_tools_and_no_emoji()
     {

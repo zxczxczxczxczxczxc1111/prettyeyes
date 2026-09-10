@@ -72,6 +72,13 @@ public partial class SettingsWindow : Window
     private readonly PinSettingsView _pinSettings = new();
 
     /// <summary>
+    /// The pointer's combination, and the two things about the over-the-screen
+    /// mode that its button cannot say. Same reason as the pinning card: the
+    /// combination arrives unassigned and needs somewhere to be typed.
+    /// </summary>
+    private readonly LaserSettingsView _laserSettings = new();
+
+    /// <summary>
     /// The old sections, each now behind its own icon. Built once and reused:
     /// the modal hands its content back on close, and a control cannot have two
     /// parents.
@@ -128,6 +135,7 @@ public partial class SettingsWindow : Window
             ShowToolRow();
         };
         _pinSettings.HotkeyChanged += (_, typed) => Apply(typed.Action, typed.Hotkey);
+        _laserSettings.HotkeyChanged += (_, typed) => Apply(typed.Action, typed.Hotkey);
 
         _stylePopup.StyleChanged += (_, change) =>
         {
@@ -980,6 +988,11 @@ public partial class SettingsWindow : Window
 
                 return _pinSettings;
 
+            case FeatureCard.Laser:
+                _laserSettings.Load(_settings);
+
+                return _laserSettings;
+
             case FeatureCard.Magnifier:
                 _magnifierSettings.Load(_settings);
 
@@ -1056,6 +1069,7 @@ public partial class SettingsWindow : Window
         FeatureId.QuickSave => (_settings.Save ?? SaveOptions.Default).Enabled,
         FeatureId.Export => _export.Enabled,
         FeatureId.Pin => _settings.PinButtonShown,
+        FeatureId.Laser => _settings.LaserButtonShown,
         _ => true,
     };
 
@@ -1090,6 +1104,10 @@ public partial class SettingsWindow : Window
 
             case FeatureId.Pin:
                 Store(_settings with { PinButtonShown = !_settings.PinButtonShown });
+                break;
+
+            case FeatureId.Laser:
+                Store(_settings with { LaserButtonShown = !_settings.LaserButtonShown });
                 break;
 
             default:
@@ -1180,6 +1198,7 @@ public partial class SettingsWindow : Window
         FeatureId.QuickSave => "M8,3 V10 M5,7.5 L8,10.5 L11,7.5 M3.5,12.5 H12.5",
         FeatureId.Export => "M3,3.5 H13 V12.5 H3 Z M5.5,6 H10.5 M5.5,8.5 H10.5",
         FeatureId.Pin => "M9.5,2.5 L13.5,6.5 L11,7 L8,11 L5,8 L9,5 Z M5,11 L2.5,13.5",
+        FeatureId.Laser => "M3,13 L9.5,6.5 M11.5,4.5 A1.4,1.4 0 1 0 11.51,4.5",
         _ => "M3.5,4 H12.5 V12 H3.5 Z",
     };
 
@@ -1198,6 +1217,7 @@ public partial class SettingsWindow : Window
         FeatureId.QuickSave => "Быстрое сохранение",
         FeatureId.Export => "Оформление",
         FeatureId.Pin => "Закрепление",
+        FeatureId.Laser => "Лазерная указка",
         _ => "Рамка",
     };
 
@@ -1391,6 +1411,7 @@ public partial class SettingsWindow : Window
     {
         HotkeyAction.Region => RegionHotkey,
         HotkeyAction.FullScreen => FullScreenHotkey,
+        HotkeyAction.Laser => _laserSettings.Field(action),
         _ => _pinSettings.Field(action),
     };
 
@@ -1451,7 +1472,7 @@ public partial class SettingsWindow : Window
         if (cost is null)
         {
             HideMessage();
-            _pinSettings.Warn(null);
+            WarnCard(null);
 
             return;
         }
@@ -1469,12 +1490,23 @@ public partial class SettingsWindow : Window
         // to a wall.
         if (Modal.IsOpen)
         {
-            _pinSettings.Warn(text);
+            WarnCard(text);
         }
 
         Message.Text = text;
         Message.Foreground = Ink(brushKey);
         Message.IsVisible = true;
+    }
+
+    /// <summary>
+    /// Said in every card that has a line to say it in. Only one of them is on
+    /// screen, and asking which is a question that goes stale the moment a
+    /// third card grows a message of its own.
+    /// </summary>
+    private void WarnCard(string? text)
+    {
+        _pinSettings.Warn(text);
+        _laserSettings.Warn(text);
     }
 
     private void HideMessage() => Message.IsVisible = false;

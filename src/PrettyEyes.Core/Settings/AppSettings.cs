@@ -28,6 +28,7 @@ public sealed record AppSettings(
     bool HidePinnedOnCapture = false,
     CaptureSource Capture = CaptureSource.Auto,
     HotkeyDefinition? LaserHotkey = null,
+    bool LaserButtonShown = true,
     int SchemaVersion = AppSettings.CurrentSchema)
 {
     /// <summary>

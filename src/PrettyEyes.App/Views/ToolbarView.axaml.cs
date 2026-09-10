@@ -43,6 +43,7 @@ public partial class ToolbarView : UserControl
         MarkerButton.Click += (_, _) => Pick(ToolKind.Marker);
         EmojiButton.Click += (_, _) => Pick(ToolKind.Emoji);
         TextButton.Click += (_, _) => Pick(ToolKind.Text);
+        LaserButton.Click += (_, _) => LaserClicked?.Invoke(this, EventArgs.Empty);
         PinButton.Click += (_, _) => PinClicked?.Invoke(this, EventArgs.Empty);
         UndoButton.Click += (_, _) => UndoClicked?.Invoke(this, EventArgs.Empty);
         CopyButton.Click += (_, _) => CopyClicked?.Invoke(this, EventArgs.Empty);
@@ -56,6 +57,9 @@ public partial class ToolbarView : UserControl
     /// pointer goes back to editing the selection.
     /// </summary>
     public event EventHandler<ToolKind?>? ToolPicked;
+
+    /// <summary>The pointer was switched on or off. Which of the two is the session's business.</summary>
+    public event EventHandler? LaserClicked;
 
     /// <summary>Nail the selection above every window and leave the overlay up.</summary>
     public event EventHandler? PinClicked;
@@ -78,6 +82,26 @@ public partial class ToolbarView : UserControl
     public bool CanPin
     {
         set => PinButton.IsVisible = value;
+    }
+
+    /// <summary>Whether the pointer is offered at all. Switched off in the settings like the pin.</summary>
+    public bool CanLase
+    {
+        set => LaserButton.IsVisible = value;
+    }
+
+    /// <summary>
+    /// Lit while the pointer is armed. Its own switch rather than SetActive:
+    /// SetActive speaks in ToolKind, and the pointer is not one.
+    /// </summary>
+    public void SetLaserActive(bool active)
+    {
+        LaserButton.Classes.Remove(ActiveClass);
+
+        if (active)
+        {
+            LaserButton.Classes.Add(ActiveClass);
+        }
     }
 
     /// <summary>Paints the dot that says what colour each tool will draw with.</summary>
