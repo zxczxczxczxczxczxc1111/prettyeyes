@@ -130,6 +130,56 @@ internal static class NativeMethods
     [DllImport("shell32.dll", CharSet = CharSet.Unicode)]
     internal static extern uint ExtractIconEx(string file, int index, out IntPtr large, out IntPtr small, uint count);
 
+    /// <summary>
+    /// The same job as ExtractIconEx but at a size we choose. ExtractIconEx
+    /// hands back the two sizes the file happens to carry, and the tray does
+    /// not draw at 16 on every machine: it wants SM_CXSMICON, which is 20 at
+    /// 125% and 24 at 150%. A 16-point icon stretched to 24 is a blurry icon,
+    /// and a badge composed onto one is a blurry badge.
+    /// </summary>
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    internal static extern uint PrivateExtractIcons(
+        string file, int index, int cx, int cy, out IntPtr icon, out uint id, uint count, uint flags);
+
+    internal const int SM_CXSMICON = 49;
+    internal const int SM_CYSMICON = 50;
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct IconInfo
+    {
+        internal bool fIcon;
+        internal int xHotspot;
+        internal int yHotspot;
+        internal IntPtr hbmMask;
+        internal IntPtr hbmColor;
+    }
+
+    /// <summary>
+    /// Takes an icon apart into the two bitmaps it is made of. Both come back
+    /// owned by us and both have to be deleted, which is the usual way this
+    /// call leaks.
+    /// </summary>
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern bool GetIconInfo(IntPtr icon, out IconInfo info);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    internal static extern IntPtr CreateIconIndirect(ref IconInfo info);
+
+    [DllImport("gdi32.dll", SetLastError = true)]
+    internal static extern IntPtr CreateDIBSection(
+        IntPtr hdc, ref BitmapInfo info, uint usage, out IntPtr bits, IntPtr section, uint offset);
+
+    /// <summary>Colours are literal, not indexes into a palette.</summary>
+    internal const uint DIB_RGB_COLORS = 0;
+
+    /// <summary>
+    /// The mask half of an icon. With a 32-bit colour bitmap the alpha decides
+    /// what is seen, but CreateIconIndirect still wants a mask, and an empty
+    /// one of the right size is the honest way to give it nothing to say.
+    /// </summary>
+    [DllImport("gdi32.dll")]
+    internal static extern IntPtr CreateBitmap(int width, int height, uint planes, uint bits, byte[] data);
+
     internal const int HWND_MESSAGE = -3;
     internal const int WM_HOTKEY = 0x0312;
     internal const uint VK_SNAPSHOT = 0x2C;

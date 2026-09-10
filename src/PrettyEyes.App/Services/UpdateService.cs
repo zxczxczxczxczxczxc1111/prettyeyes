@@ -7,25 +7,6 @@ using PrettyEyes.Core.Updates;
 
 namespace PrettyEyes.App.Services;
 
-/// <summary>What the update is doing right now, for the one line that says so.</summary>
-public enum UpdateStage
-{
-    Idle,
-    Checking,
-    UpToDate,
-    Available,
-    Downloading,
-    Installing,
-    Failed,
-}
-
-/// <summary>
-/// The whole state in one value. Handed out rather than exposed as a handful of
-/// properties: a status line built from three fields read at three moments can
-/// show a combination that never existed.
-/// </summary>
-public sealed record UpdateState(UpdateStage Stage, ReleaseVersion? Version = null, double Progress = 0);
-
 /// <summary>
 /// Checks for a newer release, downloads it, and hands it to the installer.
 ///

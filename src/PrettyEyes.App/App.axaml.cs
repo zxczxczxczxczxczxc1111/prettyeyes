@@ -98,6 +98,14 @@ public partial class App : Application
                 AppFlavor.Current.DisplayName,
                 $"Доступна версия {version}. Обновить можно из меню в трее.");
 
+            // The balloon is a moment; the mark on the icon is the state. Bound
+            // to StateChanged rather than Announced for exactly that reason:
+            // Announced fires once per run, while the mark has to survive the
+            // settings window closing and go out again once the installer has
+            // run.
+            Services.Updates.StateChanged += (_, state) =>
+                Dispatcher.UIThread.Post(() => Services.Tray.ShowUpdate(state));
+
             Services.Updates.Start();
 
             // Started with --settings the window opens right away. Useful for a
