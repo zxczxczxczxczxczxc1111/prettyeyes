@@ -188,11 +188,16 @@
                    version when there is nothing to do, the progress when there
                    is. A status line somewhere else on the window would belong
                    to no control. -->
-              <StackPanel Spacing="10">
-                <TextBlock x:Name="UpdateStatus" Classes="note"/>
+              <StackPanel Spacing="6">
+                <!-- The steady fact first, the answer to the button second,
+                     and the button under both. Pressing something and having
+                     the reply appear two lines above it is how "nothing
+                     happened" gets reported: the eye is on the button. -->
                 <TextBlock x:Name="CurrentVersion" Classes="note"/>
+                <TextBlock x:Name="UpdateStatus" Classes="note"/>
 
-                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left"
+                            Margin="0,6,0,0">
                   <Button x:Name="CheckNow" Classes="action" Content="Проверить обновления"/>
                   <Button x:Name="InstallUpdate" Classes="action primary" IsVisible="False"/>
                 </StackPanel>
@@ -208,8 +213,13 @@
                 <TextBlock Classes="sub" Text="Источник для создания снимка"/>
               </StackPanel>
 
+              <!-- A Grid rather than a UniformGrid: equal thirds gave "Авто"
+                   eleven points of air and "Простой" thirty, because the cells
+                   were equal and the words are not. The weights come from the
+                   measured width of each label, so the air around the three is
+                   the same. -->
               <Border Classes="segments" HorizontalAlignment="Stretch">
-                <UniformGrid x:Name="CaptureSourceRow" Rows="1"/>
+                <Grid x:Name="CaptureSourceRow"/>
               </Border>
 
               <StackPanel Spacing="6">

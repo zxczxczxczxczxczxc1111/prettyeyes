@@ -659,24 +659,105 @@ public partial class SettingsWindow : Window
         _ => "Быстрее всего, без рамки захвата",
     };
 
+    /// <summary>
+    /// The three capture sources as one track with three stops.
+    ///
+    /// Equal thirds looked crooked and measuring said why: "Авто" had eleven
+    /// points of air beside it and "Простой" thirty, because the cells were the
+    /// same size and the labels are not.
+    ///
+    /// Weighting the columns by measured text is most of the fix and not all of
+    /// it: star columns share out the SURPLUS in proportion too, so the widest
+    /// label still ended up with the most air (23 / 33 / 28 measured). Equal air
+    /// needs the weights to add up to the width exactly, and the width is only
+    /// known after a layout pass - hence the handler below rather than a
+    /// constant here.
+    /// </summary>
     private void BuildCaptureSourceRow()
     {
         CaptureSourceRow.Children.Clear();
+        CaptureSourceRow.ColumnDefinitions.Clear();
+        _segmentText.Clear();
+        _segmentWidth = 0;
 
-        foreach (var source in Enum.GetValues<CaptureSource>())
+        var sources = Enum.GetValues<CaptureSource>();
+
+        for (var index = 0; index < sources.Length; index++)
         {
-            var button = new Button { Tag = source, Content = CaptureSourceName(source) };
+            var source = sources[index];
+            var name = CaptureSourceName(source);
 
-            // One track with three stops rather than three separate chips: the
-            // three answers are exclusive, and a row of chips does not say so.
+            var button = new Button { Tag = source, Content = name };
+
             button.Classes.Add("segment");
             button.Click += (_, _) => PickCaptureSource(source);
 
+            Grid.SetColumn(button, index);
             CaptureSourceRow.Children.Add(button);
+
+            // Measured rather than counted in characters: "Windows" and
+            // "Простой" are seven letters each and nothing like the same width.
+            _segmentText.Add(TextWidth(name));
+            CaptureSourceRow.ColumnDefinitions.Add(
+                new ColumnDefinition(new GridLength(_segmentText[index] + 30, GridUnitType.Star)));
         }
 
+        CaptureSourceRow.SizeChanged += (_, e) => ShareSegmentAir(e.NewSize.Width);
         ShowCaptureSourceRow();
     }
+
+    /// <summary>The measured width of each segment's label, in the order of the columns.</summary>
+    private readonly List<double> _segmentText = [];
+
+    /// <summary>The width the columns were last sized for, so the handler settles.</summary>
+    private double _segmentWidth;
+
+    /// <summary>
+    /// Gives every label the same air on both sides.
+    ///
+    /// Star weights are relative, so making them add up to the available width
+    /// is what turns a proportional share-out into an equal one: each column
+    /// then measures its own text plus exactly the same allowance as its
+    /// neighbours. Anything left over after that is a rounding error rather
+    /// than a visible slant.
+    ///
+    /// Guarded on the width it last ran for. Rewriting the column definitions
+    /// asks for another layout pass, and a handler that answers its own change
+    /// is a loop.
+    /// </summary>
+    private void ShareSegmentAir(double width)
+    {
+        if (width <= 0 || Math.Abs(width - _segmentWidth) < 0.5 || _segmentText.Count == 0)
+        {
+            return;
+        }
+
+        _segmentWidth = width;
+
+        var air = (width - _segmentText.Sum()) / _segmentText.Count;
+
+        // A column narrower than its own text clips it, and that is worse than
+        // an uneven row: at that point the words matter more than the rhythm.
+        air = Math.Max(air, 12);
+
+        for (var index = 0; index < CaptureSourceRow.ColumnDefinitions.Count; index++)
+        {
+            CaptureSourceRow.ColumnDefinitions[index].Width =
+                new GridLength(_segmentText[index] + air, GridUnitType.Star);
+        }
+    }
+
+    /// <summary>
+    /// How wide a string comes out at the segment's size and face. Uses the
+    /// window's own font so the answer matches what will actually be drawn.
+    /// </summary>
+    private double TextWidth(string text) => new FormattedText(
+        text,
+        System.Globalization.CultureInfo.CurrentCulture,
+        FlowDirection.LeftToRight,
+        new Typeface(FontFamily),
+        12,
+        Brushes.White).Width;
 
     private void ShowCaptureSourceRow()
     {
@@ -1182,7 +1263,10 @@ public partial class SettingsWindow : Window
         UpdateStatus.Text = state.Stage switch
         {
             UpdateStage.Checking => "Проверяю...",
-            UpdateStage.UpToDate => "Установлена последняя версия",
+            // Not "установлена последняя версия": the line above already says
+            // which version is installed, and repeating it here was the answer
+            // to a different question than the one the button asks.
+            UpdateStage.UpToDate => "Обновлений нет",
             UpdateStage.Available => $"Доступна {state.Version}",
             UpdateStage.Downloading => $"Скачиваю {state.Progress:P0}",
             UpdateStage.Installing => "Запускаю установщик...",
