@@ -385,20 +385,28 @@ public partial class OverlayWindow : Window
         // The session redraws through here after every change to the document,
         // and the cursor reads the document: Ctrl over a glyph that has just
         // been undone must stop promising a carry. None of that shows up in
-        // the echo, so the echo is dropped.
-        //
-        // Dropping it is not enough on its own, which is what the first attempt
-        // got wrong: an empty echo only makes the next pointer event count, and
-        // undo arrives with the hand perfectly still. There is no next event
-        // until somebody moves the mouse, so the cursor is asked again here,
-        // from wherever the pointer was last seen. A window the pointer is not
-        // over has no echo and is left alone.
+        // the echo, so the echo is dropped - and dropping it is not enough on
+        // its own, which is what the first attempt got wrong. An empty echo
+        // only makes the next pointer event count, and undo arrives with the
+        // hand perfectly still.
+        Reaim();
+
+        _echo = null;
+    }
+
+    /// <summary>
+    /// Asks for the cursor again from wherever the pointer was last seen. What
+    /// the next press will do can change with nothing moving - an undo, a tool
+    /// picked from the toolbar, the pointer being armed - and there is no next
+    /// pointer event to correct the shape until somebody moves the mouse. A
+    /// window the pointer is not over has no echo and is left alone.
+    /// </summary>
+    private void Reaim()
+    {
         if (_echo is { } last && !_dragging)
         {
             UpdateCursor(last.X, last.Y, (KeyModifiers)last.Modifiers);
         }
-
-        _echo = null;
     }
 
     /// <summary>
@@ -416,7 +424,37 @@ public partial class OverlayWindow : Window
     public bool LaserArmed
     {
         get => Laser.IsVisible;
-        set => Laser.IsVisible = value;
+
+        set
+        {
+            if (Laser.IsVisible == value)
+            {
+                return;
+            }
+
+            Laser.IsVisible = value;
+
+            // Two things following the cursor is one too many: a beam drawn
+            // under a floating loupe is two pointers arguing about which one is
+            // being looked at, and the loupe is the one nobody is pointing
+            // with. It comes back by itself on the next move once the pointer
+            // is put away.
+            if (value)
+            {
+                HideMagnifier();
+            }
+            else if (_echo is { } seen)
+            {
+                // Put away with the hand held still, the loupe would stay gone
+                // until something else happened to move the pointer.
+                UpdateMagnifier(seen.X, seen.Y);
+            }
+
+            // Nothing has to move for the shape under the hand to be wrong:
+            // armed inside a selection the cursor was still the four arrows
+            // that promise to drag it.
+            Reaim();
+        }
     }
 
     /// <summary>The button went down with the pointer armed: a stroke starts.</summary>
@@ -564,7 +602,10 @@ public partial class OverlayWindow : Window
         // which would otherwise keep the magnifier it drew a moment ago.
         PointerSeen?.Invoke(this, EventArgs.Empty);
 
-        if (!_magnifierWanted || _mode is OverlayMode.Drawing or OverlayMode.Typing || OverToolbar(x, y))
+        if (!_magnifierWanted
+            || LaserArmed
+            || _mode is OverlayMode.Drawing or OverlayMode.Typing
+            || OverToolbar(x, y))
         {
             HideMagnifier();
             return;
@@ -1312,6 +1353,16 @@ public partial class OverlayWindow : Window
     /// <summary>The cursor says what the next press will do.</summary>
     private void UpdateCursor(int x, int y, KeyModifiers modifiers)
     {
+        // Armed, the button draws a beam wherever it is pressed, so the shape
+        // is the same everywhere - and in particular is not the four arrows of
+        // a selection this press is not going to move.
+        if (LaserArmed)
+        {
+            Cursor = Aim(x, y);
+
+            return;
+        }
+
         // Ctrl over a stamped glyph picks it up, whatever tool is armed. The
         // cursor is the only place that says so.
         if (Grabbing(modifiers) && _gesture.Over(x, y))
