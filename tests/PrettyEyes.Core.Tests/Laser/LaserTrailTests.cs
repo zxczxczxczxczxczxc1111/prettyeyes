@@ -7,9 +7,10 @@ namespace PrettyEyes.Core.Tests.Laser;
 /// The tail behind the pointer: what is in it, in what order, and when a point
 /// stops counting.
 ///
-/// All of it is arithmetic over a fixed buffer, which is the point - the thing
-/// runs sixty times a second over a live screen, and none of that is a place to
-/// find out that the oldest point was the one being drawn as the head.
+/// Modelled on the way excalidraw does it, which is the thing this was asked to
+/// feel like: a stroke starts when the button goes down and ends when it comes
+/// up, reported positions are pulled towards the previous one before being
+/// kept, and a position identical to the last one is not a position.
 /// </summary>
 public class LaserTrailTests
 {
@@ -21,16 +22,61 @@ public class LaserTrailTests
         Assert.Equal(0, new LaserTrail(Life).Count);
     }
 
+    /// <summary>
+    /// The first point of a stroke is where the button went down, exactly.
+    /// Smoothed against nothing it would be smoothed towards wherever the
+    /// previous stroke happened to end.
+    /// </summary>
     [Fact]
-    public void A_point_put_in_is_a_point_that_comes_out()
+    public void The_first_point_of_a_stroke_is_taken_as_reported()
     {
         var trail = new LaserTrail(Life);
 
+        trail.Begin();
         trail.Add(10, 20, TimeSpan.Zero);
 
         Assert.Equal(1, trail.Count);
         Assert.Equal(10, trail[0].X);
         Assert.Equal(20, trail[0].Y);
+    }
+
+    /// <summary>
+    /// A mouse reports a jagged line and the arm holding it did not draw one.
+    /// Each new point is pulled part of the way towards the reported one and no
+    /// further, which is what turns a staircase into a curve.
+    /// </summary>
+    [Fact]
+    public void Every_point_after_the_first_is_pulled_towards_the_one_before()
+    {
+        var trail = new LaserTrail(Life);
+
+        trail.Begin();
+        trail.Add(0, 0, TimeSpan.Zero);
+        trail.Add(100, 0, TimeSpan.FromMilliseconds(16));
+
+        Assert.True(trail[1].X > 0 && trail[1].X < 100, $"kept {trail[1].X} unchanged");
+    }
+
+    /// <summary>
+    /// Smoothing is a lag, not a leash. A pointer moving steadily has to be
+    /// followed at a fixed distance behind, and that distance measured in
+    /// pixels rather than left to be whatever it turns out to be.
+    /// </summary>
+    [Fact]
+    public void Smoothing_follows_the_pointer_at_a_fixed_distance_behind_it()
+    {
+        var trail = new LaserTrail(Life);
+
+        trail.Begin();
+
+        for (var tick = 0; tick < 40; tick++)
+        {
+            trail.Add(tick * 10, 0, TimeSpan.FromMilliseconds(tick));
+        }
+
+        var head = trail[trail.Count - 1].X;
+
+        Assert.InRange(head, 380, 390);
     }
 
     /// <summary>
@@ -43,13 +89,17 @@ public class LaserTrailTests
     {
         var trail = new LaserTrail(Life);
 
-        trail.Add(1, 1, TimeSpan.Zero);
-        trail.Add(2, 2, TimeSpan.FromMilliseconds(16));
-        trail.Add(3, 3, TimeSpan.FromMilliseconds(32));
+        trail.Begin();
 
-        Assert.Equal(3, trail.Count);
-        Assert.Equal(1, trail[0].X);
-        Assert.Equal(3, trail[2].X);
+        for (var step = 0; step < 5; step++)
+        {
+            trail.Add(step * 40, 0, TimeSpan.FromMilliseconds(step * 16));
+        }
+
+        for (var index = 1; index < trail.Count; index++)
+        {
+            Assert.True(trail[index].X > trail[index - 1].X, $"point {index} went backwards");
+        }
     }
 
     [Fact]
@@ -57,14 +107,14 @@ public class LaserTrailTests
     {
         var trail = new LaserTrail(Life);
 
+        trail.Begin();
+
         for (var tick = 0; tick < 10; tick++)
         {
-            trail.Add(tick, 0, TimeSpan.FromMilliseconds(tick * 16));
+            trail.Add(tick * 10, 0, TimeSpan.FromMilliseconds(tick * 16));
         }
 
-        var now = TimeSpan.FromMilliseconds(9 * 16);
-
-        trail.Advance(now);
+        trail.Advance(TimeSpan.FromMilliseconds(9 * 16));
 
         for (var index = 1; index < trail.Count; index++)
         {
@@ -81,6 +131,7 @@ public class LaserTrailTests
     {
         var trail = new LaserTrail(Life);
 
+        trail.Begin();
         trail.Add(0, 0, TimeSpan.Zero);
         trail.Advance(Life / 2);
 
@@ -92,6 +143,7 @@ public class LaserTrailTests
     {
         var trail = new LaserTrail(Life);
 
+        trail.Begin();
         trail.Add(0, 0, TimeSpan.Zero);
         trail.Advance(Life + TimeSpan.FromMilliseconds(1));
 
@@ -107,12 +159,13 @@ public class LaserTrailTests
     {
         var trail = new LaserTrail(Life);
 
+        trail.Begin();
         trail.Add(1, 1, TimeSpan.Zero);
-        trail.Add(2, 2, Life / 2);
+        trail.Add(500, 500, Life / 2);
         trail.Advance(Life + TimeSpan.FromMilliseconds(1));
 
         Assert.Equal(1, trail.Count);
-        Assert.Equal(2, trail[0].X);
+        Assert.True(trail[0].X > 1, "the wrong point survived");
     }
 
     [Fact]
@@ -120,9 +173,11 @@ public class LaserTrailTests
     {
         var trail = new LaserTrail(Life, capacity: 8);
 
+        trail.Begin();
+
         for (var tick = 0; tick < 40; tick++)
         {
-            trail.Add(tick, 0, TimeSpan.FromMilliseconds(tick));
+            trail.Add(tick * 10, 0, TimeSpan.FromMilliseconds(tick));
         }
 
         Assert.Equal(8, trail.Count);
@@ -137,13 +192,15 @@ public class LaserTrailTests
     {
         var trail = new LaserTrail(Life, capacity: 8);
 
+        trail.Begin();
+
         for (var tick = 0; tick < 40; tick++)
         {
-            trail.Add(tick, 0, TimeSpan.FromMilliseconds(tick));
+            trail.Add(tick * 10, 0, TimeSpan.FromMilliseconds(tick));
         }
 
-        Assert.Equal(39, trail[7].X);
-        Assert.Equal(32, trail[0].X);
+        Assert.True(trail[7].X > trail[0].X, "the head is not the newest point");
+        Assert.True(trail[7].X > 300, $"the head lagged behind at {trail[7].X}");
     }
 
     /// <summary>
@@ -155,6 +212,8 @@ public class LaserTrailTests
     public void Standing_still_does_not_refill_the_trail()
     {
         var trail = new LaserTrail(Life);
+
+        trail.Begin();
 
         for (var tick = 0; tick < 30; tick++)
         {
@@ -169,14 +228,55 @@ public class LaserTrailTests
     {
         var trail = new LaserTrail(Life);
 
-        trail.Add(400, 300, TimeSpan.Zero);
+        trail.Begin();
 
-        for (var tick = 1; tick < 120; tick++)
+        for (var tick = 0; tick < 120; tick++)
         {
             trail.Add(400, 300, TimeSpan.FromMilliseconds(tick * 16));
         }
 
         Assert.Equal(0, trail.Count);
+    }
+
+    /// <summary>
+    /// A stroke that has ended keeps fading where it lies. Cleared instead, a
+    /// second press would take the previous one off the screen mid-fade, which
+    /// reads as a glitch rather than as a new stroke.
+    /// </summary>
+    [Fact]
+    public void A_new_stroke_leaves_the_old_one_fading()
+    {
+        var trail = new LaserTrail(Life);
+
+        trail.Begin();
+        trail.Add(100, 100, TimeSpan.Zero);
+        trail.Add(200, 100, TimeSpan.FromMilliseconds(16));
+
+        trail.Begin();
+        trail.Add(900, 900, TimeSpan.FromMilliseconds(200));
+
+        Assert.Equal(3, trail.Count);
+    }
+
+    /// <summary>
+    /// Without the break the drawing joins the end of one stroke to the start
+    /// of the next, painting a line across the screen nobody drew.
+    /// </summary>
+    [Fact]
+    public void A_new_stroke_is_marked_so_the_drawing_does_not_join_them()
+    {
+        var trail = new LaserTrail(Life);
+
+        trail.Begin();
+        trail.Add(100, 100, TimeSpan.Zero);
+        trail.Add(200, 100, TimeSpan.FromMilliseconds(16));
+
+        trail.Begin();
+        trail.Add(900, 900, TimeSpan.FromMilliseconds(200));
+
+        Assert.True(trail[0].Break, "the first point of the trail starts a stroke");
+        Assert.False(trail[1].Break);
+        Assert.True(trail[2].Break, "the second stroke was not marked");
     }
 
     /// <summary>
@@ -189,11 +289,12 @@ public class LaserTrailTests
     {
         var trail = new LaserTrail(Life);
 
+        trail.Begin();
         trail.Add(0, 0, TimeSpan.Zero);
         trail.Add(3800, 2000, TimeSpan.FromMilliseconds(16));
 
         Assert.Equal(2, trail.Count);
-        Assert.Equal(3800, trail[1].X);
+        Assert.False(trail[1].Break);
     }
 
     /// <summary>
@@ -206,15 +307,16 @@ public class LaserTrailTests
     {
         var trail = new LaserTrail(Life);
 
-        trail.Add(1, 1, TimeSpan.Zero);
-        trail.Add(2, 2, TimeSpan.FromMilliseconds(16));
-        trail.Add(3, 3, TimeSpan.FromMilliseconds(32));
+        trail.Begin();
+        trail.Add(10, 10, TimeSpan.Zero);
+        trail.Add(200, 200, TimeSpan.FromMilliseconds(16));
+        trail.Add(300, 300, TimeSpan.FromMilliseconds(32));
 
         var copy = new LaserPoint[10];
 
         Assert.Equal(3, trail.CopyTo(copy));
-        Assert.Equal(1, copy[0].X);
-        Assert.Equal(3, copy[2].X);
+        Assert.Equal(trail[0].X, copy[0].X);
+        Assert.Equal(trail[2].X, copy[2].X);
         Assert.Equal(trail[0].Age, copy[0].Age);
     }
 
@@ -227,8 +329,9 @@ public class LaserTrailTests
     {
         var trail = new LaserTrail(Life);
 
+        trail.Begin();
         trail.Add(1, 1, TimeSpan.Zero);
-        trail.Add(2, 2, TimeSpan.FromMilliseconds(16));
+        trail.Add(200, 200, TimeSpan.FromMilliseconds(16));
 
         Assert.Throws<ArgumentException>(() => trail.CopyTo(new LaserPoint[1]));
     }
@@ -238,8 +341,9 @@ public class LaserTrailTests
     {
         var trail = new LaserTrail(Life);
 
+        trail.Begin();
         trail.Add(1, 1, TimeSpan.Zero);
-        trail.Add(2, 2, TimeSpan.FromMilliseconds(16));
+        trail.Add(200, 200, TimeSpan.FromMilliseconds(16));
         trail.Clear();
 
         Assert.Equal(0, trail.Count);

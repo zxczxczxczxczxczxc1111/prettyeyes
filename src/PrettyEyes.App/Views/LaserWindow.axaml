@@ -1,0 +1,16 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:PrettyEyes.App.Controls"
+        x:Class="PrettyEyes.App.Views.LaserWindow"
+        SystemDecorations="None"
+        Topmost="True"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        CanResize="False">
+  <!-- One monitor's worth of nothing, with the trail drawn on it. Clicks go
+       straight through: the whole point of the mode is pointing at something
+       while still using it. -->
+  <controls:LaserLayer x:Name="Layer"/>
+</Window>

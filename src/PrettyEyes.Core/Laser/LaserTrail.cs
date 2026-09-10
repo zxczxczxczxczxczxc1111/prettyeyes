@@ -2,7 +2,11 @@ namespace PrettyEyes.Core.Laser;
 
 /// <summary>One place the pointer has been, and how far through its life it is.</summary>
 /// <param name="Age">Nothing at the pointer, one at the moment it disappears.</param>
-public readonly record struct LaserPoint(float X, float Y, float Age);
+/// <param name="Break">
+/// True where a new stroke begins. Without it the drawing joins the end of one
+/// stroke to the start of the next and paints a line nobody drew.
+/// </param>
+public readonly record struct LaserPoint(float X, float Y, float Age, bool Break);
 
 /// <summary>
 /// The tail behind the laser pointer: a ring of recent positions that expire
@@ -19,18 +23,38 @@ public readonly record struct LaserPoint(float X, float Y, float Age);
 /// </summary>
 public sealed class LaserTrail
 {
+    /// <summary>
+    /// How far a new point is allowed to be from the last kept one, as a
+    /// fraction of the distance between them. Excalidraw calls the same number
+    /// streamline and runs at 0.4, meaning a point lands six tenths of the way
+    /// towards where the mouse says it is.
+    ///
+    /// This is what turns a reported staircase into something an arm looks like
+    /// it drew, and it costs one multiply.
+    /// </summary>
+    private const float Pull = 0.6f;
+
     private readonly TimeSpan _life;
     private readonly float[] _x;
     private readonly float[] _y;
     private readonly TimeSpan[] _stamp;
+    private readonly bool[] _break;
 
     private int _start;
     private int _count;
     private TimeSpan _now;
 
+    /// <summary>Where the pointer last said it was, before smoothing.</summary>
     private float _lastX;
     private float _lastY;
     private bool _hasLast;
+
+    /// <summary>Where the last point was actually put, after smoothing.</summary>
+    private float _keptX;
+    private float _keptY;
+
+    /// <summary>Set by Begin, cleared by the point that opens the stroke.</summary>
+    private bool _opening = true;
 
     /// <param name="capacity">
     /// Enough for a fast mouse. A pointer reporting at a thousand hertz fills
@@ -46,6 +70,7 @@ public sealed class LaserTrail
         _x = new float[capacity];
         _y = new float[capacity];
         _stamp = new TimeSpan[capacity];
+        _break = new bool[capacity];
     }
 
     public int Count => _count;
@@ -63,8 +88,19 @@ public sealed class LaserTrail
             var slot = (_start + index) % _x.Length;
             var age = (_now - _stamp[slot]) / _life;
 
-            return new LaserPoint(_x[slot], _y[slot], (float)Math.Clamp(age, 0, 1));
+            return new LaserPoint(_x[slot], _y[slot], (float)Math.Clamp(age, 0, 1), _break[slot]);
         }
+    }
+
+    /// <summary>
+    /// The button went down: what comes next is a new stroke. Whatever is
+    /// already in the trail stays and keeps fading where it lies - taken off
+    /// mid-fade it would read as a glitch rather than as a new stroke.
+    /// </summary>
+    public void Begin()
+    {
+        _opening = true;
+        _hasLast = false;
     }
 
     /// <summary>
@@ -75,21 +111,38 @@ public sealed class LaserTrail
     {
         Advance(now);
 
-        var nextX = (float)x;
-        var nextY = (float)y;
+        var rawX = (float)x;
+        var rawY = (float)y;
 
-        // A pointer that has stopped reports the same place every frame.
+        // A pointer being held still reports the same place every frame.
         // Compared against the last position offered rather than the last one
         // still alive: otherwise the tail dies, the next identical report is
         // taken as new, and standing still becomes a dot that never fades.
-        if (_hasLast && nextX == _lastX && nextY == _lastY)
+        if (_hasLast && rawX == _lastX && rawY == _lastY)
         {
             return;
         }
 
-        _lastX = nextX;
-        _lastY = nextY;
+        _lastX = rawX;
+        _lastY = rawY;
+
+        var opening = _opening;
+
+        if (opening || !_hasLast)
+        {
+            // Where the button went down, exactly. Smoothed, the stroke would
+            // start somewhere between here and wherever the last one ended.
+            _keptX = rawX;
+            _keptY = rawY;
+        }
+        else
+        {
+            _keptX += (rawX - _keptX) * Pull;
+            _keptY += (rawY - _keptY) * Pull;
+        }
+
         _hasLast = true;
+        _opening = false;
 
         if (_count == _x.Length)
         {
@@ -100,9 +153,10 @@ public sealed class LaserTrail
 
         var slot = (_start + _count) % _x.Length;
 
-        _x[slot] = nextX;
-        _y[slot] = nextY;
+        _x[slot] = _keptX;
+        _y[slot] = _keptY;
         _stamp[slot] = now;
+        _break[slot] = opening;
         _count++;
     }
 
@@ -141,6 +195,13 @@ public sealed class LaserTrail
             _start = (_start + 1) % _x.Length;
             _count--;
         }
+
+        // The oldest surviving point now opens whatever is left, or the drawing
+        // would run a stroke back to a point that has already expired.
+        if (_count > 0)
+        {
+            _break[_start] = true;
+        }
     }
 
     public void Clear()
@@ -148,5 +209,6 @@ public sealed class LaserTrail
         _start = 0;
         _count = 0;
         _hasLast = false;
+        _opening = true;
     }
 }

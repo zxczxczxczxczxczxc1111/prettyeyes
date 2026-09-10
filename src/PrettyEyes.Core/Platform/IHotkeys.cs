@@ -8,6 +8,13 @@ public enum HotkeyAction
     Pin,
     HidePinned,
     ShowPinned,
+
+    /// <summary>
+    /// The laser pointer over the live screen. Unassigned out of the box like
+    /// the three above it: it is a key held down during a demonstration, and
+    /// which key that is depends entirely on what else is being demonstrated.
+    /// </summary>
+    Laser,
 }
 
 public interface IHotkeys : IDisposable

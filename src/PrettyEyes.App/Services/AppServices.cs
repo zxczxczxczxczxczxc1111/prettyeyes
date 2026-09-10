@@ -91,6 +91,9 @@ public sealed class AppServices : IDisposable
     /// </summary>
     public PinnedWindows Pins { get; } = new();
 
+    /// <summary>The laser pointer over the live desktop, off until asked for.</summary>
+    public LaserMode Laser { get; } = new();
+
     /// <summary>The bundled emoji, decoded once at start-up.</summary>
     public EmojiAtlas Emoji { get; }
 
@@ -284,7 +287,7 @@ public sealed class AppServices : IDisposable
         var regionRegistered = hotkeys.TryRegister(HotkeyAction.Region, settings.Hotkey);
         var fullScreenRegistered = hotkeys.TryRegister(HotkeyAction.FullScreen, settings.FullScreenHotkey);
 
-        // The three pinning ones arrive unassigned and stay that way until
+        // The three pinning ones and the pointer arrive unassigned and stay so until
         // somebody types something: registering nothing is not a failure, so
         // they are not part of the warning below either.
         foreach (var (action, hotkey) in new[]
@@ -292,6 +295,7 @@ public sealed class AppServices : IDisposable
             (HotkeyAction.Pin, settings.PinHotkey),
             (HotkeyAction.HidePinned, settings.HidePinnedHotkey),
             (HotkeyAction.ShowPinned, settings.ShowPinnedHotkey),
+            (HotkeyAction.Laser, settings.LaserHotkey),
         })
         {
             if (hotkey is { Assigned: true })
@@ -353,6 +357,7 @@ public sealed class AppServices : IDisposable
         // After the record exists, because the pins ask it for the current
         // settings on every open rather than keeping a copy.
         built.Pins.Use(built);
+        built.Laser.Use(built);
         built.WatchForIdle();
 
         return built;
@@ -442,6 +447,7 @@ public sealed class AppServices : IDisposable
         _trim?.Stop();
         _idle?.Dispose();
         Hotkeys.Dispose();
+        Laser.Dispose();
         Tray.Dispose();
         Emoji.Dispose();
         Updates.Dispose();

@@ -28,6 +28,7 @@ public partial class TrayMenuWindow : Window
         Title = AppFlavor.Current.DisplayName;
 
         CaptureItem.Click += (_, _) => Pick(TrayMenuChoice.Capture);
+        LaserItem.Click += (_, _) => Pick(TrayMenuChoice.Laser);
         OpenFolderItem.Click += (_, _) => Pick(TrayMenuChoice.OpenFolder);
         UpdateItem.Click += (_, _) => Pick(TrayMenuChoice.Update);
         ShowPinsItem.Click += (_, _) => Pick(TrayMenuChoice.ShowPins);
@@ -65,6 +66,14 @@ public partial class TrayMenuWindow : Window
             ? $"Закрыть все закреплённые ({pins})"
             : "Закрыть закреплённое";
     }
+
+    /// <summary>
+    /// The pointer entry says what pressing it will do, not what is happening.
+    /// A label that read "Лазерная указка" while one was live would be a
+    /// switch with no state.
+    /// </summary>
+    public void ShowLaserEntry(bool on) =>
+        LaserItem.Content = on ? "Выключить указку" : "Лазерная указка";
 
     /// <summary>Shows the folder entry when autosave has one to show.</summary>
     public void ShowFolderEntry(bool visible) => OpenFolderItem.IsVisible = visible;

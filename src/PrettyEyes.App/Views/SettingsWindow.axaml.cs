@@ -1352,6 +1352,7 @@ public partial class SettingsWindow : Window
         HotkeyAction.Pin => _settings.PinHotkey ?? HotkeyDefinition.None,
         HotkeyAction.HidePinned => _settings.HidePinnedHotkey ?? HotkeyDefinition.None,
         HotkeyAction.ShowPinned => _settings.ShowPinnedHotkey ?? HotkeyDefinition.None,
+        HotkeyAction.Laser => _settings.LaserHotkey ?? HotkeyDefinition.None,
         _ => HotkeyDefinition.None,
     };
 
@@ -1363,6 +1364,7 @@ public partial class SettingsWindow : Window
         HotkeyAction.Pin => _settings with { PinHotkey = hotkey },
         HotkeyAction.HidePinned => _settings with { HidePinnedHotkey = hotkey },
         HotkeyAction.ShowPinned => _settings with { ShowPinnedHotkey = hotkey },
+        HotkeyAction.Laser => _settings with { LaserHotkey = hotkey },
         _ => _settings,
     };
 

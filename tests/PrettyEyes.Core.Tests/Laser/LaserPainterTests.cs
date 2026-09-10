@@ -8,13 +8,15 @@ namespace PrettyEyes.Core.Tests.Laser;
 /// What the trail looks like once it is pixels.
 ///
 /// The shape is the whole point of a laser pointer: a stripe of even width
-/// reads as a scribble, and a stripe that fades from the wrong end reads as
-/// something being drawn backwards.
+/// reads as a scribble, and a stripe that tapers from the wrong end reads as
+/// something being drawn backwards. Nothing here assumes an exact coordinate -
+/// the points are smoothed on the way in, so the drawing is checked by looking
+/// at what got painted rather than by probing where it was supposed to land.
 /// </summary>
 public class LaserPainterTests
 {
-    private const int Width = 200;
-    private const int Height = 100;
+    private const int Width = 400;
+    private const int Height = 200;
 
     [Fact]
     public void An_empty_trail_leaves_the_surface_alone()
@@ -25,15 +27,11 @@ public class LaserPainterTests
     }
 
     [Fact]
-    public void The_pointer_end_is_the_colour_it_was_given()
+    public void A_stroke_gets_painted()
     {
         using var sheet = Paint(Streak());
 
-        var head = sheet.GetPixel(180, 50);
-
-        Assert.Equal(LaserPainter.Default.Red, head.Red);
-        Assert.Equal(LaserPainter.Default.Green, head.Green);
-        Assert.Equal(LaserPainter.Default.Blue, head.Blue);
+        Assert.True(Lit(sheet) > 200, $"only {Lit(sheet)} points were painted");
     }
 
     /// <summary>
@@ -45,33 +43,37 @@ public class LaserPainterTests
     {
         using var sheet = Paint(Streak());
 
-        Assert.True(
-            Column(sheet, 178) > Column(sheet, 22) + 1,
-            $"head {Column(sheet, 178)} points, tail {Column(sheet, 22)}");
+        var columns = Enumerable.Range(0, Width).Where(x => Column(sheet, x) > 0).ToList();
+        var tail = Column(sheet, columns[0] + 2);
+        var head = Column(sheet, columns[^1] - 2);
+
+        Assert.True(head > tail, $"head {head} points, tail {tail}");
     }
 
     [Fact]
-    public void The_far_end_is_fainter_than_the_pointer()
+    public void The_stroke_is_the_colour_it_was_given()
     {
         using var sheet = Paint(Streak());
 
-        Assert.True(
-            sheet.GetPixel(22, 50).Red < sheet.GetPixel(178, 50).Red,
-            "the far end is not fading");
+        var brightest = All(sheet).Max(p => sheet.GetPixel(p.x, p.y).Red);
+
+        Assert.Equal(LaserPainter.Default.Red, brightest);
     }
 
     /// <summary>
-    /// One reported position is a pointer that has just appeared, not an error.
+    /// One reported position is a pointer that has just been put down, not an
+    /// error.
     /// </summary>
     [Fact]
     public void A_single_point_still_shows_a_pointer()
     {
         var trail = new LaserTrail(TimeSpan.FromMilliseconds(900));
-        trail.Add(100, 50, TimeSpan.Zero);
+        trail.Begin();
+        trail.Add(200, 100, TimeSpan.Zero);
 
         using var sheet = Paint(trail);
 
-        Assert.True(sheet.GetPixel(100, 50).Red > 200, "nothing was drawn");
+        Assert.True(sheet.GetPixel(200, 100).Red > 200, "nothing was drawn");
     }
 
     [Fact]
@@ -80,21 +82,53 @@ public class LaserPainterTests
         using var sheet = Paint(Streak());
 
         Assert.Equal(0u, sheet.GetPixel(5, 5).Red);
-        Assert.Equal(0u, sheet.GetPixel(195, 95).Red);
+        Assert.Equal(0u, sheet.GetPixel(395, 195).Red);
     }
 
     /// <summary>
-    /// Nine positions across the sheet, sixty milliseconds apart, read at the
-    /// moment the last one arrived. The far end is then a bit over half way
-    /// through its life: still drawn, visibly older.
+    /// Two presses in two places are two strokes. Joined, the drawing runs a
+    /// line between them that the pointer never travelled.
+    /// </summary>
+    [Fact]
+    public void Two_strokes_are_not_joined_across_the_gap_between_them()
+    {
+        var trail = new LaserTrail(TimeSpan.FromMilliseconds(900));
+
+        trail.Begin();
+
+        for (var step = 0; step < 6; step++)
+        {
+            trail.Add(20 + (step * 8), 40, TimeSpan.FromMilliseconds(step * 16));
+        }
+
+        trail.Begin();
+
+        for (var step = 0; step < 6; step++)
+        {
+            trail.Add(300 + (step * 8), 160, TimeSpan.FromMilliseconds(100 + (step * 16)));
+        }
+
+        using var sheet = Paint(trail);
+
+        Assert.True(sheet.GetPixel(30, 40).Red > 100, "the first stroke is missing");
+        Assert.True(sheet.GetPixel(310, 160).Red > 100, "the second stroke is missing");
+        Assert.Equal(0u, sheet.GetPixel(170, 100).Red);
+    }
+
+    /// <summary>
+    /// A full stroke: a second of reports at sixty a second, which is as long
+    /// as a trail ever gets and the only length at which the taper is fully
+    /// stretched out.
     /// </summary>
     private static LaserTrail Streak()
     {
         var trail = new LaserTrail(TimeSpan.FromMilliseconds(900));
 
-        for (var step = 0; step < 9; step++)
+        trail.Begin();
+
+        for (var step = 0; step < 54; step++)
         {
-            trail.Add(20 + (step * 20), 50, TimeSpan.FromMilliseconds(step * 60));
+            trail.Add(40 + (step * 6), 100, TimeSpan.FromMilliseconds(step * 16));
         }
 
         return trail;
@@ -120,4 +154,7 @@ public class LaserPainterTests
 
     private static int Lit(SKBitmap sheet) =>
         Enumerable.Range(0, Width).Sum(x => Column(sheet, x));
+
+    private static IEnumerable<(int x, int y)> All(SKBitmap sheet) =>
+        Enumerable.Range(0, Height).SelectMany(y => Enumerable.Range(0, Width).Select(x => (x, y)));
 }

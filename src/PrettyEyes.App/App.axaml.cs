@@ -72,6 +72,10 @@ public partial class App : Application
                     case HotkeyAction.Pin:
                         _session?.PinSelection();
                         break;
+
+                    case HotkeyAction.Laser:
+                        Services.Laser.Toggle();
+                        break;
                 }
             };
 
@@ -165,6 +169,10 @@ public partial class App : Application
         // A pin left on a monitor that is gone is a pin nobody can reach, and
         // what it shows exists nowhere else. It is moved, never closed.
         Services.Pins.Rehome(layout.Monitors);
+
+        // Sized and placed for a desktop that no longer exists. Built again
+        // rather than moved: there may also be a different number of them now.
+        Services.Laser.Rehome();
     }
 
     public void StartCapture()
@@ -194,6 +202,16 @@ public partial class App : Application
 
         CaptureResult capture;
 
+        // The pointer's own trail has no business being in the picture, and
+        // the live panes have no business being over a frozen screen either -
+        // the overlay has a pointer of its own. Taken off for the whole
+        // session and put back when it ends.
+        //
+        // Not solved the way the pins are: a pane invisible to capture is also
+        // invisible on the shared screen, which is the one place it has to be
+        // seen.
+        var laserAside = Services.Laser.StepAside();
+
         try
         {
             using var scope = Log.Default.Scope("capture");
@@ -202,6 +220,12 @@ public partial class App : Application
         catch (InvalidOperationException ex)
         {
             Services.Notifier.Notify(AppFlavor.Current.DisplayName, $"Не удалось снять экран: {ex.Message}");
+
+            if (laserAside)
+            {
+                Services.Laser.StepBack();
+            }
+
             return;
         }
 
@@ -209,6 +233,12 @@ public partial class App : Application
         _session.Finished += (_, _) =>
         {
             _session = null;
+
+            if (laserAside)
+            {
+                Services.Laser.StepBack();
+            }
+
             Services.NudgeTrim();
         };
         _session.Start(capture);
@@ -246,6 +276,12 @@ public partial class App : Application
 
         CaptureResult capture;
 
+        // The pointer's own trail has no business being in the picture. Taken
+        // off the screen first and put back whatever happens next: unlike the
+        // pins this cannot be solved by making the panes invisible to capture,
+        // because they are being shown to somebody through exactly that.
+        var laserAside = Services.Laser.StepAside();
+
         try
         {
             using var scope = Log.Default.Scope("capture");
@@ -255,6 +291,13 @@ public partial class App : Application
         {
             Services.Notifier.Notify(AppFlavor.Current.DisplayName, $"Не удалось снять экран: {ex.Message}");
             return;
+        }
+        finally
+        {
+            if (laserAside)
+            {
+                Services.Laser.StepBack();
+            }
         }
 
         using var document = new Document(capture.Image, capture.Bounds);
@@ -353,6 +396,7 @@ public partial class App : Application
         var monitor = layout.MonitorAt(x, y) ?? layout.Monitors[0];
 
         _menu = new TrayMenuWindow();
+        _menu.ShowLaserEntry(Services.Laser.IsOn);
         _menu.ShowFolderEntry(Services.Settings.Save?.Ready == true);
         _menu.ShowUpdateEntry(Services.Updates.Found?.Version.ToString());
         _menu.ShowPinEntries(Services.Pins.Count);
@@ -360,6 +404,10 @@ public partial class App : Application
         {
             switch (choice)
             {
+                case TrayMenuChoice.Laser:
+                    Services.Laser.Toggle();
+                    break;
+
                 case TrayMenuChoice.Capture:
                     StartCapture();
                     break;

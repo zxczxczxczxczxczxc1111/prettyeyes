@@ -309,8 +309,9 @@ public class JsonSettingsStoreTests
         Assert.True(settings.PinButtonShown);       // the headline feature is visible
         Assert.False(settings.HidePinnedOnCapture); // screen sharing beats screenshots
         Assert.Null(settings.PinHotkey);
+        Assert.Null(settings.LaserHotkey);
         // Not asserting SchemaVersion here: Normalize assigns it unconditionally,
         // so the check would pass no matter what the rest of this does.
-        Assert.Equal(14, AppSettings.CurrentSchema);
+        Assert.Equal(15, AppSettings.CurrentSchema);
     }
 }

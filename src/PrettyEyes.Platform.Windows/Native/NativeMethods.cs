@@ -237,6 +237,26 @@ internal static class NativeMethods
     [DllImport("dwmapi.dll")]
     internal static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
 
+    /// <summary>
+    /// Blocks until the composer has finished the frame it is on. The only
+    /// honest way to say "that window is off the screen now": ShowWindow
+    /// returns long before anything is recomposed, and a capture taken in the
+    /// same turn still contains what was just hidden.
+    /// </summary>
+    [DllImport("dwmapi.dll")]
+    internal static extern int DwmFlush();
+
+    /// <summary>
+    /// Asks Windows for a finer timer. Without it the shortest a timer can
+    /// actually wait is about 15.6 ms, so a sixteen-millisecond tick fires at
+    /// forty-four hertz rather than sixty.
+    /// </summary>
+    [DllImport("winmm.dll")]
+    internal static extern int timeBeginPeriod(uint period);
+
+    [DllImport("winmm.dll")]
+    internal static extern int timeEndPeriod(uint period);
+
     [StructLayout(LayoutKind.Sequential)]
     internal struct Point
     {
@@ -321,6 +341,18 @@ internal static class NativeMethods
 
     [DllImport("user32.dll", SetLastError = true, EntryPoint = "SetWindowLongPtrW")]
     internal static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int index, IntPtr value);
+
+    /// <summary>The window procedure itself, which is what subclassing replaces.</summary>
+    internal const int GWLP_WNDPROC = -4;
+
+    /// <summary>"Not mine, keep looking behind me." The answer to a hit test.</summary>
+    internal const uint WM_NCHITTEST = 0x0084;
+
+    internal static readonly IntPtr HTTRANSPARENT = new(-1);
+
+    [DllImport("user32.dll", EntryPoint = "CallWindowProcW")]
+    internal static extern IntPtr CallWindowProc(
+        IntPtr previous, IntPtr hWnd, uint message, IntPtr wParam, IntPtr lParam);
 
     /// <summary>A window with this style is composited with an alpha of its own.</summary>
     internal const long WS_EX_LAYERED = 0x00080000;

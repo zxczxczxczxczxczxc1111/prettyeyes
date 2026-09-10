@@ -29,6 +29,10 @@
 
     <StackPanel Spacing="2">
       <Button x:Name="CaptureItem" Classes="menu" Content="Скриншот"/>
+      <!-- Always there, not only while it is on. The combination for it is
+           unassigned out of the box, so an entry that appeared once the mode
+           was running would be an entry nobody could reach. -->
+      <Button x:Name="LaserItem" Classes="menu" Content="Лазерная указка"/>
       <!-- Only there when there is a folder to open: autosave writes silently,
            and "somewhere on the disk" is not an answer. -->
       <Button x:Name="OpenFolderItem" Classes="menu" Content="Папка скриншотов" IsVisible="False"/>

@@ -30,16 +30,43 @@ public static class WindowClicks
             return;
         }
 
+        Ignore(window);
+
         var style = (long)NativeMethods.GetWindowLongPtr(window, NativeMethods.GWL_EXSTYLE);
 
         NativeMethods.SetWindowLongPtr(
             window,
             NativeMethods.GWL_EXSTYLE,
-            new IntPtr(style | NativeMethods.WS_EX_TRANSPARENT | NativeMethods.WS_EX_LAYERED));
+            new IntPtr(style | NativeMethods.WS_EX_LAYERED));
 
         // Fully opaque, so the per-pixel alpha the window paints with is what
         // decides what is seen. This says "the layer is solid", not "the window
         // is solid": the frame is still a border around nothing.
         NativeMethods.SetLayeredWindowAttributes(window, 0, 255, NativeMethods.LWA_ALPHA);
+    }
+
+    /// <summary>
+    /// WS_EX_TRANSPARENT on its own, without the layer.
+    ///
+    /// Measured while trying to build a full-screen pane that clicks go
+    /// through, and it is not enough by itself: with only this, a click still
+    /// fails to reach another process's window underneath. Answering
+    /// WM_NCHITTEST with HTTRANSPARENT was measured too and does not do it
+    /// either - that falls through within a thread, not across processes. The
+    /// layer is what makes pass-through work, and the layer is what costs the
+    /// frames: ten a second against forty-eight without it on a pane at
+    /// 2560x1440.
+    ///
+    /// Kept because PassThrough is built out of it and because it is half of
+    /// what the documentation asks for. Nothing calls it alone.
+    /// </summary>
+    private static void Ignore(IntPtr window)
+    {
+        var style = (long)NativeMethods.GetWindowLongPtr(window, NativeMethods.GWL_EXSTYLE);
+
+        NativeMethods.SetWindowLongPtr(
+            window,
+            NativeMethods.GWL_EXSTYLE,
+            new IntPtr(style | NativeMethods.WS_EX_TRANSPARENT));
     }
 }

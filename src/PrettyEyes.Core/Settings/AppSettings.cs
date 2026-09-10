@@ -27,6 +27,7 @@ public sealed record AppSettings(
     bool DrawOnPinned = true,
     bool HidePinnedOnCapture = false,
     CaptureSource Capture = CaptureSource.Auto,
+    HotkeyDefinition? LaserHotkey = null,
     int SchemaVersion = AppSettings.CurrentSchema)
 {
     /// <summary>
@@ -34,7 +35,7 @@ public sealed record AppSettings(
     /// older build is missing everything added since, and the reader has to
     /// know what to fill in rather than hand out nulls.
     /// </summary>
-    public const int CurrentSchema = 14;
+    public const int CurrentSchema = 15;
 
     public static AppSettings Default =>
         new(HotkeyDefinition.Default, HotkeyDefinition.DefaultFullScreen, false);
