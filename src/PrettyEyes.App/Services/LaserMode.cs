@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using PrettyEyes.App.Views;
 using PrettyEyes.Core.Diagnostics;
 using PrettyEyes.Core.Geometry;
@@ -211,9 +211,14 @@ public sealed class LaserMode : IDisposable
         var asked = _asked / elapsed.TotalSeconds;
         var rate = (drawn - _drawn) / elapsed.TotalSeconds;
 
-        if (rate < Slow)
+        // Nobody asked for a frame, so nobody was let down: the second after
+        // the button comes up is all fade and then nothing, and a line saying
+        // "asked 0, drew 0" is a complaint about silence.
+        if (asked >= Slow && rate < Slow)
         {
-            Log.Default.Info($"указка: просили {asked:F0} кадров в секунду, нарисовано {rate:F0}");
+            // The ASCII tail is not decoration: the load script runs in a console
+            // that mangles Cyrillic, and it matches on "fps".
+            Log.Default.Info($"указка: просили {asked:F0} кадров в секунду, нарисовано {rate:F0} (fps)");
         }
 
         _asked = 0;
