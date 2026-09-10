@@ -34,6 +34,21 @@ public sealed class LaserTrail
     /// </summary>
     private const float Pull = 0.6f;
 
+    /// <summary>
+    /// How far the pointer has to have moved before that counts as somewhere
+    /// new, in pixels.
+    ///
+    /// A mouse reports far faster than it moves - a thousand hertz is a report
+    /// every fraction of a pixel - and one point per report means the length of
+    /// trail a buffer holds depends on whose mouse it is. Measured in pixels,
+    /// it does not: the buffer holds a distance.
+    ///
+    /// Two, because the beam's edge is antialiased and its narrowest pass is a
+    /// pixel and a bit wide, so a corner cut two pixels early is a corner
+    /// nobody can see.
+    /// </summary>
+    private const float Step = 2f;
+
     private readonly TimeSpan _life;
     private readonly float[] _x;
     private readonly float[] _y;
@@ -57,11 +72,13 @@ public sealed class LaserTrail
     private bool _opening = true;
 
     /// <param name="capacity">
-    /// Enough for a fast mouse. A pointer reporting at a thousand hertz fills
-    /// a second's worth of tail well before this, and the far end of the tail
-    /// is the part nobody looks at.
+    /// Points, and with a point costing two pixels of movement, half as many
+    /// pixels of gesture. The default holds a stroke a screen and a half long,
+    /// which is more than the painter draws before the beam tapers out - so
+    /// what limits the length is the drawing, where it can be looked at, and
+    /// not a buffer size nobody sees.
     /// </param>
-    public LaserTrail(TimeSpan life, int capacity = 256)
+    public LaserTrail(TimeSpan life, int capacity = 640)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(life, TimeSpan.Zero);
         ArgumentOutOfRangeException.ThrowIfLessThan(capacity, 2);
@@ -114,11 +131,14 @@ public sealed class LaserTrail
         var rawX = (float)x;
         var rawY = (float)y;
 
-        // A pointer being held still reports the same place every frame.
-        // Compared against the last position offered rather than the last one
-        // still alive: otherwise the tail dies, the next identical report is
-        // taken as new, and standing still becomes a dot that never fades.
-        if (_hasLast && rawX == _lastX && rawY == _lastY)
+        // A pointer being held still reports the same place every frame, and
+        // one being dragged slowly reports a fraction of a pixel at a time.
+        // Compared against the last position taken rather than the last one
+        // offered: otherwise a slow drag is a series of moves that are each
+        // too small and never adds up to anything. That also means the tail
+        // dying does not make the next identical report new, so standing still
+        // stays a dot that fades rather than one that never does.
+        if (_hasLast && Near(rawX, rawY))
         {
             return;
         }
@@ -202,6 +222,19 @@ public sealed class LaserTrail
         {
             _break[_start] = true;
         }
+    }
+
+    /// <summary>
+    /// Whether a reported position is close enough to the last one taken to be
+    /// the same place. Squared, because a square root to answer a comparison is
+    /// a square root on every report a mouse sends.
+    /// </summary>
+    private bool Near(float x, float y)
+    {
+        var dx = x - _lastX;
+        var dy = y - _lastY;
+
+        return (dx * dx) + (dy * dy) < Step * Step;
     }
 
     public void Clear()

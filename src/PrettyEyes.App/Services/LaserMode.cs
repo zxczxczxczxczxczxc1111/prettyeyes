@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using PrettyEyes.App.Views;
 using PrettyEyes.Core.Diagnostics;
+using PrettyEyes.Core.Geometry;
 using PrettyEyes.Platform.Windows;
 
 namespace PrettyEyes.App.Services;
@@ -16,6 +17,9 @@ namespace PrettyEyes.App.Services;
 public sealed class LaserMode : IDisposable
 {
     private readonly List<LaserWindow> _windows = [];
+
+    /// <summary>The monitors the panes were built for, in the same order.</summary>
+    private IReadOnlyList<MonitorInfo> _screens = [];
     private readonly LaserPointer _pointer = new();
 
     private AppServices? _services;
@@ -64,7 +68,9 @@ public sealed class LaserMode : IDisposable
             return;
         }
 
-        foreach (var monitor in _services.Monitors.Enumerate().Monitors)
+        _screens = _services.Monitors.Enumerate().Monitors;
+
+        foreach (var monitor in _screens)
         {
             var window = LaserWindow.Open(monitor, _pointer.Trail);
 
@@ -101,6 +107,7 @@ public sealed class LaserMode : IDisposable
         }
 
         _windows.Clear();
+        _screens = [];
         _stepped = false;
 
         Log.Default.Info("указка выключена");
@@ -159,15 +166,10 @@ public sealed class LaserMode : IDisposable
 
         _stepped = false;
 
-        foreach (var window in _windows)
+        for (var index = 0; index < _windows.Count; index++)
         {
-            window.Show();
-
-            // Re-applied rather than trusted: the handle survives a hide, but
-            // the cost of being wrong is a pane in the Alt+Tab list. The hit
-            // test is answered by a hook on the window itself and needs
-            // nothing put back.
-            WindowSwitcher.Hide(window.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
+            _windows[index].Show();
+            _windows[index].Settle(_screens[index]);
         }
     }
 

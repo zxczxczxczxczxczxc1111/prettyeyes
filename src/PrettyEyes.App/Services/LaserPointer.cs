@@ -16,10 +16,16 @@ namespace PrettyEyes.App.Services;
 public sealed class LaserPointer : IDisposable
 {
     /// <summary>
-    /// How long a point stays on screen. Long enough to draw a circle round
-    /// something and have the start of the circle still be there.
+    /// How long a point stays on screen. Long enough to underline a sentence
+    /// at reading speed and still have the beginning of it lit when the hand
+    /// reaches the end, which is the gesture people actually make - a circle
+    /// round something takes less.
+    ///
+    /// Excalidraw uses a second. That is a second for a mouse in a browser
+    /// window; over a whole desktop the same gesture covers more ground and
+    /// takes longer.
     /// </summary>
-    private static readonly TimeSpan Life = TimeSpan.FromMilliseconds(900);
+    private static readonly TimeSpan Life = TimeSpan.FromMilliseconds(1600);
 
     private static readonly TimeSpan Frame = TimeSpan.FromMilliseconds(16);
 

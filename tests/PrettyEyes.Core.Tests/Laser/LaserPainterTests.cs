@@ -116,6 +116,36 @@ public class LaserPainterTests
     }
 
     /// <summary>
+    /// Underlining a sentence. The taper used to be counted in points rather
+    /// than pixels, so how long the beam looked depended on how fast the mouse
+    /// reported: fifty points of a thousand-hertz mouse is a beam long enough
+    /// to underline a word.
+    ///
+    /// Nine hundred pixels drawn in half a second, which is an unhurried
+    /// underline, and all of it still on screen at the end of the gesture.
+    /// </summary>
+    [Fact]
+    public void A_stroke_the_width_of_a_sentence_is_lit_along_its_whole_length()
+    {
+        var trail = new LaserTrail(TimeSpan.FromMilliseconds(1600));
+
+        trail.Begin();
+
+        for (var step = 0; step <= 300; step++)
+        {
+            trail.Add(40 + (step * 3), 60, TimeSpan.FromMilliseconds(step * 1.6));
+        }
+
+        using var sheet = Paint(trail, 1000, 120);
+
+        var tail = Enumerable.Range(0, 120).Count(y => sheet.GetPixel(60, y).Red > 20);
+        var head = Enumerable.Range(0, 120).Count(y => sheet.GetPixel(900, y).Red > 20);
+
+        Assert.True(tail > 4, $"the far end of the underline is {tail} pixels thick");
+        Assert.True(head > tail, $"head {head} pixels, tail {tail}");
+    }
+
+    /// <summary>
     /// A full stroke: a second of reports at sixty a second, which is as long
     /// as a trail ever gets and the only length at which the taper is fully
     /// stretched out.
@@ -134,9 +164,11 @@ public class LaserPainterTests
         return trail;
     }
 
-    private static SKBitmap Paint(LaserTrail trail)
+    private static SKBitmap Paint(LaserTrail trail) => Paint(trail, Width, Height);
+
+    private static SKBitmap Paint(LaserTrail trail, int width, int height)
     {
-        var sheet = new SKBitmap(Width, Height);
+        var sheet = new SKBitmap(width, height);
         using var canvas = new SKCanvas(sheet);
         canvas.Clear(SKColors.Black);
 

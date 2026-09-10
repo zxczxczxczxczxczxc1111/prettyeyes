@@ -27,6 +27,10 @@ namespace PrettyEyes.App.Views;
 /// using what is being demonstrated, which is how every other pointer that
 /// lives over a live screen works, and the cursor says which of the two is
 /// happening.
+///
+/// With one hole in it, cut by ShellPassThrough: the taskbar. A mode that owns
+/// the whole screen also owns the tray icon it is switched off from, and "on"
+/// would mean "stuck on" for anybody who has not assigned it a combination.
 /// </summary>
 public partial class LaserWindow : Window
 {
@@ -64,9 +68,25 @@ public partial class LaserWindow : Window
         // scale only learns the new scale once it is there.
         window.Position = new PixelPoint(monitor.Bounds.X, monitor.Bounds.Y);
 
-        WindowSwitcher.Hide(window.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
+        window.Settle(monitor);
 
         return window;
+    }
+
+    /// <summary>
+    /// The two things the pane needs said to it as a window rather than as a
+    /// control: keep out of the switcher, and keep off the taskbar.
+    ///
+    /// Together, because they are re-applied together after a hide - the handle
+    /// survives one, but the cost of being wrong is a pane in the Alt+Tab list
+    /// and a taskbar nobody can click.
+    /// </summary>
+    public void Settle(MonitorInfo monitor)
+    {
+        var handle = TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+
+        WindowSwitcher.Hide(handle);
+        ShellPassThrough.Keep(handle, monitor.Bounds, monitor.WorkArea);
     }
 
     /// <summary>

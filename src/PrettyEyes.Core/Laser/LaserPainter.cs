@@ -24,8 +24,8 @@ namespace PrettyEyes.Core.Laser;
 /// so a stroke being drawn keeps a constant visible length however long the
 /// gesture goes on.
 ///
-/// One instance per surface, holding its one paint and its one path, because
-/// this is called on every frame of a live screen.
+/// One instance per surface, holding its one paint, its one path and one array
+/// of widths, because this is called on every frame of a live screen.
 /// </summary>
 public sealed class LaserPainter : IDisposable
 {
@@ -39,11 +39,19 @@ public sealed class LaserPainter : IDisposable
     private const float Reach = 4.5f;
 
     /// <summary>
-    /// How many points back the taper runs. Excalidraw uses fifty, and at sixty
-    /// reports a second that is a tail a bit under a second long - which is why
-    /// it and the lifetime agree with each other rather than fight.
+    /// How far back along the stroke the taper runs, in pixels of the screen it
+    /// is drawn on.
+    ///
+    /// Pixels rather than points, which is the whole difference between a beam
+    /// that can underline a sentence and one that cannot. Counted in points,
+    /// the visible length is however far the mouse happened to travel between
+    /// reports: fifty points of a thousand-hertz mouse is a couple of
+    /// centimetres, and fifty of a slow one is half the screen.
+    ///
+    /// Twelve hundred is a line of text across most of a screen, which is the
+    /// thing people underline.
     /// </summary>
-    private const float Tail = 50f;
+    private const float Span = 1200f;
 
     /// <summary>Below this the shape is thinner than a pixel and not worth a triangle.</summary>
     private const float Hairline = 0.2f;
@@ -73,6 +81,12 @@ public sealed class LaserPainter : IDisposable
     private readonly SKPath _path = new();
 
     /// <summary>
+    /// Half the width at each point of the stroke being drawn, worked out once
+    /// and read six times: three passes, two sides each.
+    /// </summary>
+    private float[] _width = new float[256];
+
+    /// <summary>
     /// Takes a copy of the points rather than the trail. Drawing happens on the
     /// render thread and the trail is written on the UI one, so what arrives
     /// here is already frozen.
@@ -94,6 +108,8 @@ public sealed class LaserPainter : IDisposable
             {
                 continue;
             }
+
+            Measure(points, from, index);
 
             // Outside in. Each pass covers the middle of the one before it, so
             // what is left of the wider pass is its rim.
@@ -125,13 +141,49 @@ public sealed class LaserPainter : IDisposable
     private static byte Mix(byte channel, float towards) =>
         (byte)Math.Clamp(channel + ((255 - channel) * towards), 0, 255);
 
+    /// <summary>
+    /// Half the width at every point of one stroke: the smaller of what its age
+    /// allows and what its distance back from the pointer allows. A stroke has
+    /// to disappear when it is old and taper when it is not.
+    ///
+    /// Walked from the pointer backwards, adding up the distance travelled,
+    /// because that is the direction the answer depends on.
+    /// </summary>
+    private void Measure(ReadOnlySpan<LaserPoint> points, int from, int to)
+    {
+        var count = to - from;
+
+        if (_width.Length < count)
+        {
+            _width = new float[Math.Max(count, _width.Length * 2)];
+        }
+
+        var back = 0f;
+
+        for (var index = to - 1; index >= from; index--)
+        {
+            if (index < to - 1)
+            {
+                var dx = points[index + 1].X - points[index].X;
+                var dy = points[index + 1].Y - points[index].Y;
+
+                back += MathF.Sqrt((dx * dx) + (dy * dy));
+            }
+
+            var byAge = Ease(1f - points[index].Age);
+            var byPlace = Ease(Math.Clamp(1f - (back / Span), 0f, 1f));
+
+            _width[index - from] = Reach * Math.Min(byAge, byPlace);
+        }
+    }
+
     private void Stroke(
         SKCanvas canvas, ReadOnlySpan<LaserPoint> points, int from, int to, float scale, SKColor colour)
     {
         _paint.Color = colour;
 
         var count = to - from;
-        var head = Width(points[to - 1], count - 1, count) * scale;
+        var head = _width[count - 1] * scale;
 
         if (count == 1)
         {
@@ -168,10 +220,9 @@ public sealed class LaserPainter : IDisposable
         for (var step = 0; step < count; step++)
         {
             var index = forwards ? from + step : to - 1 - step;
-            var local = index - from;
 
             var (dx, dy) = Direction(points, from, to, index);
-            var width = Width(points[index], local, count) * scale;
+            var width = _width[index - from] * scale;
 
             // Perpendicular to the direction of travel, and the far side is the
             // same offset with the sign flipped.
@@ -208,19 +259,6 @@ public sealed class LaserPainter : IDisposable
         // Two identical neighbours mean a stroke of one step; any direction
         // will do, and along the x axis is a direction.
         return length < 0.0001f ? (1f, 0f) : (dx / length, dy / length);
-    }
-
-    /// <summary>
-    /// Half the width at one point. The smaller of what its age allows and what
-    /// its distance back from the pointer allows: a stroke has to disappear
-    /// when it is old, and taper when it is not.
-    /// </summary>
-    private static float Width(LaserPoint point, int index, int count)
-    {
-        var byAge = Ease(1f - point.Age);
-        var byPlace = Ease(Math.Clamp((Tail - (count - index)) / Tail, 0f, 1f));
-
-        return Reach * Math.Min(byAge, byPlace);
     }
 
     /// <summary>Quick off the mark and slow at the end, so most of the stroke is full width.</summary>

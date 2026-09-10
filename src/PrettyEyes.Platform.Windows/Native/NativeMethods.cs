@@ -305,6 +305,45 @@ internal static class NativeMethods
     [DllImport("gdi32.dll")]
     internal static extern bool DeleteDC(IntPtr hdc);
 
+    /// <summary>Difference: what is in the first region and not the second.</summary>
+    internal const int RGN_DIFF = 4;
+
+    [DllImport("gdi32.dll")]
+    internal static extern IntPtr CreateRectRgn(int left, int top, int right, int bottom);
+
+    [DllImport("gdi32.dll")]
+    internal static extern int CombineRgn(IntPtr into, IntPtr first, IntPtr second, int mode);
+
+    /// <summary>
+    /// The window keeps the region it is given and frees it itself, so the
+    /// handle must not be deleted after a successful call.
+    /// </summary>
+    [DllImport("user32.dll")]
+    internal static extern int SetWindowRgn(IntPtr window, IntPtr region, bool redraw);
+
+    internal const uint ABM_GETSTATE = 0x00000004;
+    internal const uint ABM_GETTASKBARPOS = 0x00000005;
+    internal const int ABS_AUTOHIDE = 0x0000001;
+
+    internal const int ABE_LEFT = 0;
+    internal const int ABE_TOP = 1;
+    internal const int ABE_RIGHT = 2;
+    internal const int ABE_BOTTOM = 3;
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct AppBarData
+    {
+        internal int cbSize;
+        internal IntPtr hWnd;
+        internal uint uCallbackMessage;
+        internal int uEdge;
+        internal Rect rc;
+        internal int lParam;
+    }
+
+    [DllImport("shell32.dll")]
+    internal static extern IntPtr SHAppBarMessage(uint message, ref AppBarData data);
+
     // SetLastError is required: the caller reports Marshal.GetLastWin32Error().
     [DllImport("gdi32.dll", SetLastError = true)]
     internal static extern bool BitBlt(

@@ -204,6 +204,67 @@ public class LaserTrailTests
     }
 
     /// <summary>
+    /// A mouse reports far faster than it moves: at a thousand hertz a hand
+    /// crossing the screen sends a report every fraction of a pixel. Kept, they
+    /// fill the buffer in a quarter of a second and the far end of the trail is
+    /// thrown away while the gesture is still going on.
+    ///
+    /// So a point costs a distance rather than a report, and the length the
+    /// trail can hold stops depending on whose mouse it is.
+    /// </summary>
+    [Fact]
+    public void A_report_a_hair_away_from_the_last_one_is_not_a_new_point()
+    {
+        var trail = new LaserTrail(Life);
+
+        trail.Begin();
+        trail.Add(100, 100, TimeSpan.Zero);
+        trail.Add(101, 100, TimeSpan.FromMilliseconds(1));
+
+        Assert.Equal(1, trail.Count);
+    }
+
+    /// <summary>
+    /// Measured against the last point kept, not the last one offered: a slow
+    /// drag arrives one pixel at a time and has to end up somewhere.
+    /// </summary>
+    [Fact]
+    public void Small_moves_add_up_until_they_are_worth_a_point()
+    {
+        var trail = new LaserTrail(Life);
+
+        trail.Begin();
+
+        for (var step = 0; step <= 12; step++)
+        {
+            trail.Add(100 + step, 100, TimeSpan.FromMilliseconds(step));
+        }
+
+        Assert.InRange(trail.Count, 2, 8);
+        Assert.True(trail[trail.Count - 1].X > 100, "the drag never moved the head");
+    }
+
+    /// <summary>
+    /// Long enough to underline a sentence with, which is what the trail is
+    /// for. Held at two pixels a point, a thousand of them is two thousand
+    /// pixels of gesture, and the buffer has to have room for that.
+    /// </summary>
+    [Fact]
+    public void The_trail_holds_a_stroke_the_width_of_a_screen()
+    {
+        var trail = new LaserTrail(Life);
+
+        trail.Begin();
+
+        for (var step = 0; step <= 600; step++)
+        {
+            trail.Add(step * 3, 500, TimeSpan.FromMilliseconds(step / 2.0));
+        }
+
+        Assert.True(trail[0].X < 100, $"the far end was dropped, it starts at {trail[0].X}");
+    }
+
+    /// <summary>
     /// A pointer that has stopped reports the same place sixty times a second.
     /// Recorded, that fills the buffer with one point and the trail stops
     /// fading, which is the opposite of what standing still should look like.
