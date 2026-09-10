@@ -1,0 +1,662 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- The settings window's own controls.
+
+       Included in SettingsWindow.Styles rather than in Controls.axaml, and the
+       duplication is the point. A Style resolves StaticResource against the
+       tree it is declared in: one written in Application.Styles reads the
+       application palette even when the control using it sits in this window.
+       Declared here, they read SettingsTokens.axaml instead, and nothing
+       outside this window changes by a pixel.
+
+       Window styles are applied after application styles, so where a class
+       exists in both - action, field, toolpick, corner, CheckBox - this file
+       wins on the setters it repeats.
+
+       ONE HOVER RECIPE, and everything interactive on this window follows it:
+
+         resting   Surface (#111113) for anything with a frame of its own,
+                   transparent for rows and bare glyph buttons
+         hover     background SurfaceRaised (#171719), border BorderStrong,
+                   ink TextStrong
+         pressed   background FillHover (#1E1E22)
+         focus     border Focus (white)
+         disabled  opacity 0.4
+         movement  150 ms on background and border, and nothing else
+
+       Written down because it drifted. The rows lifted to one grey and the
+       buttons to another, the hotkey field answered with a border and no fill
+       at all, and closing the window turned bright red - the only saturated
+       colour anywhere in the application, sitting on the one control nobody
+       has ever had trouble finding. Two controls a centimetre apart answering
+       the same gesture differently is what "strange" means here.
+
+       The one deliberate exception: anything already selected hovers violet
+       rather than grey. Falling back to the grey film would read as the
+       selection being taken away. -->
+
+  <!-- Typography. Three sizes and three greys, and the hierarchy is carried by
+       those rather than by weight: nothing here is heavier than Medium. -->
+  <Style Selector="TextBlock.h2">
+    <Setter Property="FontSize" Value="19"/>
+    <Setter Property="FontWeight" Value="Medium"/>
+    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+  </Style>
+
+  <Style Selector="TextBlock.sub">
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+  </Style>
+
+  <Style Selector="TextBlock.note">
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="Foreground" Value="{StaticResource TextFaint}"/>
+    <Setter Property="TextWrapping" Value="Wrap"/>
+  </Style>
+
+  <Style Selector="TextBlock.grouplabel">
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="Foreground" Value="{StaticResource TextFaint}"/>
+  </Style>
+
+  <!-- Hairlines. The whole separation strategy: no card gets a box drawn round
+       it, blocks are told apart by distance first and by one of these second. -->
+  <Style Selector="Border.hrule">
+    <Setter Property="Height" Value="1"/>
+    <Setter Property="Background" Value="{StaticResource Border}"/>
+    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+  </Style>
+
+  <Style Selector="Border.vrule">
+    <Setter Property="Width" Value="1"/>
+    <Setter Property="Background" Value="{StaticResource Border}"/>
+    <Setter Property="VerticalAlignment" Value="Stretch"/>
+  </Style>
+
+  <!-- Every button on this window gets this template, and that is the whole
+       reason the hover stopped flickering.
+
+       FluentTheme's own button style answers :pointerover by slamming a
+       translucent white film onto the presenter with no transition at all.
+       Ours then crawled over it across 150 ms: a flash of pale grey followed
+       by a slide into dark, which is exactly what the flicker was.
+
+       Writing our own template was not enough on its own, and the reason is
+       worth keeping. Fluent's selector is
+
+           Button:pointerover /template/ ContentPresenter#PART_ContentPresenter
+
+       and it matches by NAME, not by template. A replacement template that
+       keeps the conventional part name is still a valid target for it, so the
+       film went on painting over our fill and the measured hover settled at
+       #2E2E30 instead of the #171719 the style asks for. The presenter is
+       therefore called Body: there is nothing here for that selector to find,
+       and it does not apply. Nothing in Avalonia requires the old name -
+       PART_ContentPresenter is Fluent's convention, not the Button's contract.
+
+       Background and border live on the button itself, and one Border with one
+       pair of transitions decides how they move. Padding sits on the presenter
+       and the fill on the border, so a hover covers the whole control rather
+       than only the text inside it. -->
+  <Style Selector=":is(Button)">
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Border x:Name="Skin"
+                Background="{TemplateBinding Background}"
+                BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="{TemplateBinding BorderThickness}"
+                CornerRadius="{TemplateBinding CornerRadius}">
+          <Border.Transitions>
+            <Transitions>
+              <BrushTransition Property="Background" Duration="0:0:0.15"/>
+              <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+            </Transitions>
+          </Border.Transitions>
+          <ContentPresenter x:Name="Body"
+                            Background="Transparent"
+                            Content="{TemplateBinding Content}"
+                            ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Padding="{TemplateBinding Padding}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                            VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}"/>
+        </Border>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <!-- Minimise and close. They read as a pair: same size, same shape, same
+       answer to the pointer. Closing used to go bright red, which is the
+       Windows convention and wrong here. -->
+  <Style Selector="Button.sys">
+    <Setter Property="Width" Value="44"/>
+    <Setter Property="Height" Value="34"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="Background" Value="{StaticResource SurfaceGhost}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    <Setter Property="VerticalContentAlignment" Value="Center"/>
+  </Style>
+
+  <Style Selector="Button.sys:pointerover">
+    <Setter Property="Background" Value="{StaticResource SurfaceRaised}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+  </Style>
+
+  <Style Selector="Button.sys:pressed">
+    <Setter Property="Background" Value="{StaticResource FillHover}"/>
+  </Style>
+
+  <Style Selector="Button.sys:focus-visible">
+    <Setter Property="BorderBrush" Value="{StaticResource Focus}"/>
+  </Style>
+
+  <Style Selector="Button.sys Path">
+    <Setter Property="Stroke" Value="{Binding $parent[Button].Foreground}"/>
+    <Setter Property="StrokeThickness" Value="1.2"/>
+    <Setter Property="StrokeLineCap" Value="Round"/>
+    <Setter Property="Stretch" Value="None"/>
+    <Setter Property="Width" Value="12"/>
+    <Setter Property="Height" Value="12"/>
+    <Setter Property="HorizontalAlignment" Value="Center"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+
+  <!-- The switch. Still a CheckBox underneath, deliberately: IsChecked,
+       IsCheckedChanged and both handlers behind them are untouched, so a
+       redesign of the switch cannot break autostart. -->
+  <Style Selector="CheckBox.switch">
+    <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    <Setter Property="FontSize" Value="14"/>
+    <Setter Property="MinHeight" Value="0"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid ColumnDefinitions="Auto,14,*" Background="Transparent">
+          <Border x:Name="Track"
+                  Grid.Column="0"
+                  Width="38" Height="22"
+                  CornerRadius="11"
+                  BorderThickness="1"
+                  BorderBrush="Transparent"
+                  Background="{StaticResource SwitchOff}"
+                  VerticalAlignment="Center">
+            <Border.Transitions>
+              <Transitions>
+                <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+              </Transitions>
+            </Border.Transitions>
+            <Ellipse x:Name="Knob"
+                     Width="16" Height="16"
+                     Fill="#FFFFFFFF"
+                     HorizontalAlignment="Left"
+                     VerticalAlignment="Center"
+                     Margin="3,0,0,0">
+              <Ellipse.Transitions>
+                <Transitions>
+                  <ThicknessTransition Property="Margin" Duration="0:0:0.15" Easing="CubicEaseOut"/>
+                </Transitions>
+              </Ellipse.Transitions>
+            </Ellipse>
+          </Border>
+          <ContentPresenter Grid.Column="2"
+                            Content="{TemplateBinding Content}"
+                            VerticalAlignment="Center"/>
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+  </Style>
+
+  <Style Selector="CheckBox.switch:pointerover /template/ Border#Track">
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}"/>
+  </Style>
+
+  <Style Selector="CheckBox.switch:checked /template/ Border#Track">
+    <Setter Property="Background" Value="{StaticResource AccentFill}"/>
+  </Style>
+
+  <Style Selector="CheckBox.switch:checked:pointerover /template/ Border#Track">
+    <Setter Property="Background" Value="{StaticResource AccentHover}"/>
+  </Style>
+
+  <Style Selector="CheckBox.switch:checked /template/ Ellipse#Knob">
+    <Setter Property="Margin" Value="19,0,0,0"/>
+  </Style>
+
+  <Style Selector="CheckBox.switch:focus-visible /template/ Border#Track">
+    <Setter Property="BorderBrush" Value="{StaticResource Focus}"/>
+  </Style>
+
+  <Style Selector="CheckBox.switch:disabled">
+    <Setter Property="Opacity" Value="0.4"/>
+  </Style>
+
+  <!-- A hotkey row: what it does on the left, what it is bound to on the right.
+       The combination used to be a field as wide as the column, which made the
+       binding read as the subject of the row rather than as its answer. -->
+  <Style Selector="Border.hotrow">
+    <Setter Property="Background" Value="{StaticResource Surface}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RField}"/>
+    <Setter Property="Padding" Value="14,10"/>
+    <Setter Property="Transitions">
+      <Transitions>
+        <BrushTransition Property="Background" Duration="0:0:0.15"/>
+        <BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+      </Transitions>
+    </Setter>
+  </Style>
+
+  <Style Selector="Border.hotrow:pointerover">
+    <Setter Property="Background" Value="{StaticResource SurfaceRaised}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}"/>
+  </Style>
+
+  <Style Selector="Border.hotrow Path.rowicon">
+    <Setter Property="Stroke" Value="{StaticResource TextDim}"/>
+    <Setter Property="StrokeThickness" Value="1.3"/>
+    <Setter Property="StrokeLineCap" Value="Round"/>
+    <Setter Property="StrokeJoin" Value="Round"/>
+    <Setter Property="Stretch" Value="None"/>
+    <Setter Property="Width" Value="18"/>
+    <Setter Property="Height" Value="18"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+
+  <!-- The combination itself, inside the row: compact, right-aligned, and no
+       wider than the words it holds. -->
+  <Style Selector="Button.field">
+    <Setter Property="Background" Value="{StaticResource Surface}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="Padding" Value="12,6"/>
+    <Setter Property="MinWidth" Value="104"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+  </Style>
+
+  <Style Selector="Button.field:pointerover">
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}"/>
+  </Style>
+
+  <Style Selector="Button.field:pointerover">
+    <Setter Property="Background" Value="{StaticResource SurfaceRaised}"/>
+  </Style>
+
+  <Style Selector="Button.field:pressed">
+    <Setter Property="Background" Value="{StaticResource FillHover}"/>
+  </Style>
+
+  <!-- Focused means "typing a combination now", which is why the ink goes quiet
+       and the frame goes violet: the old value is about to stop being true.
+       The one place a coloured frame is not decoration. -->
+  <Style Selector="Button.field:focus">
+    <Setter Property="BorderBrush" Value="{StaticResource AccentInk}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+  </Style>
+
+  <!-- An ordinary action. Quiet on purpose: on this window the buttons are
+       never the thing being read. -->
+  <Style Selector=":is(Button).action">
+    <Setter Property="Background" Value="{StaticResource Surface}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+    <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="Padding" Value="14,8"/>
+  </Style>
+
+  <Style Selector=":is(Button).action:pointerover">
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}"/>
+  </Style>
+
+  <Style Selector=":is(Button).action:pointerover">
+    <Setter Property="Background" Value="{StaticResource SurfaceRaised}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+  </Style>
+
+  <Style Selector=":is(Button).action:pressed">
+    <Setter Property="Background" Value="{StaticResource FillHover}"/>
+  </Style>
+
+  <Style Selector=":is(Button).action:focus-visible">
+    <Setter Property="BorderBrush" Value="{StaticResource Focus}"/>
+  </Style>
+
+  <Style Selector=":is(Button).action:disabled">
+    <Setter Property="Opacity" Value="0.4"/>
+  </Style>
+
+  <!-- The one button that installs something. Still not loud: violet ink on the
+       ordinary surface, because the loud version of this button would be an
+       advert for an update nobody asked for. -->
+  <Style Selector=":is(Button).action.primary">
+    <Setter Property="BorderBrush" Value="{StaticResource AccentInk}"/>
+    <Setter Property="Foreground" Value="{StaticResource AccentInk}"/>
+  </Style>
+
+  <Style Selector=":is(Button).action.primary:pointerover">
+    <Setter Property="Background" Value="{StaticResource AccentMuted}"/>
+    <Setter Property="Foreground" Value="{StaticResource AccentInk}"/>
+  </Style>
+
+  <Style Selector=":is(Button).action.primary:pressed">
+    <Setter Property="Background" Value="{StaticResource AccentMutedHover}"/>
+  </Style>
+
+  <!-- One track, three stops. The segments share a frame, so the row reads as a
+       single control with one answer rather than as three buttons. -->
+  <Style Selector=":is(Button).segment">
+    <Setter Property="Background" Value="{StaticResource SurfaceGhost}"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+    <Setter Property="FontSize" Value="12"/>
+    <Setter Property="Padding" Value="8,7"/>
+    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+  </Style>
+
+  <Style Selector=":is(Button).segment:pointerover">
+    <Setter Property="Background" Value="{StaticResource SurfaceRaised}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+  </Style>
+
+  <Style Selector=":is(Button).segment:pressed">
+    <Setter Property="Background" Value="{StaticResource FillHover}"/>
+  </Style>
+
+  <Style Selector=":is(Button).segment.active">
+    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource AccentInk}"/>
+  </Style>
+
+  <Style Selector=":is(Button).segment.active">
+    <Setter Property="Background" Value="{StaticResource AccentMuted}"/>
+  </Style>
+
+  <Style Selector=":is(Button).segment.active:pointerover">
+    <Setter Property="Background" Value="{StaticResource AccentMutedHover}"/>
+  </Style>
+
+  <Style Selector=":is(Button).segment:focus-visible">
+    <Setter Property="BorderBrush" Value="{StaticResource Focus}"/>
+  </Style>
+
+  <Style Selector="Border.segments">
+    <Setter Property="Background" Value="{StaticResource Surface}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RField}"/>
+    <Setter Property="Padding" Value="3"/>
+  </Style>
+
+  <!-- A row that goes somewhere. Not a link: no underline anywhere in this
+       application, so the affordance is the chevron plus the film on hover. -->
+  <Style Selector=":is(Button).nav">
+    <Setter Property="Background" Value="{StaticResource SurfaceGhost}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+    <Setter Property="Foreground" Value="{StaticResource Text}"/>
+    <Setter Property="FontSize" Value="14"/>
+    <Setter Property="Padding" Value="10,7"/>
+    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+  </Style>
+
+  <Style Selector=":is(Button).nav:pointerover">
+    <Setter Property="Background" Value="{StaticResource SurfaceRaised}"/>
+  </Style>
+
+  <Style Selector=":is(Button).nav:pressed">
+    <Setter Property="Background" Value="{StaticResource FillHover}"/>
+  </Style>
+
+  <Style Selector=":is(Button).nav:focus-visible">
+    <Setter Property="BorderBrush" Value="{StaticResource Focus}"/>
+  </Style>
+
+  <Style Selector=":is(Button).nav Path.rowicon">
+    <Setter Property="Stroke" Value="{StaticResource TextDim}"/>
+    <Setter Property="StrokeThickness" Value="1.3"/>
+    <Setter Property="StrokeLineCap" Value="Round"/>
+    <Setter Property="StrokeJoin" Value="Round"/>
+    <Setter Property="Stretch" Value="None"/>
+    <Setter Property="Width" Value="18"/>
+    <Setter Property="Height" Value="18"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+
+  <Style Selector=":is(Button).nav Path.chevron">
+    <Setter Property="Stroke" Value="{StaticResource TextFaint}"/>
+    <Setter Property="StrokeThickness" Value="1.3"/>
+    <Setter Property="StrokeLineCap" Value="Round"/>
+    <Setter Property="StrokeJoin" Value="Round"/>
+    <Setter Property="Stretch" Value="None"/>
+    <Setter Property="Width" Value="10"/>
+    <Setter Property="Height" Value="14"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+
+  <Style Selector=":is(Button).nav:pointerover Path.chevron">
+    <Setter Property="Stroke" Value="{StaticResource TextDim}"/>
+  </Style>
+
+  <!-- The one action that throws away what somebody set up, dressed down so it
+       does not compete with the rows above it. Same hover as everything else:
+       being quiet at rest is the whole of its difference. -->
+  <Style Selector=":is(Button).quiet">
+    <Setter Property="Background" Value="{StaticResource SurfaceGhost}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="BorderBrush" Value="Transparent"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextFaint}"/>
+    <Setter Property="FontSize" Value="13"/>
+    <Setter Property="Padding" Value="10,7"/>
+  </Style>
+
+  <Style Selector=":is(Button).quiet:pointerover">
+    <Setter Property="Background" Value="{StaticResource SurfaceRaised}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+  </Style>
+
+  <Style Selector=":is(Button).quiet:pressed">
+    <Setter Property="Background" Value="{StaticResource FillHover}"/>
+  </Style>
+
+  <Style Selector=":is(Button).quiet:focus-visible">
+    <Setter Property="BorderBrush" Value="{StaticResource Focus}"/>
+  </Style>
+
+  <Style Selector=":is(Button).quiet Path.rowicon">
+    <Setter Property="Stroke" Value="{StaticResource TextFaint}"/>
+    <Setter Property="StrokeThickness" Value="1.3"/>
+    <Setter Property="StrokeLineCap" Value="Round"/>
+    <Setter Property="StrokeJoin" Value="Round"/>
+    <Setter Property="Stretch" Value="None"/>
+    <Setter Property="Width" Value="16"/>
+    <Setter Property="Height" Value="16"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+
+  <!-- The toolbar in miniature. Bigger squares than before, because at 38 the
+       icon and the corner mark were fighting for the same corner. -->
+  <Style Selector=":is(Button).toolpick">
+    <Setter Property="Width" Value="46"/>
+    <Setter Property="Height" Value="46"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="Background" Value="{StaticResource Surface}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+    <Setter Property="Opacity" Value="0.45"/>
+  </Style>
+
+  <Style Selector=":is(Button).toolpick:pointerover">
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}"/>
+  </Style>
+
+  <Style Selector=":is(Button).toolpick:pointerover">
+    <Setter Property="Background" Value="{StaticResource SurfaceRaised}"/>
+  </Style>
+
+  <Style Selector=":is(Button).toolpick:pressed">
+    <Setter Property="Background" Value="{StaticResource FillHover}"/>
+  </Style>
+
+  <!-- Selected. The wash is 1.19:1 and therefore decoration; what makes this
+       state legible is the ink border at 7.42:1. -->
+  <Style Selector=":is(Button).toolpick.active">
+    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource AccentInk}"/>
+    <Setter Property="Background" Value="{StaticResource AccentMuted}"/>
+    <Setter Property="Opacity" Value="1"/>
+  </Style>
+
+  <Style Selector=":is(Button).toolpick.active:pointerover">
+    <Setter Property="Background" Value="{StaticResource AccentMutedHover}"/>
+  </Style>
+
+  <Style Selector=":is(Button).toolpick:focus-visible">
+    <Setter Property="BorderBrush" Value="{StaticResource Focus}"/>
+  </Style>
+
+  <Style Selector=":is(Button).toolpick Path">
+    <Setter Property="Stroke" Value="{Binding $parent[Button].Foreground}"/>
+    <Setter Property="StrokeThickness" Value="1.5"/>
+    <Setter Property="StrokeLineCap" Value="Round"/>
+    <Setter Property="StrokeJoin" Value="Round"/>
+    <Setter Property="Width" Value="16"/>
+    <Setter Property="Height" Value="16"/>
+    <Setter Property="Stretch" Value="None"/>
+    <Setter Property="HorizontalAlignment" Value="Center"/>
+    <Setter Property="VerticalAlignment" Value="Center"/>
+  </Style>
+
+  <!-- The mark that says "the right button opens something here". A rounded
+       wedge now instead of a hard triangle, and violet on hover so it stays
+       visible against a selected square's wash. -->
+  <Style Selector=":is(Button).corner">
+    <Setter Property="Width" Value="14"/>
+    <Setter Property="Height" Value="14"/>
+    <Setter Property="Padding" Value="0"/>
+    <Setter Property="Background" Value="{StaticResource SurfaceGhost}"/>
+    <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="Foreground" Value="{StaticResource TextFaint}"/>
+  </Style>
+
+  <Style Selector=":is(Button).corner:pointerover">
+    <Setter Property="Foreground" Value="{StaticResource AccentInk}"/>
+  </Style>
+
+  <Style Selector=":is(Button).corner Path">
+    <Setter Property="Fill" Value="{Binding $parent[Button].Foreground}"/>
+    <Setter Property="Stroke" Value="{x:Null}"/>
+    <Setter Property="Width" Value="7"/>
+    <Setter Property="Height" Value="7"/>
+    <Setter Property="Stretch" Value="None"/>
+    <Setter Property="HorizontalAlignment" Value="Right"/>
+    <Setter Property="VerticalAlignment" Value="Bottom"/>
+  </Style>
+
+  <!-- Counters as one line rather than four boxes: at this size four bordered
+       tiles were the only thing on the window that looked like a dashboard. -->
+  <Style Selector="TextBlock.statvalue">
+    <Setter Property="FontSize" Value="20"/>
+    <Setter Property="FontWeight" Value="Medium"/>
+    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+  </Style>
+
+  <Style Selector="TextBlock.statcaption">
+    <Setter Property="FontSize" Value="11"/>
+    <Setter Property="Foreground" Value="{StaticResource TextFaint}"/>
+  </Style>
+
+  <!-- The cards the modal shows, in this window's palette. -->
+  <Style Selector="Border.modalcard">
+    <Setter Property="Background" Value="{StaticResource Surface}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RField}"/>
+  </Style>
+
+  <Style Selector="TextBlock.modaltitle">
+    <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+  </Style>
+
+  <Style Selector="TextBox.field">
+    <Setter Property="Background" Value="{StaticResource Surface}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+    <Setter Property="CaretBrush" Value="{StaticResource TextStrong}"/>
+    <Setter Property="SelectionBrush" Value="{StaticResource AccentMuted}"/>
+    <Setter Property="Padding" Value="12,9"/>
+  </Style>
+
+  <Style Selector="TextBox.field /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{StaticResource Surface}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+  </Style>
+
+  <Style Selector="TextBox.field:pointerover /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{StaticResource SurfaceRaised}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}"/>
+  </Style>
+
+  <Style Selector="TextBox.field:focus /template/ Border#PART_BorderElement">
+    <Setter Property="Background" Value="{StaticResource SurfaceRaised}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource AccentInk}"/>
+  </Style>
+
+  <!-- The old choice chip still exists inside the tool cards (colour, width,
+       font), so it gets the new palette and the new hover rather than being
+       left behind with the overlay's. -->
+  <Style Selector=":is(Button).choice">
+    <Setter Property="Background" Value="{StaticResource Surface}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource Border}"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="CornerRadius" Value="{StaticResource RChip}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextDim}"/>
+    <Setter Property="Padding" Value="10,6"/>
+    <Setter Property="FontSize" Value="12"/>
+  </Style>
+
+  <Style Selector=":is(Button).choice:pointerover">
+    <Setter Property="BorderBrush" Value="{StaticResource BorderStrong}"/>
+  </Style>
+
+  <Style Selector=":is(Button).choice:pointerover">
+    <Setter Property="Background" Value="{StaticResource SurfaceRaised}"/>
+    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+  </Style>
+
+  <Style Selector=":is(Button).choice:pressed">
+    <Setter Property="Background" Value="{StaticResource FillHover}"/>
+  </Style>
+
+  <Style Selector=":is(Button).choice.active">
+    <Setter Property="Foreground" Value="{StaticResource TextStrong}"/>
+    <Setter Property="BorderBrush" Value="{StaticResource AccentInk}"/>
+  </Style>
+
+  <Style Selector=":is(Button).choice.active">
+    <Setter Property="Background" Value="{StaticResource AccentMuted}"/>
+  </Style>
+
+  <Style Selector=":is(Button).choice.active:pointerover">
+    <Setter Property="Background" Value="{StaticResource AccentMutedHover}"/>
+  </Style>
+</Styles>

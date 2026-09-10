@@ -37,6 +37,15 @@ public partial class SettingsWindow : Window
     private AppServices? _services;
     private bool _resetAsked;
 
+    /// <summary>
+    /// Whether the capture source was touched while this window has been open.
+    ///
+    /// Once it has been, the engine assignments the warning is built from
+    /// belong to the previous choice, and there is no honest line to print
+    /// until another screenshot has been taken.
+    /// </summary>
+    private bool _captureSourceChanged;
+
     private AppSettings _settings = AppSettings.Default;
     private ToolVisibility _tools = new();
     private ToolStyles _styles = new();
@@ -87,6 +96,17 @@ public partial class SettingsWindow : Window
         // The window has no system frame, so dragging is ours to implement.
         TitleBar.PointerPressed += (_, e) => BeginMoveDrag(e);
         CloseButton.Click += (_, _) => Close();
+
+        // No system frame means no system minimise either. The button on the
+        // taskbar is there, so there has to be a way back down to it.
+        MinimizeButton.Click += (_, _) => WindowState = WindowState.Minimized;
+
+        // The whole strip lights up on hover, so the whole strip has to answer
+        // a click; the box at the end captures the combination once it has the
+        // focus. Without this the row would look interactive and only be
+        // interactive along its right-hand edge.
+        RegionRow.PointerPressed += (_, _) => RegionHotkey.Focus();
+        FullScreenRow.PointerPressed += (_, _) => FullScreenHotkey.Focus();
 
         _pinSettings.Changed += (_, change) => Store(change(_settings));
         _magnifierSettings.Changed += (_, change) =>
@@ -139,6 +159,7 @@ public partial class SettingsWindow : Window
         Opened += (_, _) =>
         {
             WindowCorners.Round(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero);
+            FitToScreen();
 
             // Fades in rather than snapping into place; the transition lives in
             // the XAML and needs the value set after the first layout pass.
@@ -154,6 +175,38 @@ public partial class SettingsWindow : Window
 
     /// <summary>The settings as they stand after every applied change.</summary>
     public AppSettings Current => _settings;
+
+    /// <summary>
+    /// Never taller than the desktop it opens on.
+    ///
+    /// The window is a fixed 780 in device-independent pixels, which is 1170
+    /// physical at 150% and does not fit on a 1080p screen. Left alone, the
+    /// bottom of the right column - the reset button - would simply be off the
+    /// edge with no way to reach it. Clamped here, the scroll viewer takes
+    /// over, which is what it is there for; at 100% and 125% nothing changes
+    /// and nothing scrolls.
+    /// </summary>
+    private void FitToScreen()
+    {
+        var screen = Screens.ScreenFromWindow(this);
+
+        if (screen is null)
+        {
+            return;
+        }
+
+        // Room for the taskbar is already out of WorkingArea; the rest is so
+        // the window does not sit edge to edge with the screen.
+        var available = (screen.WorkingArea.Height / screen.Scaling) - 24;
+
+        if (Height > available)
+        {
+            Height = available;
+            Position = new PixelPoint(
+                Position.X,
+                screen.WorkingArea.Y + (int)(12 * screen.Scaling));
+        }
+    }
 
     public void Configure(
         ISettingsStore store,
@@ -194,7 +247,11 @@ public partial class SettingsWindow : Window
         HeaderTitle.Text = AppFlavor.Current.DisplayName;
         FlavourLogo.Source = new Bitmap(AssetLoader.Open(new Uri(AppFlavor.Current.LogoAsset)));
 
-        CurrentVersion.Text = $"установлена {BuildLabel.Current}";
+        // The number a person recognises, and the commit one hover away. The
+        // two used to be printed together, so the line that answers "which
+        // version am I on" was mostly a hash nobody can read out loud.
+        CurrentVersion.Text = $"Установлена {UpdateService.Current}";
+        ToolTip.SetTip(CurrentVersion, $"Сборка {BuildLabel.Current}");
 
         if (AppFlavor.Current.UpdatesAllowed)
         {
@@ -252,11 +309,7 @@ public partial class SettingsWindow : Window
     {
         _services = services;
 
-        foreach (var (label, value, detail) in StateRows(services))
-        {
-            Health.Children.Add(Row(label, value, detail));
-        }
-
+        ShowCaptureWarning(services);
         ShowCounters(services);
 
         OpenLog.Click += (_, _) => OpenPage(Log.DefaultPath);
@@ -272,87 +325,78 @@ public partial class SettingsWindow : Window
     }
 
     /// <summary>
-    /// One row of "Состояние": what it is on the left, what it says on the
-    /// right. A column of "label: value" sentences in one size and one colour
-    /// is a wall of text, and this block used to be exactly that.
+    /// The one line about the capture worth printing, and only when there is
+    /// one.
+    ///
+    /// Two rules, both learned by putting the old diagnostic line next to the
+    /// switch it is about and reading the result.
+    ///
+    /// It belongs to Авто and to nothing else. The line describes the engine
+    /// that actually painted the last screenshot; when somebody picked "Через
+    /// Windows" by hand, being told in yellow that a fallback engine is in use
+    /// is being told what they just asked for, and the grey note under the
+    /// switch already spells out what that choice costs. Only Авто can
+    /// surprise anybody, because only Авто claims "быстрее всего, без рамки
+    /// захвата" and can then quietly be wrong about it.
+    ///
+    /// And it describes the past, not the future. The moment the source is
+    /// changed, the measurement stops describing what the next screenshot will
+    /// do, so it goes away rather than sitting under the very switch that
+    /// invalidated it. It comes back the next time this window is opened,
+    /// which is the next time there is a fresh answer to give.
     /// </summary>
-    private static Control Row(string label, string value, string? detail)
+    private void ShowCaptureWarning(AppServices services)
     {
-        var grid = new Grid
-        {
-            // Fixed, so every value in the block starts at the same place. A
-            // column sized to its content would jump about with whatever the
-            // longest label happened to be. 130 is the longest label we have
-            // plus a hair; the middle column is the gutter.
-            ColumnDefinitions = new ColumnDefinitions("130,12,*"),
-        };
+        CaptureWarning.IsVisible = false;
 
-        var name = new TextBlock
+        if (_captureSourceChanged || _settings.Capture != CaptureSource.Auto)
         {
-            Text = label,
-            FontSize = 12,
-            Foreground = (IBrush?)Application.Current?.FindResource("TextFaint"),
-        };
-
-        var said = new TextBlock
-        {
-            Text = value,
-            FontSize = 12,
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = (IBrush?)Application.Current?.FindResource("Text"),
-        };
-
-        Grid.SetColumn(said, 2);
-
-        if (detail is not null)
-        {
-            // The technical answer is one hover away and out of the way: the
-            // name of a capture API means nothing to the person using the
-            // application and everything to whoever gets asked about it later.
-            ToolTip.SetTip(said, detail);
+            return;
         }
 
-        grid.Children.Add(name);
-        grid.Children.Add(said);
-
-        return grid;
-    }
-
-    /// <summary>
-    /// How long the last screenshot took, and a warning when the capture is not
-    /// the good one.
-    ///
-    /// "Захват: в порядке" was cut on purpose: an application somebody is
-    /// looking at is evidently running, and a line that says so on every open
-    /// is noise. A capture that quietly fell back to another engine is not
-    /// obvious at all, though, so that line stayed - and only that one.
-    /// </summary>
-    private static IEnumerable<(string Label, string Value, string? Detail)> StateRows(AppServices services)
-    {
         if (services.Capture is not DesktopCapture capture || capture.Painters.Count == 0)
         {
-            yield break;
+            return;
         }
 
-        var (label, value, detail) = CaptureHealth(capture.Painters);
+        var (_, value, detail) = CaptureHealth(capture.Painters);
 
-        if (value is not null)
+        if (value is null)
         {
-            yield return (label, value, detail);
+            return;
         }
 
-        yield return capture.LastMilliseconds > 0
-            // The engine that took it hangs off this line now: it is the answer
-            // to "why is it suddenly slow", and it belongs next to the number
-            // rather than on a line of its own.
-            ? ("Последний снимок", $"{capture.LastMilliseconds:F0} мс", detail)
-            : ("Последний снимок", "ещё не было", detail);
+        CaptureWarning.Text = value;
+        CaptureWarning.IsVisible = true;
+
+        // The technical answer stays one hover away and out of the way: the
+        // name of a capture API means nothing to the person using the
+        // application and everything to whoever gets asked about it later.
+        ToolTip.SetTip(CaptureWarning, detail);
     }
 
     /// <summary>
-    /// The counters as tiles. Four numbers in a row are read at a glance; the
-    /// same four as "Буфер 40, файл 41, закреплено 29" read as a telegram, and
-    /// broke the rhythm of every line around them.
+    /// How long the last screenshot took, or null when there has not been one.
+    ///
+    /// Null rather than "нет": the line read "последний снимок нет", which is
+    /// not a sentence, and a measurement that does not exist is better left
+    /// unmentioned than announced as missing.
+    /// </summary>
+    private static string? LastShot(AppServices services) =>
+        services.Capture is DesktopCapture { LastMilliseconds: > 0 } capture
+            ? $"{capture.LastMilliseconds:F0} мс"
+            : null;
+
+    /// <summary>
+    /// The counters as one line rather than four boxes.
+    ///
+    /// Four bordered tiles were the only thing on this window that looked like
+    /// a dashboard, and nobody opens the settings for a dashboard. The numbers
+    /// are still the loudest thing in the block and the captions the quietest;
+    /// what went away is the furniture around them.
+    ///
+    /// Equal columns rather than a stack sized to its own text: "всего" against
+    /// "закреплено" is nearly double, and content-sized cells came out ragged.
     /// </summary>
     private void ShowCounters(AppServices services)
     {
@@ -362,22 +406,17 @@ public partial class SettingsWindow : Window
 
         if (shots.Total == 0)
         {
-            // Empty state on purpose: four zeroes in four boxes look like a
+            // Empty state on purpose: four zeroes in a row look like a
             // dashboard nobody has plugged in yet.
             Counters.Children.Add(new TextBlock
             {
                 Text = "Снимков пока нет",
                 FontSize = 12,
-                Foreground = (IBrush?)Application.Current?.FindResource("TextFaint"),
+                Foreground = Ink("TextFaint"),
             });
 
             return;
         }
-
-        // Equal columns rather than a horizontal stack: tiles sized to their
-        // own text come out ragged, and "всего" against "закреплено" is nearly
-        // double. The odd columns are the gaps.
-        var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,8,*,8,*,8,*") };
 
         var counters = new[]
         {
@@ -387,13 +426,43 @@ public partial class SettingsWindow : Window
             ("закреплено", shots.ToPin),
         };
 
+        var columns = new ColumnDefinitions();
+
         for (var index = 0; index < counters.Length; index++)
         {
-            var (caption, count) = counters[index];
-            var tile = Tile(caption, count);
+            if (index > 0)
+            {
+                columns.Add(new ColumnDefinition(GridLength.Auto));
+            }
 
-            Grid.SetColumn(tile, index * 2);
-            row.Children.Add(tile);
+            columns.Add(new ColumnDefinition(new GridLength(1, GridUnitType.Star)));
+        }
+
+        var row = new Grid { ColumnDefinitions = columns };
+
+        for (var index = 0; index < counters.Length; index++)
+        {
+            if (index > 0)
+            {
+                // The hairline is what separates one number from the next now
+                // that neither of them has a box. Short of the full height, so
+                // it reads as a divider and not as a column edge.
+                var rule = new Border
+                {
+                    Classes = { "vrule" },
+                    Height = 30,
+                    Margin = new Thickness(6, 0),
+                };
+
+                Grid.SetColumn(rule, (index * 2) - 1);
+                row.Children.Add(rule);
+            }
+
+            var (caption, count) = counters[index];
+            var cell = Stat(caption, count.ToString());
+
+            Grid.SetColumn(cell, index * 2);
+            row.Children.Add(cell);
         }
 
         Counters.Children.Add(row);
@@ -403,28 +472,48 @@ public partial class SettingsWindow : Window
         // the same fact twice.
         if (services.Shots.ThisWeek != shots.Total)
         {
-            Counters.Children.Add(new TextBlock
-            {
-                Text = $"за неделю {services.Shots.ThisWeek}",
-                FontSize = 11,
-                Foreground = (IBrush?)Application.Current?.FindResource("TextFaint"),
-            });
+            Counters.Children.Add(Quiet($"за неделю {services.Shots.ThisWeek}"));
+        }
+
+        // Milliseconds are a technical number and get a technical place: a
+        // faint line under the counters rather than a fifth column, where
+        // "1240 мс" at twenty pixels would have been half again as wide as
+        // every other value in the row.
+        if (LastShot(services) is { } took)
+        {
+            Counters.Children.Add(Quiet($"последний снимок {took}"));
         }
     }
 
-    private static Control Tile(string caption, int count) => new Border
+    /// <summary>One counter: the number loud, the word for it quiet.</summary>
+    private static Control Stat(string caption, string value) => new StackPanel
     {
-        Classes = { "tile" },
-        Child = new StackPanel
+        Spacing = 2,
+        Children =
         {
-            Spacing = 2,
-            Children =
-            {
-                new TextBlock { Classes = { "value" }, Text = count.ToString() },
-                new TextBlock { Classes = { "caption" }, Text = caption },
-            },
+            new TextBlock { Classes = { "statvalue" }, Text = value },
+            new TextBlock { Classes = { "statcaption" }, Text = caption },
         },
     };
+
+    private TextBlock Quiet(string text) => new()
+    {
+        Text = text,
+        FontSize = 11,
+        Foreground = Ink("TextFaint"),
+    };
+
+    /// <summary>
+    /// A brush from this window's palette, not from the application's.
+    ///
+    /// The two dictionaries share every key and disagree on every value:
+    /// Application.Current.FindResource("TextFaint") returns the overlay's
+    /// 35% white, which on #111113 is a good deal fainter than the #70707A
+    /// this window is built out of. The difference is small enough to look
+    /// like a rendering artefact rather than like a bug, which is exactly why
+    /// it is worth a helper.
+    /// </summary>
+    private IBrush? Ink(string key) => this.FindResource(key) as IBrush;
 
     /// <summary>
     /// Says what the person will notice, not which API took the picture, and
@@ -491,13 +580,17 @@ public partial class SettingsWindow : Window
         if (!_resetAsked)
         {
             _resetAsked = true;
-            ResetSettings.Content = "Точно сбросить?";
+
+            // The label inside the button rather than the button's content: the
+            // content is now an icon beside a word, and replacing it wholesale
+            // would throw the icon away and put it back four seconds later.
+            ResetLabel.Text = "Точно сбросить?";
 
             DispatcherTimer.RunOnce(
                 () =>
                 {
                     _resetAsked = false;
-                    ResetSettings.Content = "Настройки по умолчанию";
+                    ResetLabel.Text = "Сбросить настройки";
                 },
                 TimeSpan.FromSeconds(4));
 
@@ -574,7 +667,9 @@ public partial class SettingsWindow : Window
         {
             var button = new Button { Tag = source, Content = CaptureSourceName(source) };
 
-            button.Classes.Add("choice");
+            // One track with three stops rather than three separate chips: the
+            // three answers are exclusive, and a row of chips does not say so.
+            button.Classes.Add("segment");
             button.Click += (_, _) => PickCaptureSource(source);
 
             CaptureSourceRow.Children.Add(button);
@@ -610,8 +705,18 @@ public partial class SettingsWindow : Window
             return;
         }
 
+        _captureSourceChanged = true;
+
         Store(_settings with { Capture = source });
         ShowCaptureSourceRow();
+
+        // The yellow line was about the engine that has just stopped being the
+        // one in use. Left where it was, it would read as a caption belonging
+        // to the button that had only now been pressed.
+        if (_services is { } services)
+        {
+            ShowCaptureWarning(services);
+        }
     }
 
     private void BuildDefaultToolRow()
@@ -1087,6 +1192,15 @@ public partial class SettingsWindow : Window
             UpdateStage.Failed => state.Version is null ? "Не удалось проверить" : "Не удалось обновиться",
             _ => string.Empty,
         };
+
+        // Nothing to say and no empty line saying it: before anybody has asked
+        // for a check there is no status, and a blank row above the version
+        // read as a missing label rather than as silence.
+        UpdateStatus.IsVisible = UpdateStatus.Text.Length > 0;
+
+        // The accent goes on the one line that is asking for something to be
+        // done. Everything else here stays the colour of a footnote.
+        UpdateStatus.Foreground = Ink(state.Stage == UpdateStage.Available ? "AccentInk" : "TextFaint");
     }
 
     private void Apply(HotkeyAction action, HotkeyDefinition hotkey)
@@ -1273,7 +1387,7 @@ public partial class SettingsWindow : Window
         }
 
         Message.Text = text;
-        Message.Foreground = (IBrush)Application.Current!.FindResource(brushKey)!;
+        Message.Foreground = Ink(brushKey);
         Message.IsVisible = true;
     }
 

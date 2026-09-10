@@ -1,0 +1,86 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- The settings window, and only the settings window.
+
+       Merged into SettingsWindow.Resources rather than into the application:
+       Tokens.axaml is read by the overlay, the toolbar, the tray menu, the
+       pinned windows and every tool card, and moving Surface from #0A0A0B to
+       #111113 would repaint all of them. The keys are deliberately the same
+       names, so nothing inside this window has to know that its palette is a
+       local one - StaticResource walks up the tree and stops at the nearest
+       dictionary, which is this one.
+
+       Every number below is measured, not chosen by eye. A dark violet is fine
+       as a fill and useless as a line, which is how #4E4069 once shipped at
+       2.3:1 against a required 3:1, so the accent is two tokens and not one. -->
+
+  <!-- Ground and surfaces. Opaque greys rather than white with alpha: this is
+       the owner's palette of 10.09.2026, handed over as hex. The faint cool
+       cast (formally hue 240 at under 4% saturation) is invisible and agrees
+       with a violet accent, so it stays. -->
+  <SolidColorBrush x:Key="Bg" Color="#FF050505"/>
+  <SolidColorBrush x:Key="Surface" Color="#FF111113"/>
+  <SolidColorBrush x:Key="SurfaceRaised" Color="#FF171719"/>
+
+  <!-- 16.87:1, 7.28:1 and 3.85:1 on #111113. TextStrong and Text are the same
+       ink on purpose: the hierarchy here is carried by size and spacing, and a
+       fourth grey would only blur the three that mean something. -->
+  <SolidColorBrush x:Key="TextStrong" Color="#FFF2F2F4"/>
+  <SolidColorBrush x:Key="Text" Color="#FFF2F2F4"/>
+  <SolidColorBrush x:Key="TextDim" Color="#FFA0A0AA"/>
+  <SolidColorBrush x:Key="TextFaint" Color="#FF70707A"/>
+
+  <SolidColorBrush x:Key="Border" Color="#FF242429"/>
+  <SolidColorBrush x:Key="BorderStrong" Color="#FF303038"/>
+  <SolidColorBrush x:Key="Fill" Color="#FF171719"/>
+  <SolidColorBrush x:Key="FillHover" Color="#FF1E1E22"/>
+
+  <!-- "No background yet", and emphatically NOT Transparent.
+
+       Transparent in Avalonia is transparent WHITE (#00FFFFFF), so a brush
+       transition from it to #171719 interpolates the colour as well as the
+       alpha and spends the middle of its 150 ms as half-opaque near-white over
+       a near-black window. Measured: a ramp up to #6A6A6A and back down again,
+       which is precisely the flash people describe as flickering. Only the
+       controls whose resting fill was Transparent did it; the ones already
+       carrying an opaque colour ramped straight there.
+
+       Same colour as the hover, at zero alpha. The colour is then constant for
+       the whole transition and only the opacity moves, which is the one thing
+       that cannot overshoot. -->
+  <SolidColorBrush x:Key="SurfaceGhost" Color="#00171719"/>
+
+  <!-- The accent, in two parts.
+
+       AccentFill carries 4.23:1 against #111113 where a non-text element needs
+       3:1, and the white knob riding on it carries 4.46:1. AccentInk is the
+       line and the glyph version: 7.42:1 on the surface, 6.23:1 on the muted
+       wash. AccentMuted is 1.19:1 and is therefore decoration only - the
+       selected state is legible because of the ink border, not because of it.
+
+       Hue 267-269 is violet. The obvious candidates around 252 (#7C5CFF and
+       friends) were dropped for reading blue, which the brief forbids. -->
+  <SolidColorBrush x:Key="Accent" Color="#FF9855E0"/>
+  <SolidColorBrush x:Key="AccentFill" Color="#FF9855E0"/>
+  <SolidColorBrush x:Key="AccentHover" Color="#FFA063E8"/>
+  <SolidColorBrush x:Key="AccentInk" Color="#FFBC8DF5"/>
+  <SolidColorBrush x:Key="AccentMuted" Color="#FF291D38"/>
+  <!-- Hover on something already selected. Without it a violet square answers
+       the pointer by turning grey, which reads as losing its selection. -->
+  <SolidColorBrush x:Key="AccentMutedHover" Color="#FF33254A"/>
+
+  <!-- Off is grey and not a hole: 1.67:1 against the surface is enough to read
+       as a switch, and the knob on it sits at 11.27:1. -->
+  <SolidColorBrush x:Key="SwitchOff" Color="#FF3A3A42"/>
+
+  <!-- Focus is white even though the accent is not. A coloured ring reads as an
+       error state; this one only ever means "the keyboard is here". -->
+  <SolidColorBrush x:Key="Focus" Color="#FFFFFFFF"/>
+
+  <SolidColorBrush x:Key="Warn" Color="#FFFBBF24"/>
+  <SolidColorBrush x:Key="Danger" Color="#FFF87171"/>
+
+  <CornerRadius x:Key="RCard">12</CornerRadius>
+  <CornerRadius x:Key="RField">10</CornerRadius>
+  <CornerRadius x:Key="RChip">8</CornerRadius>
+</ResourceDictionary>

@@ -3,13 +3,29 @@
         xmlns:controls="using:PrettyEyes.App.Controls"
         xmlns:views="using:PrettyEyes.App.Views"
         x:Class="PrettyEyes.App.Views.SettingsWindow"
-        Width="880" Height="720"
+        Width="960" Height="920"
         CanResize="False"
         SystemDecorations="None"
         Background="{StaticResource Bg}"
         WindowStartupLocation="CenterScreen">
+  <!-- The palette and the controls are local to this window on purpose: the
+       same keys exist application-wide with different values, and the overlay,
+       the toolbar, the tray menu and the pinned windows go on reading those.
+       See SettingsTokens.axaml for why the numbers are what they are. -->
+  <Window.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <ResourceInclude Source="/Styles/SettingsTokens.axaml"/>
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Window.Resources>
+
+  <Window.Styles>
+    <StyleInclude Source="/Styles/SettingsControls.axaml"/>
+  </Window.Styles>
+
   <Border x:Name="Card"
-          Background="{StaticResource Surface}"
+          Background="{StaticResource Bg}"
           BorderBrush="{StaticResource Border}"
           BorderThickness="1"
           Opacity="0">
@@ -24,167 +40,257 @@
     </Border.Transitions>
     <Panel>
     <DockPanel>
-      <Grid DockPanel.Dock="Top" x:Name="TitleBar" Height="44" ColumnDefinitions="Auto,*,Auto">
-        <Image Grid.Column="0" x:Name="HeaderIcon" Width="16" Height="16" Margin="16,0,0,0"/>
-        <TextBlock Grid.Column="1" x:Name="HeaderTitle" Margin="10,0,0,0"
-                   VerticalAlignment="Center" Foreground="{StaticResource TextDim}" FontSize="12"/>
-        <Button Grid.Column="2" x:Name="CloseButton" Classes="ghost close"
-                Margin="0,0,10,0" Content="✕"/>
-      </Grid>
+      <!-- Title bar. The mark used to sit up here and was the largest thing on
+           the window; it has moved down beside the section it decorates, and
+           what is left is an identity on the left and two system buttons on
+           the right. Nothing else is allowed in this strip. -->
+      <Panel DockPanel.Dock="Top" Height="62">
+        <Grid x:Name="TitleBar" Background="Transparent"
+              ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto">
+          <Image Grid.Column="0" x:Name="HeaderIcon" Width="18" Height="18" Margin="24,0,0,0"/>
+          <TextBlock Grid.Column="1" x:Name="HeaderTitle" Margin="10,0,0,0"
+                     VerticalAlignment="Center"
+                     Foreground="{StaticResource TextStrong}"
+                     FontSize="14" FontWeight="Medium"/>
+          <Border Grid.Column="2" Classes="vrule" Height="18" Margin="16,0"
+                  VerticalAlignment="Center"/>
+          <TextBlock Grid.Column="3" Text="Настройки"
+                     VerticalAlignment="Center"
+                     Foreground="{StaticResource TextDim}" FontSize="14"/>
+          <Button Grid.Column="5" x:Name="MinimizeButton" Classes="sys"
+                  ToolTip.Tip="Свернуть">
+            <Path Data="M1,6 H11"/>
+          </Button>
+          <Button Grid.Column="6" x:Name="CloseButton" Classes="sys"
+                  Margin="0,0,8,0" ToolTip.Tip="Закрыть">
+            <Path Data="M1.5,1.5 L10.5,10.5 M10.5,1.5 L1.5,10.5"/>
+          </Button>
+        </Grid>
+        <Border Classes="hrule" VerticalAlignment="Bottom"/>
+      </Panel>
 
+      <!-- Vertical only, and a fallback rather than a feature: at 100% nothing
+           on this window is meant to scroll. At 150% the window is taller than
+           a 1080p desktop, and a bar is better than a cut-off button. -->
       <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-        <!-- Two columns, nothing folded away. The window is opened to set
-             things up and closed again, so it can afford the room; a setting
-             that has to be hunted for is worse than a wide window. -->
-        <Grid Margin="32,8,32,32" ColumnDefinitions="400,32,400" RowDefinitions="Auto">
-          <StackPanel Grid.Column="0" Grid.Row="0" Spacing="30">
-            <StackPanel Spacing="12">
-              <TextBlock Text="Скриншот" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
+        <!-- 60 / 40, split by a hairline. Asymmetric because the two halves are
+             not the same job: making a screenshot on the left, how the
+             application behaves on the right. -->
+        <Grid Margin="30,22,30,22" ColumnDefinitions="3*,28,Auto,28,2*">
+          <Border Grid.Column="2" Classes="vrule"/>
 
-              <StackPanel Spacing="8">
-                <TextBlock Text="Выделить область" Foreground="{StaticResource Text}"/>
-                <controls:HotkeyBox x:Name="RegionHotkey" Classes="field" HorizontalAlignment="Stretch"/>
+          <StackPanel Grid.Column="0" Spacing="22">
+
+            <!-- Снимок -->
+            <StackPanel Spacing="14">
+              <StackPanel Spacing="4">
+                <TextBlock Classes="h2" Text="Снимок"/>
+                <TextBlock Classes="sub" Text="Горячие клавиши для быстрого начала"/>
               </StackPanel>
 
               <StackPanel Spacing="8">
-                <TextBlock Text="Весь монитор в буфер" Foreground="{StaticResource Text}"/>
-                <controls:HotkeyBox x:Name="FullScreenHotkey" Classes="field" HorizontalAlignment="Stretch"/>
+                <!-- The action on the left, what it is bound to on the right.
+                     The combination used to be a field as wide as the column,
+                     which made the binding read as the subject of the row
+                     rather than as its answer. -->
+                <Border x:Name="RegionRow" Classes="hotrow">
+                  <Grid ColumnDefinitions="Auto,12,*,12,Auto">
+                    <Path Grid.Column="0" Classes="rowicon"
+                          Data="M2,6 V3 H5 M11,3 H14 V6 M14,10 V13 H11 M5,13 H2 V10 M8,6 V10 M6,8 H10"/>
+                    <TextBlock Grid.Column="2" Text="Выделить область"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource Text}"/>
+                    <controls:HotkeyBox Grid.Column="4" x:Name="RegionHotkey" Classes="field"/>
+                  </Grid>
+                </Border>
+
+                <Border x:Name="FullScreenRow" Classes="hotrow">
+                  <Grid ColumnDefinitions="Auto,12,*,12,Auto">
+                    <Path Grid.Column="0" Classes="rowicon"
+                          Data="M2,3.5 H16 V12 H2 Z M7,15 H11 M9,12 V15"/>
+                    <TextBlock Grid.Column="2" Text="Весь монитор в буфер"
+                               VerticalAlignment="Center"
+                               Foreground="{StaticResource Text}"/>
+                    <controls:HotkeyBox Grid.Column="4" x:Name="FullScreenHotkey" Classes="field"/>
+                  </Grid>
+                </Border>
               </StackPanel>
 
-              <!-- Under the two fields it is almost always about, rather than at
-                   the foot of the window: down there it sat past the toolbar and
-                   past the whole right column, so a refused combination was
-                   announced a screen away from the field that refused it. The
-                   two rarer messages - autostart and a failed save - land here
-                   too, which is the price of one line instead of three. -->
+              <!-- Under the two fields it is almost always about. Down at the
+                   foot of the window a refused combination was announced a
+                   screen away from the field that refused it. -->
               <TextBlock x:Name="Message" FontSize="12" TextWrapping="Wrap" IsVisible="False"/>
 
-              <!-- Beside the two combinations it lists, rather than alone at the
-                   bottom of the other column: down there it was a section with a
-                   divider and a single button in it. -->
               <Button x:Name="ShowKeys" Classes="action" Content="Все сочетания клавиш"
-                      HorizontalAlignment="Left" Margin="0,4,0,0"/>
-
+                      HorizontalAlignment="Left"/>
             </StackPanel>
 
-            <StackPanel Spacing="12">
-              <TextBlock Text="Панель инструментов" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
-              <TextBlock Text="Выключенное не появится в панели при выделении. Наведи, чтобы прочитать название. Уголок значит, что у иконки есть свои настройки: правый клик по ней, здесь или в самой панели."
-                         Foreground="{StaticResource TextFaint}" FontSize="11" TextWrapping="Wrap"/>
-              <!-- The same icons the toolbar draws, in the same order, so the
-                   setting is read as a picture of the toolbar rather than as a
-                   list that happens to be about it. Filled from code: the list
-                   cannot then drift from the tools that actually exist. -->
-              <TextBlock Text="Рисование" Foreground="{StaticResource TextFaint}" FontSize="11"/>
-              <StackPanel x:Name="ToolRow" Orientation="Horizontal" Spacing="8"/>
-              <!-- Second row, same shapes: features are not tools, they never
-                   enter ToolVisibility and the last-one-standing rule does not
-                   apply to them. Two rows say that without a paragraph. -->
-              <TextBlock Text="Функции" Foreground="{StaticResource TextFaint}" FontSize="11"/>
-              <StackPanel x:Name="FeatureRow" Orientation="Horizontal" Spacing="8"/>
+            <Border Classes="hrule"/>
 
-              <!-- Out in the open rather than behind a right click: this is a
-                   setting about the toolbar itself, not about one icon on it. -->
-              <TextBlock Text="Инструмент сразу после выделения" Foreground="{StaticResource TextDim}"
-                         FontSize="12" FontWeight="Medium" Margin="0,8,0,0"/>
-              <StackPanel x:Name="DefaultToolRow" Orientation="Horizontal" Spacing="8"/>
-            </StackPanel>
-
-          </StackPanel>
-
-          <StackPanel Grid.Column="2" Grid.Row="0" Spacing="30">
-            <StackPanel Spacing="12">
-              <TextBlock Text="Система" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
-              <CheckBox x:Name="Autostart" Content="Запускать вместе с Windows"/>
-              <CheckBox x:Name="CheckUpdates" Content="Проверять обновления"/>
-
-              <!-- The button and what it found, side by side: a status line
-                   somewhere else on the window belongs to no control. -->
-              <Grid ColumnDefinitions="Auto,12,*">
-                <Button x:Name="CheckNow" Grid.Column="0" Classes="action" Content="Проверить сейчас"/>
-                <TextBlock x:Name="UpdateStatus" Grid.Column="2" VerticalAlignment="Center"
-                           FontSize="12" TextWrapping="Wrap"
-                           Foreground="{StaticResource TextDim}"/>
-              </Grid>
-
-              <!-- What to install, and what is in it. The second one is there
-                   whether or not an update is: reading the notes is also how
-                   somebody decides they do not want it. -->
-              <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Left">
-                <Button x:Name="InstallUpdate" Classes="action" IsVisible="False"/>
-                <Button x:Name="OpenReleases" Classes="action" Content="Что нового"/>
+            <!-- Панель инструментов -->
+            <StackPanel Spacing="14">
+              <StackPanel Spacing="4">
+                <TextBlock Classes="h2" Text="Панель инструментов"/>
+                <TextBlock Classes="sub"
+                           Text="Инструменты появятся при выделении области. Наведите, чтобы узнать назначение."/>
+                <!-- The corner mark is the only affordance on this window that
+                     nobody would guess, so it keeps its one sentence. -->
+                <TextBlock Classes="note"
+                           Text="Уголок значит, что у иконки есть свои настройки: правый клик по ней, здесь или в самой панели."/>
               </StackPanel>
 
-              <TextBlock x:Name="CurrentVersion" Foreground="{StaticResource TextFaint}" FontSize="11"/>
+              <!-- The same icons the toolbar draws, in the same order, filled
+                   from code so the list cannot drift from the tools that
+                   actually exist. -->
+              <StackPanel Spacing="8">
+                <TextBlock Classes="grouplabel" Text="Рисование"/>
+                <StackPanel x:Name="ToolRow" Orientation="Horizontal" Spacing="8"/>
+              </StackPanel>
+
+              <!-- Features are not tools: they never enter ToolVisibility and
+                   the last-one-standing rule does not apply to them. -->
+              <StackPanel Spacing="8">
+                <TextBlock Classes="grouplabel" Text="Функции"/>
+                <StackPanel x:Name="FeatureRow" Orientation="Horizontal" Spacing="8"/>
+              </StackPanel>
+
+              <StackPanel Spacing="8">
+                <TextBlock Classes="grouplabel" Text="Инструмент после выделения"/>
+                <StackPanel x:Name="DefaultToolRow" Orientation="Horizontal" Spacing="8"/>
+              </StackPanel>
+            </StackPanel>
+          </StackPanel>
+
+          <StackPanel Grid.Column="4" Spacing="22">
+
+            <!-- Поведение -->
+            <StackPanel Spacing="14">
+              <!-- The mark sits beside the heading it decorates rather than in
+                   the title bar. Right-aligned in its own column, so it can
+                   never end up over the text or over the switches. -->
+              <Grid ColumnDefinitions="*,12,Auto">
+                <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                  <TextBlock Classes="h2" Text="Поведение"/>
+                  <TextBlock Classes="sub" Text="Настройки запуска и обновлений"/>
+                </StackPanel>
+                <Image Grid.Column="2" x:Name="FlavourLogo"
+                       Width="82" Opacity="0.9"
+                       IsHitTestVisible="False"
+                       VerticalAlignment="Center"/>
+              </Grid>
+
+              <StackPanel Spacing="14">
+                <CheckBox x:Name="Autostart" Classes="switch" Content="Запускать вместе с Windows"/>
+                <CheckBox x:Name="CheckUpdates" Classes="switch" Content="Проверять обновления"/>
+              </StackPanel>
+
+              <!-- One line about the update, whatever there is to say: the
+                   version when there is nothing to do, the progress when there
+                   is. A status line somewhere else on the window would belong
+                   to no control. -->
+              <StackPanel Spacing="10">
+                <TextBlock x:Name="UpdateStatus" Classes="note"/>
+                <TextBlock x:Name="CurrentVersion" Classes="note"/>
+
+                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Left">
+                  <Button x:Name="CheckNow" Classes="action" Content="Проверить обновления"/>
+                  <Button x:Name="InstallUpdate" Classes="action primary" IsVisible="False"/>
+                </StackPanel>
+              </StackPanel>
             </StackPanel>
 
-            <!-- How much has happened. Nothing here is wrong or right. -->
-            <StackPanel Spacing="12">
-              <TextBlock Text="Снимки" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
+            <Border Classes="hrule"/>
+
+            <!-- Захват -->
+            <StackPanel Spacing="14">
+              <StackPanel Spacing="4">
+                <TextBlock Classes="h2" Text="Захват"/>
+                <TextBlock Classes="sub" Text="Источник для создания снимка"/>
+              </StackPanel>
+
+              <Border Classes="segments" HorizontalAlignment="Stretch">
+                <UniformGrid x:Name="CaptureSourceRow" Rows="1"/>
+              </Border>
+
+              <StackPanel Spacing="6">
+                <TextBlock x:Name="CaptureSourceNote" Classes="note"/>
+                <!-- Only when the capture is NOT fine. Directly under the
+                     control that decides it: the answer to "why is there a
+                     yellow frame again" has to live next to the switch that
+                     causes it, not in the log file. -->
+                <TextBlock x:Name="CaptureWarning" FontSize="12" TextWrapping="Wrap"
+                           Foreground="{StaticResource Warn}" IsVisible="False"/>
+              </StackPanel>
+            </StackPanel>
+
+            <Border Classes="hrule"/>
+
+            <!-- Хранилище -->
+            <StackPanel Spacing="14">
+              <StackPanel Spacing="4">
+                <TextBlock Classes="h2" Text="Хранилище"/>
+                <TextBlock Classes="sub" Text="Статистика снимков"/>
+              </StackPanel>
+
               <StackPanel x:Name="Counters" Spacing="8"/>
             </StackPanel>
 
-            <!-- What used to be a whole block called "Состояние" and mostly
-                 restated the obvious: an application that runs is working, and
-                 the folder it saves into has a button to it right here. What
-                 stayed is the number somebody might genuinely want to see, plus
-                 a line that appears only when the capture is NOT fine - the
-                 answer to "the yellow frame is back" has to live somewhere
-                 outside the log file. -->
-            <StackPanel Spacing="12">
-              <TextBlock Text="Скорость" Foreground="{StaticResource TextDim}" FontSize="12" FontWeight="Medium"/>
+            <Border Classes="hrule"/>
 
-              <!-- Filled from code: what it says depends on what has happened
-                   since start-up. -->
-              <StackPanel x:Name="Health" Spacing="8"/>
+            <!-- Остальное -->
+            <StackPanel Spacing="14">
+              <TextBlock Classes="h2" Text="Остальное"/>
 
-              <!-- Directly under the line that says which engine painted
-                   which monitor: this is where somebody who does not like that
-                   answer changes it. Needed rarely - one laptop in a hundred
-                   hands back a picture the fast engine reads wrongly - so it
-                   sits at the bottom of a section nobody opens by accident. -->
-              <StackPanel Spacing="8">
-                <TextBlock Text="Источник захвата" Foreground="{StaticResource TextFaint}" FontSize="11"/>
-                <StackPanel x:Name="CaptureSourceRow" Orientation="Horizontal" Spacing="4"
-                            HorizontalAlignment="Left"/>
-                <TextBlock x:Name="CaptureSourceNote" Foreground="{StaticResource TextFaint}"
-                           FontSize="11" TextWrapping="Wrap"/>
-              </StackPanel>
+              <StackPanel Spacing="2" Margin="-10,0,-10,0">
+                <Button x:Name="OpenLog" Classes="nav">
+                  <Grid ColumnDefinitions="Auto,12,*,8,Auto">
+                    <Path Grid.Column="0" Classes="rowicon"
+                          Data="M9,2 A7,7 0 1 0 9.01,2 M9,4.5 V9 L12,10.8"/>
+                    <TextBlock Grid.Column="2" Text="Журнал" VerticalAlignment="Center"/>
+                    <Path Grid.Column="4" Classes="chevron" Data="M3,2 L8,7 L3,12"/>
+                  </Grid>
+                </Button>
 
-              <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Left">
-                <Button x:Name="OpenLog" Classes="action" Content="Журнал"/>
-                <Button x:Name="OpenShots" Classes="action" Content="Папка снимков"/>
+                <Button x:Name="OpenShots" Classes="nav">
+                  <Grid ColumnDefinitions="Auto,12,*,8,Auto">
+                    <Path Grid.Column="0" Classes="rowicon"
+                          Data="M2,4.5 H7 L8.5,6.5 H16 V14 H2 Z"/>
+                    <TextBlock Grid.Column="2" Text="Папка снимков" VerticalAlignment="Center"/>
+                    <Path Grid.Column="4" Classes="chevron" Data="M3,2 L8,7 L3,12"/>
+                  </Grid>
+                </Button>
+
+                <!-- Reading the notes is also how somebody decides they do not
+                     want the update, so it is here whether or not one is
+                     waiting. -->
+                <Button x:Name="OpenReleases" Classes="nav">
+                  <Grid ColumnDefinitions="Auto,12,*,8,Auto">
+                    <Path Grid.Column="0" Classes="rowicon"
+                          Data="M9,2 L10.7,7.3 L16,9 L10.7,10.7 L9,16 L7.3,10.7 L2,9 L7.3,7.3 Z"/>
+                    <TextBlock Grid.Column="2" Text="Что нового" VerticalAlignment="Center"/>
+                    <Path Grid.Column="4" Classes="chevron" Data="M3,2 L8,7 L3,12"/>
+                  </Grid>
+                </Button>
               </StackPanel>
             </StackPanel>
 
-            <!-- On its own, away from the two that merely open a folder: this
-                 one throws away everything the person set up. -->
-            <StackPanel Spacing="8">
-              <Button x:Name="ResetSettings" Classes="action" Content="Настройки по умолчанию"
-                      HorizontalAlignment="Left"/>
-            </StackPanel>
+            <!-- On its own and dressed down: this one throws away everything
+                 the person set up. It asks before it does it. -->
+            <Button x:Name="ResetSettings" Classes="quiet" HorizontalAlignment="Left"
+                    Margin="-10,0,0,0">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <Path Classes="rowicon"
+                      Data="M13.5,8 A5.5,5.5 0 1 1 11.6,3.8 M12,1.5 V4.5 H9"/>
+                <TextBlock x:Name="ResetLabel" Text="Сбросить настройки" VerticalAlignment="Center"/>
+              </StackPanel>
+            </Button>
           </StackPanel>
         </Grid>
       </ScrollViewer>
     </DockPanel>
 
-      <!-- The mark, in the corner where a signature goes, and dimmed: it is the
-           last thing on this window that should catch the eye.
-
-           It sits over the whole card rather than in the scrolling content, so
-           the gap around it does not depend on how much the settings happened
-           to fill. At the top right rather than the bottom: once the
-           sections moved into their cards the page grew short, and a mark left
-           at the bottom read as forgotten rather than as a signature. Up here
-           it sits beside the first line of the right column, where the eye
-           already is. The file itself is cropped to the ink for the same
-           reason. -->
-      <Image x:Name="FlavourLogo" Height="72" Opacity="0.85"
-             Margin="0,58,28,0" IsHitTestVisible="False"
-             HorizontalAlignment="Right" VerticalAlignment="Top"/>
-
-      <!-- Last child of the panel, so it covers everything above it including
-           the mark. Hidden until something asks for it. -->
+      <!-- Last child of the panel, so it covers everything above it. Hidden
+           until something asks for it. -->
       <views:SettingsModal x:Name="Modal"/>
     </Panel>
   </Border>
