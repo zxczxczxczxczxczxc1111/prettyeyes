@@ -99,8 +99,15 @@ public partial class OverlayWindow : Window
     /// <summary>The selection as it stood when the current click began.</summary>
     private CaptureRect _beforeGesture;
 
-    /// <summary>What a second double click puts back. Null once it has.</summary>
+    /// <summary>What a second triple click puts back. Null once it has.</summary>
     private CaptureRect? _restore;
+
+    /// <summary>
+    /// Where the windows were when the screen was frozen. Empty until the
+    /// session hands one over, and empty is a legal answer: the gesture below
+    /// falls back to the whole monitor.
+    /// </summary>
+    private WindowShapes _shapes = WindowShapes.None;
 
     /// <summary>Dragging over a label to pick characters, not to draw.</summary>
     private bool _pickingText;
@@ -1082,27 +1089,23 @@ public partial class OverlayWindow : Window
             _beforeGesture = _selection;
         }
 
-        // Double click means the whole monitor: dragging across the screen for
-        // the most common capture there is makes no sense. Doing it again puts
-        // back whatever was selected before - a whole screen where a small
-        // frame used to be is the kind of mistake worth one click to undo.
-        if (e.ClickCount == 2 && _mode != OverlayMode.Drawing)
+        // Double click means the window under the pointer, triple click means
+        // the whole monitor: dragging a frame around either of the two commonest
+        // captures there are makes no sense.
+        //
+        // The double fires on the way to the triple, so a triple click shows the
+        // window for the length of one gesture before the monitor replaces it.
+        // Deliberate - it is the same click count arriving twice, and hiding the
+        // first would mean holding the double back on a timer, which is a delay
+        // on the common gesture to tidy up the rare one.
+        if (e.ClickCount is 2 or 3 && _mode != OverlayMode.Drawing)
         {
             _dragging = false;
             _grip = SelectionGrip.None;
 
-            CaptureRect selection;
-
-            if (_beforeGesture == _monitorBounds && _restore is not null)
-            {
-                selection = _restore.Value;
-                _restore = null;
-            }
-            else
-            {
-                _restore = _beforeGesture;
-                selection = _monitorBounds;
-            }
+            var selection = e.ClickCount == 2
+                ? WindowAt(x, y)
+                : WholeMonitor();
 
             // Nothing selected is a legal thing to go back to: the first double
             // click of a capture replaces exactly that.
@@ -1160,6 +1163,49 @@ public partial class OverlayWindow : Window
         {
             _mode = OverlayMode.Adjusting;
         }
+    }
+
+    /// <summary>
+    /// Where the windows were when the screen was frozen. Handed over by the
+    /// session, because it belongs to the capture and not to any one monitor.
+    /// </summary>
+    public void ShowWindowShapes(WindowShapes shapes) => _shapes = shapes;
+
+    /// <summary>
+    /// The window under the pointer, cropped to the picture that was taken.
+    /// Falls back to the whole monitor: on bare desktop there is nothing to
+    /// select, and a gesture that does nothing reads as a gesture that failed.
+    /// </summary>
+    private CaptureRect WindowAt(int x, int y)
+    {
+        if (_shapes.At(x, y) is not { } shape)
+        {
+            return WholeMonitor();
+        }
+
+        var visible = shape.Intersect(_frameBounds);
+
+        return visible.IsEmpty ? WholeMonitor() : visible;
+    }
+
+    /// <summary>
+    /// This monitor, or what was selected before the last time this gesture
+    /// took it - a whole screen where a small frame used to be is the kind of
+    /// mistake worth one gesture to undo.
+    /// </summary>
+    private CaptureRect WholeMonitor()
+    {
+        if (_beforeGesture == _monitorBounds && _restore is not null)
+        {
+            var back = _restore.Value;
+            _restore = null;
+
+            return back;
+        }
+
+        _restore = _beforeGesture;
+
+        return _monitorBounds;
     }
 
     protected override void OnPointerMoved(PointerEventArgs e)

@@ -469,4 +469,62 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool KillTimer(IntPtr hWnd, IntPtr id);
+
+    internal delegate bool WindowEnumProc(IntPtr window, IntPtr data);
+
+    /// <summary>
+    /// Walks top-level windows in z-order, front to back. The order is the
+    /// whole reason this is used instead of asking about one window at a time.
+    /// </summary>
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool EnumWindows(WindowEnumProc callback, IntPtr data);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool IsWindowVisible(IntPtr window);
+
+    /// <summary>Minimised. Its rectangle is off in the far corner of nowhere.</summary>
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool IsIconic(IntPtr window);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool GetWindowRect(IntPtr window, out Rect rect);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    internal static extern int GetClassName(IntPtr window, System.Text.StringBuilder name, int capacity);
+
+    [DllImport("user32.dll")]
+    internal static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+
+    /// <summary>
+    /// DWMWA_EXTENDED_FRAME_BOUNDS. What the window looks like on screen.
+    /// GetWindowRect answers with the invisible resize border around it
+    /// instead, which on a normal window is seven or eight pixels of desktop
+    /// down each side.
+    /// </summary>
+    internal const int DwmExtendedFrameBounds = 9;
+
+    /// <summary>
+    /// DWMWA_CLOAKED. Non-zero means the window is composed but not shown:
+    /// a virtual desktop that is not the current one, a suspended packaged
+    /// application. IsWindowVisible still says true for those.
+    /// </summary>
+    internal const int DwmCloaked = 14;
+
+    [DllImport("dwmapi.dll")]
+    internal static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out Rect value, int size);
+
+    [DllImport("dwmapi.dll")]
+    internal static extern int DwmGetWindowAttribute(IntPtr window, int attribute, out int value, int size);
+
+    /// <summary>LWA_ALPHA: the alpha this window was given means something.</summary>
+    internal const uint LwaAlpha = 0x00000002;
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool GetLayeredWindowAttributes(
+        IntPtr window, out uint key, out byte alpha, out uint flags);
 }

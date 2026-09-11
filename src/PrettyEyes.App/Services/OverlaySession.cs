@@ -220,6 +220,10 @@ public sealed class OverlaySession
             window.SetMagnifierEnabled(_services.Settings.ShowMagnifier);
             window.SetMagnifierGrid(_services.Settings.MagnifierGrid);
             window.SetExportStyle(_services.Settings.Export ?? ExportStyle.None);
+
+            // Belongs to the capture, not to a monitor: a window can straddle
+            // two, and the double click has to find it from either side.
+            window.ShowWindowShapes(capture.Shapes);
             window.PlaceOn(capture.Layout.Monitors[i], Document);
         }
 

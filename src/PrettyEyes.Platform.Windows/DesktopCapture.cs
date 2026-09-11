@@ -88,6 +88,10 @@ public sealed class DesktopCapture : IScreenCapture, IDisposable
         var layout = _monitors.Enumerate();
         var frame = DesktopFrameLayout.For(layout);
 
+        // Before a pixel is read, and before anything of ours is on screen: the
+        // list is only true for the instant the frame belongs to.
+        var windows = Win32WindowShapes.Snapshot(frame.Bounds);
+
         var buffer = Step("alloc", () => _buffers.Rent(frame.Size, frame.NeedsZeroing));
 
         try
@@ -143,7 +147,7 @@ public sealed class DesktopCapture : IScreenCapture, IDisposable
             LastMilliseconds = whole.Elapsed.TotalMilliseconds;
         }
 
-        return new CaptureResult(image, layout);
+        return new CaptureResult(image, layout, windows);
     }
 
     /// <summary>
