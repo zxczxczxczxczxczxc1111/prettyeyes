@@ -14,6 +14,29 @@
     <Application.Styles>
         <FluentTheme/>
         <StyleInclude Source="/Styles/Controls.axaml"/>
+        <!-- Tooltips anchor to their own control instead of following the
+             pointer, which is the default. A pointer-placed tooltip opens below
+             and to the right of the cursor, and when there is no room there -
+             the toolbar sitting just above the taskbar after a whole-screen
+             selection is exactly that case - Windows flips it back over the
+             cursor. The tooltip is a window of its own, so from that moment the
+             button underneath gets no hover and no click: the press lands in
+             the tooltip. Found 11.09.2026 on the save button, and it was never
+             about saving: every button in the app with a tip could do it.
+
+             Anchored, the popup is always placed beside the control's
+             rectangle. When it flips it flips to the other side of that
+             rectangle, so it cannot end up on top of the thing it describes. -->
+        <Style Selector=":is(Control)">
+            <Setter Property="ToolTip.Placement" Value="Top"/>
+            <!-- Avalonia ships a vertical offset of 20 with the tooltip, and it
+                 is there for the pointer placement above: twenty points is a
+                 mouse cursor. Anchored to a control it is twenty points of the
+                 control itself, which puts the popup back over the button and
+                 keeps the bug. Measured 11.09.2026: the popup's lower edge
+                 landed exactly on the button's upper edge plus twenty. -->
+            <Setter Property="ToolTip.VerticalOffset" Value="0"/>
+        </Style>
         <!-- :is(Window) rather than Window: an Avalonia type selector matches the
              exact type, so a bare Window selector skips every window we have. -->
         <Style Selector=":is(Window)">
