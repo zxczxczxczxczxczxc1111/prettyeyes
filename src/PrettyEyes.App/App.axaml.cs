@@ -325,32 +325,48 @@ public partial class App : Application
         // blurs, an aura and a tile of grain over a picture nobody else owns.
         var (shot, fitted) = DocumentRenderer.Shot(document, style);
 
-        // Transparency is no longer flattened here. The clipboard writes PNG as
-        // well as a DIB, and it is the clipboard that knows which of the two
-        // can carry an alpha channel.
-        using var image = await Task.Run(() => DocumentRenderer.Finish(shot, fitted));
-
-        var result = await Services.Clipboard.SendAsync(image, CancellationToken.None);
-
+        // Everything after the crop happens off this thread, for the same
+        // reason the decoration does. Measured on a 2560x1440 monitor: the
+        // clipboard alone is 180 milliseconds of encoding, and spending them
+        // here is spending them on the frame the flash is trying to draw.
+        //
         // Autosave applies here too: the point of the setting is that a
         // screenshot ends up in the folder, whichever way it was taken. The
         // same image, not a second render of it: with the aura that would be a
         // second blur for a picture we already have.
-        if (Services.Settings.Save?.Ready == true)
+        //
+        // Transparency is not flattened anywhere here. The clipboard writes
+        // PNG as well as a DIB, and it is the clipboard that knows which of
+        // the two can carry an alpha channel.
+        var autosave = Services.Settings.Save?.Ready == true;
+
+        var result = await Task.Run(async () =>
         {
-            await Services.Folder.SendAsync(image, CancellationToken.None);
-        }
+            using var image = DocumentRenderer.Finish(shot, fitted);
+
+            var copied = await Services.Clipboard.SendAsync(image, CancellationToken.None);
+
+            if (autosave)
+            {
+                await Services.Folder.SendAsync(image, CancellationToken.None);
+            }
+
+            return copied;
+        });
 
         if (result == SinkResult.Sent)
         {
             Services.Shots.Record(ShotTarget.Clipboard);
         }
-
-        Services.Notifier.Notify(
-            AppFlavor.Current.DisplayName,
-            result == SinkResult.Sent
-                ? "Скриншот монитора скопирован в буфер."
-                : "Не удалось скопировать скриншот в буфер.");
+        else
+        {
+            // Only the failure speaks. Success has the flash, and a balloon on
+            // every single screenshot is noise in front of the thing it is
+            // congratulating you on.
+            Services.Notifier.Notify(
+                AppFlavor.Current.DisplayName,
+                "Не удалось скопировать скриншот в буфер.");
+        }
 
         // No overlay was ever opened here, so nothing else will say that the
         // work is done.

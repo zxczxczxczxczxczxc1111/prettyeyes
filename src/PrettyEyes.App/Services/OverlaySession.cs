@@ -912,9 +912,11 @@ public sealed class OverlaySession
                     break;
                 case SinkResult.Cancelled:
                     SetTopmost(true);
+                    TakeKeyboardBack();
                     break;
                 case SinkResult.Failed:
                     SetTopmost(true);
+                    TakeKeyboardBack();
 
                     // Work in progress must survive a failed save.
                     ShowError(failure ?? "Не удалось сохранить скриншот. Попробуй ещё раз.");
@@ -924,8 +926,30 @@ public sealed class OverlaySession
         catch (InvalidOperationException ex)
         {
             SetTopmost(true);
+            TakeKeyboardBack();
             ShowError(ex.Message);
         }
+    }
+
+    /// <summary>
+    /// Hands the keyboard back to the overlay after a dialog has had it.
+    ///
+    /// The save dialog leaves the overlay on screen and visibly on top, but
+    /// not active: Windows hands the focus back to whatever it takes for the
+    /// owner, and a borderless overlay was never that. The result is
+    /// a capture that ignores Escape and Ctrl+C until it is clicked, which
+    /// reads as the application having frozen. The window under the pointer is
+    /// preferred, because on two monitors that is the one being worked on.
+    ///
+    /// Also clears the output clock: nothing is closing, and leaving it
+    /// running makes the next close report the time since a save that was
+    /// abandoned a minute ago.
+    /// </summary>
+    private void TakeKeyboardBack()
+    {
+        _outputFrom = 0;
+
+        (_pointerWindow ?? _windows.FirstOrDefault())?.Activate();
     }
 
     private void SetTopmost(bool value)
