@@ -1,7 +1,7 @@
 ﻿; prettyeyes installer. Per-user install: a tray utility has no business
 ; asking for administrator rights.
 #define AppName "prettyeyes"
-#define AppVersion "1.6.0"
+#define AppVersion "1.7.0"
 #define AppExe "PrettyEyes.App.exe"
 ; Собирается ключом ISCC /DCheck. Всё, что здесь разведено, разведено потому, что
 ; иначе проверочная сборка займёт место прода. AppId решает, что во что ставится;
@@ -32,7 +32,7 @@
 ; Каталог публикации приходит из build.ps1: у каждой сборки он свой, иначе
 ; установщик может упаковать бинарь чужого вида.
 #ifndef PublishDir
-  #define PublishDir "..\src\PrettyEyes.Appin\Release
+  #define PublishDir "..\src\PrettyEyes.App\bin\Release
 et10.0-windows10.0.22621.0\win-x64\publish"
 #endif
 
