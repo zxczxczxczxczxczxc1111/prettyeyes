@@ -27,7 +27,7 @@ SMALL = 64
 # выглядят крупнее тех, у кого поля были.
 PAD = 0.03
 
-DEFAULT_SOURCE = r"C:\Users\xd\Desktop\icons"
+DEFAULT_SOURCE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets-src", "emoji")
 ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "src", "PrettyEyes.App", "Assets", "Emoji")
 
 # Имя файла в папке исходников -> код глифа.
