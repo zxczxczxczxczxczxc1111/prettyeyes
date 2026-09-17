@@ -1,4 +1,4 @@
-using PrettyEyes.Core.Geometry;
+﻿using PrettyEyes.Core.Geometry;
 using PrettyEyes.Core.Model;
 using PrettyEyes.Core.Rendering;
 using PrettyEyes.Core.Tools;
@@ -61,8 +61,11 @@ public sealed class EmojiAnnotation : IMovable
 
         var destination = SKRect.Create(Bounds.X, Bounds.Y, Bounds.Width, Bounds.Height);
 
-        // Linear: the glyphs are 72 pixels square and usually drawn larger, and
-        // a nearest-neighbour emoji looks like a mistake rather than a choice.
+        // Linear: the glyphs are 256 pixels square and usually drawn smaller,
+        // and a nearest-neighbour emoji looks like a mistake rather than a
+        // choice. Mipmaps because the stamp goes down to 24 pixels, which is a
+        // tenth of the file and well past where plain filtering starts to
+        // sparkle.
         canvas.DrawImage(_glyph, destination, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
     }
 }

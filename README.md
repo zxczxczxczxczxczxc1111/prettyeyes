@@ -96,4 +96,3 @@
 
 Нашёл ошибку или хочешь предложить функцию? [Напиши в Issues](https://github.com/zxczxczxczxczxczxc1111/prettyeyes/issues).
 
-Эмодзи: [Twemoji](https://github.com/jdecked/twemoji), лицензия CC-BY 4.0. Emoji artwork by Twitter, Inc and other contributors.

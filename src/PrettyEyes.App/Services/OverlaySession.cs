@@ -172,9 +172,11 @@ public sealed class OverlaySession
             window.EmojiCardControl.Picked += OnEmojiPicked;
             window.EmojiCardControl.Restore(_services.Settings.RecentEmoji ?? []);
 
-            if (_emoji is not null)
+            // Has, not a null check: the settings survive a change of artwork,
+            // and a code that is no longer bundled has no picture to show.
+            if (EmojiAtlas.Has(_emoji))
             {
-                window.ToolbarControl.ShowGlyph(_emoji);
+                window.ToolbarControl.ShowGlyph(_emoji!);
             }
             // The pool hands windows back in whatever state the previous
             // capture left them. A successful copy takes Topmost off and never
@@ -582,8 +584,10 @@ public sealed class OverlaySession
         }
 
         // Emoji without a glyph has nothing to stamp: the grid opens instead of
-        // the tool arming itself with nothing.
-        if (kind == ToolKind.Emoji && _emoji is null)
+        // the tool arming itself with nothing. A code from an older set counts
+        // as nothing chosen - the settings outlive the artwork, and a glyph
+        // that is no longer bundled must not take the tool down with it.
+        if (kind == ToolKind.Emoji && !EmojiAtlas.Has(_emoji))
         {
             OnStyleRequested(sender, ToolKind.Emoji);
             return;

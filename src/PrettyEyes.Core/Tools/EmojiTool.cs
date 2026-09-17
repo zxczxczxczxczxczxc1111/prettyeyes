@@ -11,9 +11,22 @@ namespace PrettyEyes.Core.Tools;
 /// </summary>
 public sealed class EmojiTool : ITool
 {
-    /// <summary>Below this a glyph is unrecognisable, above it it dominates.</summary>
+    /// <summary>Below this a glyph is unrecognisable.</summary>
     public const int MinSize = 24;
-    public const int MaxSize = 96;
+
+    /// <summary>
+    /// As large as a glyph can be dragged or wheeled to. On a 2K monitor the
+    /// old ceiling of 96 was a mark you had to look for, and the artwork is
+    /// 256 pixels square, so it has the detail to be stamped this large.
+    /// </summary>
+    public const int MaxSize = 192;
+
+    /// <summary>
+    /// What a plain click is allowed to reach. Deliberately below MaxSize: the
+    /// ceiling is there for "make it big on purpose", while a click on a full
+    /// monitor should still produce a mark rather than a poster.
+    /// </summary>
+    public const int DefaultMaxSize = 96;
 
     /// <summary>A sixth of the shorter side, which lands around 64 on a normal region.</summary>
     private const int SelectionFraction = 6;
@@ -38,7 +51,7 @@ public sealed class EmojiTool : ITool
     {
         var shorter = Math.Min(selection.Width, selection.Height);
 
-        return Math.Clamp(shorter / SelectionFraction, MinSize, MaxSize);
+        return Math.Clamp(shorter / SelectionFraction, MinSize, DefaultMaxSize);
     }
 
     public void Begin(int x, int y)

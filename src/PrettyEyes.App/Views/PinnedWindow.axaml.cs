@@ -115,6 +115,17 @@ public partial class PinnedWindow : Window, IPinned
 
         Toolbar.ToolPicked += (_, kind) =>
         {
+            // The same rule the overlay has: emoji with nothing chosen opens
+            // the grid instead of arming a stamp with no picture. A code left
+            // by an older set of artwork resolves to nothing and lands here.
+            if (kind == ToolKind.Emoji && Glyph?.Invoke() is null)
+            {
+                StyleCard.Close();
+                EmojiCard.Open();
+
+                return;
+            }
+
             _tool = kind;
             Toolbar.SetActive(kind);
         };

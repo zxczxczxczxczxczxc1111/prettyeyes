@@ -5,80 +5,91 @@ using SkiaSharp;
 namespace PrettyEyes.App.Services;
 
 /// <summary>
-/// The bundled glyphs, decoded once and kept.
+/// The bundled glyphs, decoded when one is actually stamped.
 ///
-/// Twemoji, CC-BY 4.0. The set is bundled rather than taken from the system
-/// font: colour glyph rendering through Skia on Windows is not something to
-/// rely on, and a screenshot tool whose emoji look different on every machine
-/// is a screenshot tool with a bug report waiting.
+/// Bundled rather than taken from the system font: colour glyph rendering
+/// through Skia on Windows is not something to rely on, and a screenshot tool
+/// whose emoji look different on every machine is a screenshot tool with a bug
+/// report waiting.
 ///
-/// Decoding all forty costs a few milliseconds, but it happens while the screen
-/// is frozen and the user is waiting, so it is done at start-up instead.
+/// Lazy rather than warmed at start-up. The files are 256 pixels square now,
+/// so decoding all of them would cost 29 pictures of memory for a session that
+/// usually stamps none; one glyph decodes in well under a millisecond, and by
+/// the time it is asked for, the person has already clicked the tool. What the
+/// picker shows is a different, smaller set of files - see EmojiPickerView.
 /// </summary>
 public sealed class EmojiAtlas : IDisposable
 {
     /// <summary>
-    /// In the order they are shown. Faces first, then hands, then the marks
-    /// people put on screenshots to say "look here" and "this is wrong".
+    /// In the order they are shown. Laughing first, then the rest of the
+    /// faces by mood, then hands, then the things that are not faces at all.
+    ///
+    /// The codes are the Unicode ones wherever a glyph means the same thing as
+    /// a standard emoji, because they end up in settings.json: a person whose
+    /// chosen emoji is 1f480 must still have their skull after an update.
+    /// Variants of one glyph get a suffix.
     /// </summary>
     private static readonly string[] Codes =
     [
-        "1f602", "1f923", "1f60d", "1f618", "1f60e", "1f914", "1f610", "1f644",
-        "1f62d", "1f621", "1f631", "1f925", "1f973", "1f60f", "1f634", "1f92f",
-        "1f480", "1f44d", "1f44e", "1f44c", "1f44f", "1f64f", "1f4aa", "1f440",
-        "1f9e0", "2764", "1f494", "1f525", "2728", "1f4a5", "2705", "274c",
-        "26a0", "2757", "2753", "1f4a1", "1f4cc", "1f680", "1f389", "1f4a9",
+        "1f602", "1f602-2", "1f601", "1f61d", "1f61b", "1f61c", "1f60d", "1f970",
+        "1f60e", "1f97a", "1f622", "1f62d", "1f971", "1f635", "1f92e", "1f47f",
+        "1f921", "1f921-2", "1f435", "1f648", "1f47d", "1f4a9", "1f44d", "1f44e",
+        "1f64f", "1fa77", "1f480", "1f480-2", "1f480-3",
     ];
+
+    private static readonly HashSet<string> Known = new(Codes, StringComparer.Ordinal);
 
     private readonly Dictionary<string, SKImage> _glyphs = [];
     private readonly object _gate = new();
 
-    private bool _loaded;
-
     public static IReadOnlyList<string> All => Codes;
 
     /// <summary>
-    /// Decodes everything, in the background. Failing to load a glyph is not
-    /// worth a message: the grid simply shows one fewer.
+    /// Whether this code is one of ours at all. Asked before a tool is armed:
+    /// a code left in the settings by an older set is not an error, it just
+    /// means the person has to pick again.
     /// </summary>
-    public Task WarmAsync() => Task.Run(() =>
-    {
-        using var scope = Log.Default.Scope("emoji.warm");
+    public static bool Has(string? code) => code is not null && Known.Contains(code);
 
-        lock (_gate)
-        {
-            if (_loaded)
-            {
-                return;
-            }
-
-            foreach (var code in Codes)
-            {
-                try
-                {
-                    using var stream = AssetLoader.Open(new Uri($"avares://PrettyEyes.App/Assets/Emoji/{code}.png"));
-                    var image = SKImage.FromEncodedData(stream);
-
-                    if (image is not null)
-                    {
-                        _glyphs[code] = image;
-                    }
-                }
-                catch (Exception error) when (error is FileNotFoundException or ArgumentException)
-                {
-                    Log.Default.Error($"глиф {code} не загрузился", error);
-                }
-            }
-
-            _loaded = true;
-        }
-    });
-
+    /// <summary>
+    /// The picture for a code, decoded on first use and kept for the process.
+    /// A glyph that fails to load is not worth a message: the tool behaves as
+    /// though nothing was picked.
+    /// </summary>
     public SKImage? Glyph(string code)
     {
         lock (_gate)
         {
-            return _glyphs.GetValueOrDefault(code);
+            if (_glyphs.TryGetValue(code, out var cached))
+            {
+                return cached;
+            }
+
+            if (!Known.Contains(code))
+            {
+                return null;
+            }
+
+            try
+            {
+                using var stream = AssetLoader.Open(new Uri($"avares://PrettyEyes.App/Assets/Emoji/{code}.png"));
+                var image = SKImage.FromEncodedData(stream);
+
+                if (image is null)
+                {
+                    return null;
+                }
+
+                _glyphs[code] = image;
+
+                return image;
+            }
+            catch (Exception error) when (error is FileNotFoundException or ArgumentException)
+            {
+                Log.Default.Error($"глиф {code} не загрузился", error);
+
+                return null;
+            }
         }
     }
 
@@ -92,7 +103,6 @@ public sealed class EmojiAtlas : IDisposable
             }
 
             _glyphs.Clear();
-            _loaded = false;
         }
     }
 }

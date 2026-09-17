@@ -258,10 +258,9 @@ public sealed class AppServices : IDisposable
         var overlayWindows = new OverlayWindowPool();
         overlayWindows.Warm(monitors.Enumerate().Monitors.Count);
 
-        // Decoded in the background: forty PNGs on a frozen screen would be a
-        // pause the user can see.
+        // Nothing is decoded here: a glyph is read when one is stamped, and
+        // most captures stamp none.
         var emoji = new EmojiAtlas();
-        _ = emoji.WarmAsync();
 
         var settingsStore = new JsonSettingsStore(JsonSettingsStore.DefaultPath);
         var settings = settingsStore.Load();

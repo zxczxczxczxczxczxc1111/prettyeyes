@@ -67,7 +67,22 @@ public class EmojiAnnotationTests
     [Fact]
     public void A_click_on_a_huge_selection_is_capped()
     {
-        Assert.Equal(EmojiTool.MaxSize, EmojiTool.DefaultSize(new CaptureRect(0, 0, 5120, 1440)));
+        // At the click's own ceiling, not the tool's: dragging and the wheel
+        // reach further, a click on a whole desktop should still be a mark.
+        Assert.Equal(EmojiTool.DefaultMaxSize, EmojiTool.DefaultSize(new CaptureRect(0, 0, 5120, 1440)));
+        Assert.True(EmojiTool.DefaultMaxSize < EmojiTool.MaxSize);
+    }
+
+    [Fact]
+    public void The_wheel_grows_a_glyph_up_to_the_tool_ceiling()
+    {
+        using var glyph = NewGlyph();
+
+        var annotation = new EmojiAnnotation(new CaptureRect(100, 100, EmojiTool.DefaultMaxSize, EmojiTool.DefaultMaxSize), glyph);
+        var grown = annotation.ResizedBy(1000);
+
+        Assert.NotNull(grown);
+        Assert.Equal(EmojiTool.MaxSize, grown!.Bounds.Width);
     }
 
     [Fact]
