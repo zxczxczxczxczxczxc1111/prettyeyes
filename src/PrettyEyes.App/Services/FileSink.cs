@@ -31,7 +31,11 @@ public sealed class FileSink : IImageSink
 
         try
         {
-            using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+            // Off the UI thread: the overlay is still on screen behind the
+            // dialog, and a full monitor of a detailed picture takes about a
+            // second to compress. Left here, that second is spent with the
+            // message loop stopped and the overlay unable to repaint.
+            using var data = await Task.Run(() => image.Encode(SKEncodedImageFormat.Png, 100), cancellationToken);
             await using var target = await file.OpenWriteAsync();
             data.SaveTo(target);
 
